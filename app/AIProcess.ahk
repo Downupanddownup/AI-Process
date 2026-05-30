@@ -232,6 +232,7 @@ OnMouseMove(wParam, lParam, msg, hwnd) {
 PromptForDirectory(*) {
     global CurrentDir
     defaultValue := CurrentDir != "" ? CurrentDir : ""
+    SetTimer(SetTopmostInputBox, 10)
     result := InputBox("请粘贴当前主题目录路径：", "设置目录", "w360 h140", defaultValue)
 
     if (result.Result != "OK") {
@@ -253,6 +254,14 @@ PromptForDirectory(*) {
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
     ShowFeedback("当前目录已切换")
+}
+
+SetTopmostInputBox() {
+    hwnd := WinExist("设置目录 ahk_class #32770")
+    if hwnd {
+        WinSetAlwaysOnTop(1, "ahk_id " hwnd)
+        WinActivate("ahk_id " hwnd)
+    }
 }
 
 UpdateCurrentPathDisplay() {
