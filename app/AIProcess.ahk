@@ -10,18 +10,16 @@ global SettingsFile := ConfigDir "\settings.ini"
 
 global AppConfig := Map()
 global CurrentDir := ""
-global PathSummaryHwnd := 0
 global PathInput := ""
-global PathSummary := ""
-global StatusText := ""
+global CurrentPathText := ""
 global OpenWithIdeaCheckbox := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
 global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
+global ViewPathButton := ""
 global MainGui := ""
-global HoverTooltipVisible := false
 
 EnsureDefaultFiles()
 LoadConfig()
@@ -32,7 +30,6 @@ if AppConfig["StartVisible"] {
     ShowMainWindow()
 }
 
-OnMessage(0x200, OnMouseMove)
 OnMessage(0x05, OnWindowSize)
 
 return
@@ -44,8 +41,8 @@ EnsureDefaultFiles() {
 
     if !FileExist(SettingsFile) {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
-        IniWrite("560", SettingsFile, "Window", "Width")
-        IniWrite("320", SettingsFile, "Window", "Height")
+        IniWrite("390", SettingsFile, "Window", "Width")
+        IniWrite("176", SettingsFile, "Window", "Height")
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
         IniWrite("1", SettingsFile, "Behavior", "StartVisible")
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
@@ -80,8 +77,8 @@ LoadConfig() {
     global AppConfig, SettingsFile
     AppConfig := Map()
     AppConfig["Hotkey"] := IniRead(SettingsFile, "App", "Hotkey", "F2")
-    AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "560") + 0
-    AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "320") + 0
+    AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "390") + 0
+    AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "176") + 0
     AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
@@ -99,9 +96,9 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, PathInput, PathSummary, StatusText, OpenWithIdeaCheckbox, AppConfig
+    global MainGui, PathInput, CurrentPathText, OpenWithIdeaCheckbox, AppConfig
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, PathSummaryHwnd
+    global CopyReplyPromptButton, CopyRelationsButton, ViewPathButton
 
     guiOptions := "+Resize -MaximizeBox +MinimizeBox"
     if AppConfig["AlwaysOnTop"] {
@@ -110,40 +107,37 @@ CreateMainGui() {
 
     MainGui := Gui(guiOptions, "AIProcess 快捷面板")
     MainGui.BackColor := "F7F7F7"
-    MainGui.MarginX := 12
-    MainGui.MarginY := 10
-    MainGui.SetFont("s9", "Microsoft YaHei UI")
+    MainGui.MarginX := 8
+    MainGui.MarginY := 8
+    MainGui.SetFont("s8", "Microsoft YaHei UI")
     MainGui.OnEvent("Close", HandleClose)
     MainGui.OnEvent("Escape", HideToTray)
 
-    MainGui.AddText("xm ym", "当前目录")
-    PathInput := MainGui.AddEdit("xm y+6 w420 vPathInput")
-    MainGui.AddButton("x+8 yp-1 w96", "定位切换").OnEvent("Click", ApplyCurrentDirectory)
+    CurrentPathText := MainGui.AddText("xm ym w285 h18 +0x200", "当前：未设置")
+    ViewPathButton := MainGui.AddButton("x+6 yp-2 w84 h22", "查看路径")
+    ViewPathButton.OnEvent("Click", ShowFullPath)
 
-    MainGui.AddText("xm y+12", "目录摘要")
-    PathSummary := MainGui.AddText("xm y+6 w520 h34 +0x200 Border vPathSummary", "未设置当前主题目录")
-    PathSummaryHwnd := PathSummary.Hwnd
+    PathInput := MainGui.AddEdit("xm y+6 w285 h22 vPathInput")
+    MainGui.AddButton("x+6 yp-1 w84 h24", "定位切换").OnEvent("Click", ApplyCurrentDirectory)
 
-    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+12", "创建后用 IDEA 打开文件")
+    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "创建后用 IDEA 打开")
     OpenWithIdeaCheckbox.Value := AppConfig["OpenWithIdea"] ? 1 : 0
     OpenWithIdeaCheckbox.OnEvent("Click", ToggleIdeaOpen)
 
-    CreateRequirementButton := MainGui.AddButton("xm y+16 w160 h30", "创建需求.txt")
+    CreateRequirementButton := MainGui.AddButton("xm y+8 w120 h24", "创建需求.txt")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
 
-    CopyRequirementPromptButton := MainGui.AddButton("x+12 yp w160 h30", "复制需求文件提示词")
+    CopyRequirementPromptButton := MainGui.AddButton("x+8 yp w120 h24", "复制需求提示词")
     CopyRequirementPromptButton.OnEvent("Click", CopyRequirementPrompt)
 
-    CreateReplyButton := MainGui.AddButton("x+12 yp w176 h30", "创建对vX的回复.txt")
+    CreateReplyButton := MainGui.AddButton("x+8 yp w126 h24", "创建对vX回复")
     CreateReplyButton.OnEvent("Click", CreateReplyFile)
 
-    CopyReplyPromptButton := MainGui.AddButton("xm y+12 w160 h30", "复制回复文件提示词")
+    CopyReplyPromptButton := MainGui.AddButton("xm y+8 w120 h24", "复制回复提示词")
     CopyReplyPromptButton.OnEvent("Click", CopyReplyPrompt)
 
-    CopyRelationsButton := MainGui.AddButton("x+12 yp w160 h30", "复制文件关系说明")
+    CopyRelationsButton := MainGui.AddButton("x+8 yp w120 h24", "复制关系说明")
     CopyRelationsButton.OnEvent("Click", CopyContextRelations)
-
-    StatusText := MainGui.AddText("xm y+16 w520 h44 +0x200 Border vStatusText", "就绪")
 
     SetControlsEnabled(false)
 }
@@ -213,60 +207,46 @@ OnWindowSize(wParam, lParam, msg, hwnd) {
     }
 }
 
-OnMouseMove(wParam, lParam, msg, hwnd) {
-    global HoverTooltipVisible, CurrentDir, PathSummaryHwnd
-
-    if (hwnd = PathSummaryHwnd && CurrentDir != "") {
-        ToolTip(CurrentDir)
-        HoverTooltipVisible := true
-        return
-    }
-
-    if HoverTooltipVisible {
-        ToolTip()
-        HoverTooltipVisible := false
-    }
-}
-
 ApplyCurrentDirectory(*) {
     global CurrentDir, PathInput
     rawPath := Trim(PathInput.Value)
     if rawPath = "" {
-        SetStatus("请先输入目录路径", true)
+        ShowFeedback("请先输入目录路径", true)
         return
     }
 
     if !DirExist(rawPath) {
-        SetStatus("路径不是有效目录", true)
+        ShowFeedback("路径不是有效目录", true)
         return
     }
 
     CurrentDir := NormalizePath(rawPath)
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
-    SetStatus("当前目录已切换到：" CurrentDir)
+    ShowFeedback("当前目录已切换")
 }
 
 UpdateCurrentPathDisplay() {
-    global CurrentDir, PathSummary
+    global CurrentDir, CurrentPathText
     if CurrentDir = "" {
-        PathSummary.Text := "未设置当前主题目录"
+        CurrentPathText.Text := "当前：未设置"
         return
     }
 
     split := StrSplit(CurrentDir, "\")
     dirName := split.Length ? split[split.Length] : CurrentDir
-    PathSummary.Text := dirName " | " TruncateMiddle(CurrentDir, 58)
+    CurrentPathText.Text := "当前：" dirName " | " TruncateMiddle(CurrentDir, 28)
 }
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton
+    global CopyReplyPromptButton, CopyRelationsButton, ViewPathButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
+    ViewPathButton.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -274,7 +254,7 @@ ToggleIdeaOpen(ctrl, *) {
     checked := ctrl.Value = 1
     AppConfig["OpenWithIdea"] := checked
     IniWrite(checked ? "1" : "0", SettingsFile, "Editor", "OpenWithIdea")
-    SetStatus(checked ? "已开启：创建后用 IDEA 打开文件" : "已关闭：创建后用 IDEA 打开文件")
+    ShowFeedback(checked ? "已开启 IDEA 打开" : "已关闭 IDEA 打开")
 }
 
 CreateRequirementFile(*) {
@@ -287,9 +267,9 @@ CreateRequirementFile(*) {
     existed := FileExist(filePath)
     if !existed {
         FileAppend("", filePath, "UTF-8")
-        SetStatus("已创建：需求.txt")
+        ShowFeedback("已创建：需求.txt")
     } else {
-        SetStatus("文件已存在：需求.txt", true)
+        ShowFeedback("文件已存在：需求.txt", true)
     }
 
     if AppConfig["OpenWithIdea"] {
@@ -305,7 +285,7 @@ CreateReplyFile(*) {
 
     latestVersion := GetLatestVersionNumber(CurrentDir)
     if (latestVersion = 0) {
-        SetStatus("当前目录下未找到 vX.md 文件", true)
+        ShowFeedback("当前目录下未找到 vX.md 文件", true)
         return
     }
 
@@ -313,9 +293,9 @@ CreateReplyFile(*) {
     existed := FileExist(replyPath)
     if !existed {
         FileAppend("", replyPath, "UTF-8")
-        SetStatus("已创建：" ExtractFileName(replyPath))
+        ShowFeedback("已创建：" ExtractFileName(replyPath))
     } else {
-        SetStatus("文件已存在：" ExtractFileName(replyPath), true)
+        ShowFeedback("文件已存在：" ExtractFileName(replyPath), true)
     }
 
     if AppConfig["OpenWithIdea"] {
@@ -332,7 +312,7 @@ CopyRequirementPrompt(*) {
     content := LoadTemplate("requirement_prompt.txt")
     content := StrReplace(content, "{{filePath}}", CurrentDir "\需求.txt")
     A_Clipboard := content
-    SetStatus("需求提示词已复制到剪贴板")
+    ShowFeedback("需求提示词已复制")
 }
 
 CopyReplyPrompt(*) {
@@ -343,7 +323,7 @@ CopyReplyPrompt(*) {
 
     latestVersion := GetLatestVersionNumber(CurrentDir)
     if (latestVersion = 0) {
-        SetStatus("当前目录下未找到 vX.md 文件", true)
+        ShowFeedback("当前目录下未找到 vX.md 文件", true)
         return
     }
 
@@ -353,7 +333,7 @@ CopyReplyPrompt(*) {
     content := StrReplace(content, "{{filePath}}", currentReplyFile)
     content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
     A_Clipboard := content
-    SetStatus("回复提示词已复制到剪贴板")
+    ShowFeedback("回复提示词已复制")
 }
 
 CopyContextRelations(*) {
@@ -363,13 +343,13 @@ CopyContextRelations(*) {
 
     content := LoadTemplate("context_relation.txt")
     A_Clipboard := content
-    SetStatus("文件关系说明已复制到剪贴板")
+    ShowFeedback("文件关系说明已复制")
 }
 
 EnsureCurrentDirectory() {
     global CurrentDir
     if CurrentDir = "" {
-        SetStatus("请先设置当前主题目录", true)
+        ShowFeedback("请先设置当前主题目录", true)
         return false
     }
     return true
@@ -380,14 +360,26 @@ OpenFileInIdea(filePath) {
     try {
         Run('"' AppConfig["IdeaCommand"] '" "' filePath '"')
     } catch Error {
-        SetStatus("IDEA 打开失败，请检查 settings.ini 中的 IdeaCommand", true)
+        ShowFeedback("IDEA 打开失败，请检查 settings.ini 中的 IdeaCommand", true)
     }
 }
 
-SetStatus(message, isError := false) {
-    global StatusText
-    prefix := isError ? "错误：" : "提示："
-    StatusText.Text := prefix " " message
+ShowFeedback(message, isError := false) {
+    if isError {
+        MsgBox(message, "AIProcess", "Iconx T3")
+        return
+    }
+    ToolTip(message)
+    SetTimer(() => ToolTip(), -1200)
+}
+
+ShowFullPath(*) {
+    global CurrentDir
+    if CurrentDir = "" {
+        ShowFeedback("请先设置当前主题目录", true)
+        return
+    }
+    MsgBox(CurrentDir, "当前完整路径", "Iconi")
 }
 
 LoadTemplate(fileName) {
