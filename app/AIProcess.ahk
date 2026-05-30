@@ -19,6 +19,7 @@ global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
 global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
+global CopyDiscussButton := ""
 global MainGui := ""
 global HoverTooltipVisible := false
 
@@ -101,7 +102,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, AppConfig
     global SetDirectoryButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton
+    global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton
 
     guiOptions := "+Resize -MaximizeBox +MinimizeBox"
     if AppConfig["AlwaysOnTop"] {
@@ -141,6 +142,9 @@ CreateMainGui() {
 
     CopyRelationsButton := MainGui.AddButton("xm y+6 w90 h24", "复关系")
     CopyRelationsButton.OnEvent("Click", CopyContextRelations)
+
+    CopyDiscussButton := MainGui.AddButton("x+6 yp w90 h24", "先别改")
+    CopyDiscussButton.OnEvent("Click", CopyDiscussPrompt)
 
     SetControlsEnabled(false)
 }
@@ -265,12 +269,13 @@ UpdateCurrentPathDisplay() {
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton
+    global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
+    CopyDiscussButton.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -368,6 +373,11 @@ CopyContextRelations(*) {
     content := BuildContextRelationsText()
     A_Clipboard := content
     ShowFeedback("文件关系说明已复制")
+}
+
+CopyDiscussPrompt(*) {
+    A_Clipboard := "先别改，谈谈"
+    ShowFeedback("已复制：先别改，谈谈")
 }
 
 EnsureCurrentDirectory() {
