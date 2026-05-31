@@ -13,6 +13,7 @@ global CurrentDir := ""
 global CurrentPathText := ""
 global CurrentPathHwnd := 0
 global OpenWithIdeaCheckbox := ""
+global NoModifyPromptCheckbox := ""
 global SetDirectoryButton := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
@@ -51,7 +52,12 @@ EnsureDefaultFiles() {
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
         IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
+        IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
+    }
+
+    if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
+        IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
     }
 
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
@@ -74,6 +80,13 @@ EnsureDefaultFiles() {
         "当前目录中的 需求.txt 是原始需求说明；vX.md 是 AI 沟通过程中的版本文档；对vX的回复.txt 是用户对对应版本的回复；实施文档.md 是整个需求沟通收敛后的最终结论文件，也是后续正式实施时最重要的执行依据。这些文件按时间顺序构成完整沟通过程。新会话接管时，应优先阅读这些文件并完成上下文重建。"
         , relationTemplate, "UTF-8")
     }
+
+    noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
+    if !FileExist(noModifyTemplate) {
+        FileAppend(
+        "补充约束：当前阶段不要修改正式代码，不要修改已有正式文件。你可以按当前要求创建新的 vX.md 或 实施文档.md；如果你认为需要进入正式修改阶段，请先明确说明并等待确认。"
+        , noModifyTemplate, "UTF-8")
+    }
 }
 
 LoadConfig() {
@@ -87,6 +100,7 @@ LoadConfig() {
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
     AppConfig["OpenWithIdea"] := IniRead(SettingsFile, "Editor", "OpenWithIdea", "1") = "1"
+    AppConfig["AppendNoModifyPrompt"] := IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "1") = "1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
 }
 
@@ -99,7 +113,7 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, AppConfig
     global SetDirectoryButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton
@@ -124,9 +138,13 @@ CreateMainGui() {
     SetDirectoryButton := MainGui.AddButton("x+6 yp-2 w48 h22", "设目录")
     SetDirectoryButton.OnEvent("Click", PromptForDirectory)
 
-    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "创建后用 IDEA 打开")
+    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "用IDEA开")
     OpenWithIdeaCheckbox.Value := AppConfig["OpenWithIdea"] ? 1 : 0
     OpenWithIdeaCheckbox.OnEvent("Click", ToggleIdeaOpen)
+
+    NoModifyPromptCheckbox := MainGui.AddCheckbox("x+10 yp", "禁改正式")
+    NoModifyPromptCheckbox.Value := AppConfig["AppendNoModifyPrompt"] ? 1 : 0
+    NoModifyPromptCheckbox.OnEvent("Click", ToggleNoModifyPrompt)
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w90 h24", "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
@@ -295,6 +313,14 @@ ToggleIdeaOpen(ctrl, *) {
     ShowFeedback(checked ? "已开启 IDEA 打开" : "已关闭 IDEA 打开")
 }
 
+ToggleNoModifyPrompt(ctrl, *) {
+    global AppConfig, SettingsFile
+    checked := ctrl.Value = 1
+    AppConfig["AppendNoModifyPrompt"] := checked
+    IniWrite(checked ? "1" : "0", SettingsFile, "Prompt", "AppendNoModifyPrompt")
+    ShowFeedback(checked ? "已开启禁改正式" : "已关闭禁改正式")
+}
+
 CreateRequirementFile(*) {
     global CurrentDir, AppConfig
     if !EnsureCurrentDirectory() {
@@ -349,6 +375,7 @@ CopyRequirementPrompt(*) {
 
     content := LoadTemplate("requirement_prompt.txt")
     content := StrReplace(content, "{{filePath}}", CurrentDir "\需求.txt")
+    content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("需求提示词已复制")
 }
@@ -370,6 +397,7 @@ CopyReplyPrompt(*) {
     content := LoadTemplate("reply_prompt.txt")
     content := StrReplace(content, "{{filePath}}", currentReplyFile)
     content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
+    content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("回复提示词已复制")
 }
@@ -380,6 +408,7 @@ CopyContextRelations(*) {
     }
 
     content := BuildContextRelationsText()
+    content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("文件关系说明已复制")
 }
@@ -432,6 +461,21 @@ LoadTemplate(fileName) {
         throw Error("模板文件不存在：" path)
     }
     return FileRead(path, "UTF-8")
+}
+
+AppendNoModifyPromptIfNeeded(content) {
+    global AppConfig
+    if !AppConfig["AppendNoModifyPrompt"] {
+        return content
+    }
+
+    extraPrompt := Trim(LoadTemplate("no_modify_prompt.txt"), "`r`n `t")
+    if (extraPrompt = "") {
+        return content
+    }
+
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n`r`n" extraPrompt
 }
 
 BuildContextRelationsText() {
