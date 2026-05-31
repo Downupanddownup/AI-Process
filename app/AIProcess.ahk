@@ -12,6 +12,8 @@ global AppConfig := Map()
 global CurrentDir := ""
 global CurrentPathText := ""
 global CurrentPathHwnd := 0
+global DirectoryDialog := ""
+global DirectoryDialogEdit := ""
 global OpenWithIdeaCheckbox := ""
 global NoModifyPromptCheckbox := ""
 global SetDirectoryButton := ""
@@ -248,16 +250,67 @@ OnMouseMove(wParam, lParam, msg, hwnd) {
 }
 
 PromptForDirectory(*) {
-    global CurrentDir
-    defaultValue := CurrentDir != "" ? CurrentDir : ""
-    SetTimer(SetTopmostInputBox, 10)
-    result := InputBox("请粘贴当前主题目录路径：", "设置目录", "w360 h140", defaultValue)
-
-    if (result.Result != "OK") {
+    global CurrentDir, DirectoryDialog, DirectoryDialogEdit, MainGui
+    if DirectoryDialog {
+        DirectoryDialog.Show()
+        WinActivate("ahk_id " DirectoryDialog.Hwnd)
         return
     }
 
-    rawPath := Trim(result.Value)
+    defaultValue := CurrentDir != "" ? CurrentDir : ""
+    ownerHwnd := MainGui ? MainGui.Hwnd : 0
+    dialogOptions := "+AlwaysOnTop +ToolWindow"
+    if ownerHwnd {
+        dialogOptions .= " +Owner" ownerHwnd
+    }
+
+    DirectoryDialog := Gui(dialogOptions, "设置目录")
+    DirectoryDialog.BackColor := "F7F7F7"
+    DirectoryDialog.MarginX := 12
+    DirectoryDialog.MarginY := 10
+    DirectoryDialog.SetFont("s8", "Microsoft YaHei UI")
+    DirectoryDialog.OnEvent("Close", CloseDirectoryDialog)
+    DirectoryDialog.OnEvent("Escape", CloseDirectoryDialog)
+
+    DirectoryDialog.AddText("xm ym w336 h18", "当前主题目录")
+    DirectoryDialogEdit := DirectoryDialog.AddEdit("xm y+6 w336 h24", defaultValue)
+
+    okButton := DirectoryDialog.AddButton("xm y+10 w72 h24 Default", "确定")
+    okButton.OnEvent("Click", SubmitDirectoryDialog)
+
+    cancelButton := DirectoryDialog.AddButton("x+8 yp w72 h24", "取消")
+    cancelButton.OnEvent("Click", CloseDirectoryDialog)
+
+    ShowDirectoryDialog()
+    DirectoryDialogEdit.Focus()
+}
+
+ShowDirectoryDialog() {
+    global DirectoryDialog, MainGui
+    if !DirectoryDialog {
+        return
+    }
+
+    width := 360
+    height := 104
+    if MainGui {
+        WinGetPos(&mainX, &mainY, &mainW, &mainH, "ahk_id " MainGui.Hwnd)
+        x := mainX + Floor((mainW - width) / 2)
+        y := mainY + Floor((mainH - height) / 2)
+        DirectoryDialog.Show("w" width " h" height " x" x " y" y)
+        return
+    }
+
+    DirectoryDialog.Show("w" width " h" height)
+}
+
+SubmitDirectoryDialog(*) {
+    global CurrentDir, DirectoryDialog, DirectoryDialogEdit
+    if !DirectoryDialog {
+        return
+    }
+
+    rawPath := Trim(DirectoryDialogEdit.Value)
     if rawPath = "" {
         ShowFeedback("请先输入目录路径", true)
         return
@@ -271,15 +324,19 @@ PromptForDirectory(*) {
     CurrentDir := NormalizePath(rawPath)
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
+    CloseDirectoryDialog()
     ShowFeedback("当前目录已切换")
 }
 
-SetTopmostInputBox() {
-    hwnd := WinExist("设置目录 ahk_class #32770")
-    if hwnd {
-        WinSetAlwaysOnTop(1, "ahk_id " hwnd)
-        WinActivate("ahk_id " hwnd)
+CloseDirectoryDialog(*) {
+    global DirectoryDialog, DirectoryDialogEdit
+    if !DirectoryDialog {
+        return
     }
+
+    DirectoryDialog.Destroy()
+    DirectoryDialog := ""
+    DirectoryDialogEdit := ""
 }
 
 UpdateCurrentPathDisplay() {
