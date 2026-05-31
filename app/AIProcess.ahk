@@ -16,6 +16,7 @@ global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
 global OpenWithIdeaCheckbox := ""
 global NoModifyPromptCheckbox := ""
+global ReplyImplementationTailCheckbox := ""
 global SetDirectoryButton := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
@@ -72,8 +73,15 @@ EnsureDefaultFiles() {
     replyTemplate := TemplateDir "\reply_prompt.txt"
     if !FileExist(replyTemplate) {
         FileAppend(
-        "这是一个回复文件，请你查看这个文件：{{filePath}}。如果你还有新的想法或问题，请创建 {{nextVersionFile}}；如果没有新的问题，请创建 实施文档.md。"
+        "这是一个回复文件，请你查看这个文件：{{filePath}}。如果你还有新的想法或问题，请创建 {{nextVersionFile}}。"
         , replyTemplate, "UTF-8")
+    }
+
+    replyImplementationTailTemplate := TemplateDir "\reply_prompt_impl_tail.txt"
+    if !FileExist(replyImplementationTailTemplate) {
+        FileAppend(
+        "如果没有新的问题，请创建 实施文档.md。"
+        , replyImplementationTailTemplate, "UTF-8")
     }
 
     relationTemplate := TemplateDir "\context_relation.txt"
@@ -115,10 +123,13 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AppConfig
     global SetDirectoryButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton
+    actionButtonWidth := 60
+    actionButtonHeight := 24
+    actionGap := 6
 
     guiOptions := "+Resize -MaximizeBox +MinimizeBox"
     if AppConfig["AlwaysOnTop"] {
@@ -148,22 +159,24 @@ CreateMainGui() {
     NoModifyPromptCheckbox.Value := AppConfig["AppendNoModifyPrompt"] ? 1 : 0
     NoModifyPromptCheckbox.OnEvent("Click", ToggleNoModifyPrompt)
 
-    CreateRequirementButton := MainGui.AddButton("xm y+8 w90 h24", "建需求")
+    CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
 
-    CopyRequirementPromptButton := MainGui.AddButton("x+6 yp w90 h24", "复需求")
+    CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
     CopyRequirementPromptButton.OnEvent("Click", CopyRequirementPrompt)
 
-    CreateReplyButton := MainGui.AddButton("xm y+6 w90 h24", "建回复")
+    CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
     CreateReplyButton.OnEvent("Click", CreateReplyFile)
 
-    CopyReplyPromptButton := MainGui.AddButton("x+6 yp w90 h24", "复回复")
+    CopyReplyPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复回复")
     CopyReplyPromptButton.OnEvent("Click", CopyReplyPrompt)
 
-    CopyRelationsButton := MainGui.AddButton("xm y+6 w90 h24", "复关系")
+    ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
+
+    CopyRelationsButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "复关系")
     CopyRelationsButton.OnEvent("Click", CopyContextRelations)
 
-    CopyDiscussButton := MainGui.AddButton("x+6 yp w90 h24", "先别改")
+    CopyDiscussButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "先别改")
     CopyDiscussButton.OnEvent("Click", CopyDiscussPrompt)
 
     SetControlsEnabled(false)
@@ -353,11 +366,12 @@ UpdateCurrentPathDisplay() {
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton
+    global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton, ReplyImplementationTailCheckbox
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
+    ReplyImplementationTailCheckbox.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
     CopyDiscussButton.Enabled := enabled
 }
@@ -454,6 +468,7 @@ CopyReplyPrompt(*) {
     content := LoadTemplate("reply_prompt.txt")
     content := StrReplace(content, "{{filePath}}", currentReplyFile)
     content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
+    content := AppendReplyImplementationTailIfNeeded(content)
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("回复提示词已复制")
@@ -533,6 +548,21 @@ AppendNoModifyPromptIfNeeded(content) {
 
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n`r`n" extraPrompt
+}
+
+AppendReplyImplementationTailIfNeeded(content) {
+    global ReplyImplementationTailCheckbox
+    if !ReplyImplementationTailCheckbox || ReplyImplementationTailCheckbox.Value != 1 {
+        return content
+    }
+
+    tailContent := Trim(LoadTemplate("reply_prompt_impl_tail.txt"), "`r`n `t")
+    if (tailContent = "") {
+        return content
+    }
+
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n" tailContent
 }
 
 BuildContextRelationsText() {
