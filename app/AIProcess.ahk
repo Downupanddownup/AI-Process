@@ -23,7 +23,8 @@ global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
 global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
-global CopyDiscussButton := ""
+global CopyExecuteButton := ""
+global ExecuteStepCheckbox := ""
 global MainGui := ""
 global HoverTooltipVisible := false
 
@@ -91,6 +92,20 @@ EnsureDefaultFiles() {
         , relationTemplate, "UTF-8")
     }
 
+    executeTemplate := TemplateDir "\execute_prompt.txt"
+    if !FileExist(executeTemplate) {
+        FileAppend(
+        "请你根据当前的实施文档：{{filePath}}，修改正式代码和文件，完成整个方案的落地。"
+        , executeTemplate, "UTF-8")
+    }
+
+    executeStepTemplate := TemplateDir "\execute_step_prompt.txt"
+    if !FileExist(executeStepTemplate) {
+        FileAppend(
+        "请你查看当前的实施文档：{{filePath}}。`n`n请先判断该方案的内容复杂度，是否需要拆解为多个实施步骤：`n- 如果不需要拆解，请直接修改正式代码和文件，完成整个方案的落地。`n- 如果需要拆解，请在当前目录下创建【实施步骤】目录，按照合理的执行顺序为每个步骤创建 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。不要在未获得我确认前直接修改正式代码。"
+        , executeStepTemplate, "UTF-8")
+    }
+
     noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
     if !FileExist(noModifyTemplate) {
         FileAppend(
@@ -126,7 +141,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AppConfig
     global SetDirectoryButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStepCheckbox
     actionButtonWidth := 60
     actionButtonHeight := 24
     actionGap := 6
@@ -176,8 +191,10 @@ CreateMainGui() {
     CopyRelationsButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "复关系")
     CopyRelationsButton.OnEvent("Click", CopyContextRelations)
 
-    CopyDiscussButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "先别改")
-    CopyDiscussButton.OnEvent("Click", CopyDiscussPrompt)
+    CopyExecuteButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复执行")
+    CopyExecuteButton.OnEvent("Click", CopyExecutePrompt)
+
+    ExecuteStepCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18", "步")
 
     SetControlsEnabled(false)
 }
@@ -366,14 +383,15 @@ UpdateCurrentPathDisplay() {
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyDiscussButton, ReplyImplementationTailCheckbox
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStepCheckbox, ReplyImplementationTailCheckbox
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
     ReplyImplementationTailCheckbox.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
-    CopyDiscussButton.Enabled := enabled
+    CopyExecuteButton.Enabled := enabled
+    ExecuteStepCheckbox.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -485,9 +503,29 @@ CopyContextRelations(*) {
     ShowFeedback("文件关系说明已复制")
 }
 
-CopyDiscussPrompt(*) {
-    A_Clipboard := "先别改，谈谈"
-    ShowFeedback("已复制：先别改，谈谈")
+CopyExecutePrompt(*) {
+    global CurrentDir, ExecuteStepCheckbox
+    if !EnsureCurrentDirectory() {
+        return
+    }
+
+    implementationPath := CurrentDir "\实施文档.md"
+    if !FileExist(implementationPath) {
+        ShowFeedback("当前目录下未找到 实施文档.md", true)
+        return
+    }
+
+    if ExecuteStepCheckbox.Value = 1 {
+        content := LoadTemplate("execute_step_prompt.txt")
+        feedbackMsg := "步骤模式提示词已复制"
+    } else {
+        content := LoadTemplate("execute_prompt.txt")
+        feedbackMsg := "执行提示词已复制"
+    }
+
+    content := StrReplace(content, "{{filePath}}", implementationPath)
+    A_Clipboard := content
+    ShowFeedback(feedbackMsg)
 }
 
 EnsureCurrentDirectory() {
