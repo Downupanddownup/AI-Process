@@ -24,9 +24,15 @@ global CreateReplyButton := ""
 global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
 global CopyExecuteButton := ""
-global ExecuteStepCheckbox := ""
+global ExecuteStrategyDropdown := ""
 global MainGui := ""
 global HoverTooltipVisible := false
+global ExecuteStrategies := [
+    Map("key", "direct", "label", "直接", "template", "execute\direct.txt", "feedback", "执行提示词已复制"),
+    Map("key", "ai_judge", "label", "AI判", "template", "execute\ai_judge.txt", "feedback", "AI判断提示词已复制"),
+    Map("key", "steps_file", "label", "步文", "template", "execute\steps_file.txt", "feedback", "步骤文档提示词已复制"),
+    Map("key", "steps_dir", "label", "步目", "template", "execute\steps_dir.txt", "feedback", "步骤目录提示词已复制")
+]
 
 EnsureDefaultFiles()
 LoadConfig()
@@ -46,6 +52,8 @@ EnsureDefaultFiles() {
     global ConfigDir, TemplateDir, SettingsFile
     DirCreate(ConfigDir)
     DirCreate(TemplateDir)
+    executeTemplateDir := TemplateDir "\execute"
+    DirCreate(executeTemplateDir)
 
     if !FileExist(SettingsFile) {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
@@ -92,18 +100,32 @@ EnsureDefaultFiles() {
         , relationTemplate, "UTF-8")
     }
 
-    executeTemplate := TemplateDir "\execute_prompt.txt"
-    if !FileExist(executeTemplate) {
+    executeDirectTemplate := executeTemplateDir "\direct.txt"
+    if !FileExist(executeDirectTemplate) {
         FileAppend(
         "请你根据当前的实施文档：{{filePath}}，修改正式代码和文件，完成整个方案的落地。"
-        , executeTemplate, "UTF-8")
+        , executeDirectTemplate, "UTF-8")
     }
 
-    executeStepTemplate := TemplateDir "\execute_step_prompt.txt"
-    if !FileExist(executeStepTemplate) {
+    executeAiJudgeTemplate := executeTemplateDir "\ai_judge.txt"
+    if !FileExist(executeAiJudgeTemplate) {
         FileAppend(
-        "请你查看当前的实施文档：{{filePath}}。`n`n请先判断该方案的内容复杂度，是否需要拆解为多个实施步骤：`n- 如果不需要拆解，请直接修改正式代码和文件，完成整个方案的落地。`n- 如果需要拆解，请在当前目录下创建【实施步骤】目录，按照合理的执行顺序为每个步骤创建 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。不要在未获得我确认前直接修改正式代码。"
-        , executeStepTemplate, "UTF-8")
+        "请你查看当前的实施文档：{{filePath}}。`n`n请先判断该方案的内容复杂度，是否需要拆解为多个实施步骤：`n- 如果不需要拆解，请直接修改正式代码和文件，完成整个方案的落地。`n- 如果需要拆解，请在当前目录下按照合理的执行顺序创建多个步骤 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。不要进入步骤目录模式，也不要在未获得我确认前直接修改正式代码。"
+        , executeAiJudgeTemplate, "UTF-8")
+    }
+
+    executeStepsFileTemplate := executeTemplateDir "\steps_file.txt"
+    if !FileExist(executeStepsFileTemplate) {
+        FileAppend(
+        "请你查看当前的实施文档：{{filePath}}。`n`n请不要直接修改正式代码。请在当前目录下按照合理的执行顺序创建多个步骤 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。"
+        , executeStepsFileTemplate, "UTF-8")
+    }
+
+    executeStepsDirTemplate := executeTemplateDir "\steps_dir.txt"
+    if !FileExist(executeStepsDirTemplate) {
+        FileAppend(
+        "请你查看当前的实施文档：{{filePath}}。`n`n请不要直接修改正式代码。请在当前目录下按照合理的执行顺序创建多个步骤目录，目录名格式如 01-xxx、02-xxx 等，并在每个目录中创建一个与目录同名的 md 文档（例如 01-xxx\\01-xxx.md）。确保所有步骤目录和文档合起来覆盖实施文档的全部内容。写完后请先停下来，告诉我已经写好，等待我验收。"
+        , executeStepsDirTemplate, "UTF-8")
     }
 
     noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
@@ -141,7 +163,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AppConfig
     global SetDirectoryButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStepCheckbox
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
     actionButtonWidth := 60
     actionButtonHeight := 24
     actionGap := 6
@@ -194,7 +216,9 @@ CreateMainGui() {
     CopyExecuteButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复执行")
     CopyExecuteButton.OnEvent("Click", CopyExecutePrompt)
 
-    ExecuteStepCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18", "步")
+    executeStrategyOptions := BuildExecuteStrategyOptions()
+    ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w44", executeStrategyOptions)
+    ExecuteStrategyDropdown.Choose(1)
 
     SetControlsEnabled(false)
 }
@@ -383,7 +407,7 @@ UpdateCurrentPathDisplay() {
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStepCheckbox, ReplyImplementationTailCheckbox
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -391,7 +415,7 @@ SetControlsEnabled(enabled) {
     ReplyImplementationTailCheckbox.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
     CopyExecuteButton.Enabled := enabled
-    ExecuteStepCheckbox.Enabled := enabled
+    ExecuteStrategyDropdown.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -504,7 +528,7 @@ CopyContextRelations(*) {
 }
 
 CopyExecutePrompt(*) {
-    global CurrentDir, ExecuteStepCheckbox
+    global CurrentDir, ExecuteStrategyDropdown
     if !EnsureCurrentDirectory() {
         return
     }
@@ -515,17 +539,12 @@ CopyExecutePrompt(*) {
         return
     }
 
-    if ExecuteStepCheckbox.Value = 1 {
-        content := LoadTemplate("execute_step_prompt.txt")
-        feedbackMsg := "步骤模式提示词已复制"
-    } else {
-        content := LoadTemplate("execute_prompt.txt")
-        feedbackMsg := "执行提示词已复制"
-    }
-
+    selectedStrategy := GetSelectedExecuteStrategy()
+    strategyMeta := GetExecuteStrategyMeta(selectedStrategy)
+    content := LoadTemplate(strategyMeta["template"])
     content := StrReplace(content, "{{filePath}}", implementationPath)
     A_Clipboard := content
-    ShowFeedback(feedbackMsg)
+    ShowFeedback(strategyMeta["feedback"])
 }
 
 EnsureCurrentDirectory() {
@@ -571,6 +590,34 @@ LoadTemplate(fileName) {
         throw Error("模板文件不存在：" path)
     }
     return FileRead(path, "UTF-8")
+}
+
+BuildExecuteStrategyOptions() {
+    global ExecuteStrategies
+    options := []
+    for strategy in ExecuteStrategies {
+        options.Push(strategy["label"])
+    }
+    return options
+}
+
+GetSelectedExecuteStrategy() {
+    global ExecuteStrategyDropdown, ExecuteStrategies
+    selectedIndex := ExecuteStrategyDropdown.Value
+    if (selectedIndex < 1 || selectedIndex > ExecuteStrategies.Length) {
+        return ExecuteStrategies[1]["key"]
+    }
+    return ExecuteStrategies[selectedIndex]["key"]
+}
+
+GetExecuteStrategyMeta(strategyKey) {
+    global ExecuteStrategies
+    for strategy in ExecuteStrategies {
+        if (strategy["key"] = strategyKey) {
+            return strategy
+        }
+    }
+    return ExecuteStrategies[1]
 }
 
 AppendNoModifyPromptIfNeeded(content) {
