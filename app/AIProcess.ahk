@@ -63,7 +63,7 @@ EnsureDefaultFiles() {
     if !FileExist(SettingsFile) {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
         IniWrite("210", SettingsFile, "Window", "Width")
-        IniWrite("182", SettingsFile, "Window", "Height")
+        IniWrite("150", SettingsFile, "Window", "Height")
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
         IniWrite("1", SettingsFile, "Behavior", "StartVisible")
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
@@ -146,7 +146,7 @@ LoadConfig() {
     AppConfig := Map()
     AppConfig["Hotkey"] := IniRead(SettingsFile, "App", "Hotkey", "F2")
     AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
-    AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "182") + 0
+    AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
     AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
@@ -229,7 +229,7 @@ CreateMainGui() {
 
     executeStrategyOptions := BuildExecuteStrategyOptions()
     ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w44", executeStrategyOptions)
-    ExecuteStrategyDropdown.Choose(1)
+    ExecuteStrategyDropdown.Choose(2)
 
     SetControlsEnabled(false)
     RefreshDirectoryStateUI()
