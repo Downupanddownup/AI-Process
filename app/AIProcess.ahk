@@ -12,12 +12,15 @@ global AppConfig := Map()
 global CurrentDir := ""
 global CurrentPathText := ""
 global CurrentPathHwnd := 0
+global CurrentDirStateMark := ""
 global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
 global OpenWithIdeaCheckbox := ""
 global NoModifyPromptCheckbox := ""
 global ReplyImplementationTailCheckbox := ""
 global SetDirectoryButton := ""
+global ReturnParentButton := ""
+global CreateIssueButton := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
@@ -27,6 +30,8 @@ global CopyExecuteButton := ""
 global ExecuteStrategyDropdown := ""
 global MainGui := ""
 global HoverTooltipVisible := false
+global ResultIssueRootName := "结果微调"
+global ResultIssueStateMark := "↳"
 global ExecuteStrategies := [
     Map("key", "direct", "label", "直接", "template", "execute\direct.txt", "feedback", "执行提示词已复制"),
     Map("key", "ai_judge", "label", "AI判", "template", "execute\ai_judge.txt", "feedback", "AI判断提示词已复制"),
@@ -160,8 +165,8 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AppConfig
-    global SetDirectoryButton
+    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AppConfig
+    global SetDirectoryButton, ReturnParentButton, CreateIssueButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
     actionButtonWidth := 60
@@ -181,12 +186,15 @@ CreateMainGui() {
     MainGui.OnEvent("Close", HandleClose)
     MainGui.OnEvent("Escape", HideToTray)
 
-    CurrentPathText := MainGui.AddText("xm ym w140 h18 +0x200", "当前：未设置")
+    CurrentPathText := MainGui.AddText("xm ym+2 w66 h18 +0x200", "当前：未设置")
     CurrentPathText.OnEvent("Click", ShowFullPath)
     CurrentPathHwnd := CurrentPathText.Hwnd
+    CurrentDirStateMark := MainGui.AddText("x+2 yp w10 h18 +0x200", "")
 
-    SetDirectoryButton := MainGui.AddButton("x+6 yp-2 w48 h22", "设目录")
+    SetDirectoryButton := MainGui.AddButton("x+6 yp-1 w44 h22", "设目录")
     SetDirectoryButton.OnEvent("Click", PromptForDirectory)
+    ReturnParentButton := MainGui.AddButton("x+4 yp w44 h22 Hidden", "返")
+    ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
 
     OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "用IDEA开")
     OpenWithIdeaCheckbox.Value := AppConfig["OpenWithIdea"] ? 1 : 0
@@ -195,6 +203,9 @@ CreateMainGui() {
     NoModifyPromptCheckbox := MainGui.AddCheckbox("x+10 yp", "禁改正式")
     NoModifyPromptCheckbox.Value := AppConfig["AppendNoModifyPrompt"] ? 1 : 0
     NoModifyPromptCheckbox.OnEvent("Click", ToggleNoModifyPrompt)
+
+    CreateIssueButton := MainGui.AddButton("x+4 yp w44 h22", "建问题")
+    CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
@@ -221,6 +232,7 @@ CreateMainGui() {
     ExecuteStrategyDropdown.Choose(1)
 
     SetControlsEnabled(false)
+    RefreshDirectoryStateUI()
 }
 
 RegisterGlobalHotkey() {
@@ -378,6 +390,7 @@ SubmitDirectoryDialog(*) {
     CurrentDir := NormalizePath(rawPath)
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
+    RefreshDirectoryStateUI()
     CloseDirectoryDialog()
     ShowFeedback("当前目录已切换")
 }
@@ -394,20 +407,22 @@ CloseDirectoryDialog(*) {
 }
 
 UpdateCurrentPathDisplay() {
-    global CurrentDir, CurrentPathText
+    global CurrentDir, CurrentPathText, CurrentDirStateMark, ResultIssueStateMark
     if CurrentDir = "" {
         CurrentPathText.Text := "当前：未设置"
+        CurrentDirStateMark.Text := ""
         return
     }
 
     split := StrSplit(CurrentDir, "\")
     dirName := split.Length ? split[split.Length] : CurrentDir
     CurrentPathText.Text := "当前：" dirName
+    CurrentDirStateMark.Text := IsResultIssueDir(CurrentDir) ? ResultIssueStateMark : ""
 }
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -416,6 +431,8 @@ SetControlsEnabled(enabled) {
     CopyRelationsButton.Enabled := enabled
     CopyExecuteButton.Enabled := enabled
     ExecuteStrategyDropdown.Enabled := enabled
+    CreateIssueButton.Enabled := enabled
+    ReturnParentButton.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -583,6 +600,28 @@ ShowFullPath(*) {
     MsgBox(CurrentDir, "当前完整路径", "Iconi")
 }
 
+RefreshDirectoryStateUI() {
+    global CurrentDir, SetDirectoryButton, ReturnParentButton, CreateIssueButton, CurrentDirStateMark
+
+    if !SetDirectoryButton || !ReturnParentButton || !CreateIssueButton || !CurrentDirStateMark {
+        return
+    }
+
+    if (CurrentDir = "") {
+        SetDirectoryButton.Visible := true
+        ReturnParentButton.Visible := false
+        CreateIssueButton.Visible := false
+        CurrentDirStateMark.Visible := false
+        return
+    }
+
+    isIssueDir := IsResultIssueDir(CurrentDir)
+    SetDirectoryButton.Visible := !isIssueDir
+    ReturnParentButton.Visible := isIssueDir
+    CreateIssueButton.Visible := !isIssueDir
+    CurrentDirStateMark.Visible := isIssueDir
+}
+
 LoadTemplate(fileName) {
     global TemplateDir
     path := TemplateDir "\" fileName
@@ -618,6 +657,90 @@ GetExecuteStrategyMeta(strategyKey) {
         }
     }
     return ExecuteStrategies[1]
+}
+
+CreateAndEnterIssueDir(*) {
+    global CurrentDir, ResultIssueRootName
+    if !EnsureCurrentDirectory() {
+        return
+    }
+
+    if IsResultIssueDir(CurrentDir) {
+        ShowFeedback("请先返回主题目录", true)
+        return
+    }
+
+    issueRoot := GetResultIssueRoot(CurrentDir)
+    DirCreate(issueRoot)
+    nextIssueDirName := GetNextIssueDirName(issueRoot)
+    nextIssueDirPath := issueRoot "\" nextIssueDirName
+    DirCreate(nextIssueDirPath)
+
+    CurrentDir := nextIssueDirPath
+    UpdateCurrentPathDisplay()
+    RefreshDirectoryStateUI()
+    ShowFeedback("已进入问题目录：" nextIssueDirName)
+}
+
+ReturnToThemeDir(*) {
+    global CurrentDir
+    if !EnsureCurrentDirectory() {
+        return
+    }
+
+    if !IsResultIssueDir(CurrentDir) {
+        ShowFeedback("当前不在问题子目录", true)
+        return
+    }
+
+    CurrentDir := GetThemeRootFromIssueDir(CurrentDir)
+    UpdateCurrentPathDisplay()
+    RefreshDirectoryStateUI()
+    ShowFeedback("已返回主题目录")
+}
+
+IsResultIssueDir(dirPath) {
+    global ResultIssueRootName
+    if (dirPath = "" || !DirExist(dirPath)) {
+        return false
+    }
+
+    SplitPath(dirPath, &dirName, &parentDir)
+    if !RegExMatch(dirName, "^\d{2}$") {
+        return false
+    }
+
+    SplitPath(parentDir, &parentName)
+    return parentName = ResultIssueRootName
+}
+
+GetThemeRootFromIssueDir(dirPath) {
+    fileName := ""
+    parentName := ""
+    parentDir := ""
+    themeDir := ""
+    SplitPath(dirPath, &fileName, &parentDir)
+    SplitPath(parentDir, &parentName, &themeDir)
+    return themeDir
+}
+
+GetResultIssueRoot(themeDirPath) {
+    global ResultIssueRootName
+    return themeDirPath "\" ResultIssueRootName
+}
+
+GetNextIssueDirName(issueRootPath) {
+    latest := 0
+    Loop Files, issueRootPath "\*", "D" {
+        dirName := A_LoopFileName
+        if RegExMatch(dirName, "^\d{2}$") {
+            version := dirName + 0
+            if (version > latest) {
+                latest := version
+            }
+        }
+    }
+    return Format("{:02}", latest + 1)
 }
 
 AppendNoModifyPromptIfNeeded(content) {
