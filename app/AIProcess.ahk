@@ -186,14 +186,14 @@ CreateMainGui() {
     MainGui.OnEvent("Close", HandleClose)
     MainGui.OnEvent("Escape", HideToTray)
 
-    CurrentPathText := MainGui.AddText("xm ym+2 w66 h18 +0x200", "当前：未设置")
+    CurrentPathText := MainGui.AddText("xm ym+2 w126 h18 +0x200", "当前：未设置")
     CurrentPathText.OnEvent("Click", ShowFullPath)
     CurrentPathHwnd := CurrentPathText.Hwnd
-    CurrentDirStateMark := MainGui.AddText("x+2 yp w10 h18 +0x200", "")
+    CurrentDirStateMark := MainGui.AddText("x+0 yp w0 h18 Hidden", "")
 
-    SetDirectoryButton := MainGui.AddButton("x+6 yp-1 w44 h22", "设目录")
+    SetDirectoryButton := MainGui.AddButton("x148 ym w54 h22", "设目录")
     SetDirectoryButton.OnEvent("Click", PromptForDirectory)
-    ReturnParentButton := MainGui.AddButton("x+4 yp w44 h22 Hidden", "返")
+    ReturnParentButton := MainGui.AddButton("x148 ym w54 h22 Hidden", "返")
     ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
 
     OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "用IDEA开")
@@ -204,7 +204,7 @@ CreateMainGui() {
     NoModifyPromptCheckbox.Value := AppConfig["AppendNoModifyPrompt"] ? 1 : 0
     NoModifyPromptCheckbox.OnEvent("Click", ToggleNoModifyPrompt)
 
-    CreateIssueButton := MainGui.AddButton("x+4 yp w44 h22", "建问题")
+    CreateIssueButton := MainGui.AddButton("x148 yp-2 w54 h22", "建问题")
     CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
@@ -407,7 +407,7 @@ CloseDirectoryDialog(*) {
 }
 
 UpdateCurrentPathDisplay() {
-    global CurrentDir, CurrentPathText, CurrentDirStateMark, ResultIssueStateMark
+    global CurrentDir, CurrentPathText, CurrentDirStateMark
     if CurrentDir = "" {
         CurrentPathText.Text := "当前：未设置"
         CurrentDirStateMark.Text := ""
@@ -417,7 +417,7 @@ UpdateCurrentPathDisplay() {
     split := StrSplit(CurrentDir, "\")
     dirName := split.Length ? split[split.Length] : CurrentDir
     CurrentPathText.Text := "当前：" dirName
-    CurrentDirStateMark.Text := IsResultIssueDir(CurrentDir) ? ResultIssueStateMark : ""
+    CurrentDirStateMark.Text := ""
 }
 
 SetControlsEnabled(enabled) {
@@ -619,7 +619,7 @@ RefreshDirectoryStateUI() {
     SetDirectoryButton.Visible := !isIssueDir
     ReturnParentButton.Visible := isIssueDir
     CreateIssueButton.Visible := !isIssueDir
-    CurrentDirStateMark.Visible := isIssueDir
+    CurrentDirStateMark.Visible := false
 }
 
 LoadTemplate(fileName) {
