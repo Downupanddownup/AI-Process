@@ -63,7 +63,7 @@ EnsureDefaultFiles() {
     if !FileExist(SettingsFile) {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
         IniWrite("210", SettingsFile, "Window", "Width")
-        IniWrite("150", SettingsFile, "Window", "Height")
+        IniWrite("155", SettingsFile, "Window", "Height")
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
         IniWrite("1", SettingsFile, "Behavior", "StartVisible")
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
