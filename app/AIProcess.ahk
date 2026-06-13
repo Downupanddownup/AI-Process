@@ -15,12 +15,17 @@ global CurrentPathHwnd := 0
 global CurrentDirStateMark := ""
 global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
+global NewThemeDialog := ""
+global NewThemeDialogEdit := ""
+global NewThemeDialogErrorText := ""
 global OpenWithIdeaCheckbox := ""
 global NoModifyPromptCheckbox := ""
 global ReplyImplementationTailCheckbox := ""
 global SetDirectoryButton := ""
 global ReturnParentButton := ""
 global CreateIssueButton := ""
+global NewThemeButton := ""
+global AutoHideCheckbox := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
@@ -63,11 +68,12 @@ EnsureDefaultFiles() {
     if !FileExist(SettingsFile) {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
         IniWrite("210", SettingsFile, "Window", "Width")
-        IniWrite("155", SettingsFile, "Window", "Height")
+        IniWrite("185", SettingsFile, "Window", "Height")
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
         IniWrite("1", SettingsFile, "Behavior", "StartVisible")
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
+        IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
         IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
         IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
@@ -75,6 +81,10 @@ EnsureDefaultFiles() {
 
     if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
         IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
+    }
+
+    if (IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "") = "") {
+        IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
     }
 
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
@@ -147,10 +157,14 @@ LoadConfig() {
     AppConfig["Hotkey"] := IniRead(SettingsFile, "App", "Hotkey", "F2")
     AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
     AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
+    if (AppConfig["WindowHeight"] < 180) {
+        AppConfig["WindowHeight"] := 180
+    }
     AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
+    AppConfig["AutoHideAfterCreate"] := IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "0") = "1"
     AppConfig["OpenWithIdea"] := IniRead(SettingsFile, "Editor", "OpenWithIdea", "1") = "1"
     AppConfig["AppendNoModifyPrompt"] := IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "1") = "1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
@@ -165,8 +179,8 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AppConfig
-    global SetDirectoryButton, ReturnParentButton, CreateIssueButton
+    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, AppConfig
+    global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
     actionButtonWidth := 60
@@ -196,16 +210,23 @@ CreateMainGui() {
     ReturnParentButton := MainGui.AddButton("x148 ym w54 h22 Hidden", "返")
     ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
 
-    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "用IDEA开")
+    NewThemeButton := MainGui.AddButton("xm y+6 w54 h22", "新主题")
+    NewThemeButton.OnEvent("Click", CreateNewTheme)
+
+    CreateIssueButton := MainGui.AddButton("x+6 yp w54 h22", "建问题")
+    CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
+
+    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "IDEA开")
     OpenWithIdeaCheckbox.Value := AppConfig["OpenWithIdea"] ? 1 : 0
     OpenWithIdeaCheckbox.OnEvent("Click", ToggleIdeaOpen)
 
-    NoModifyPromptCheckbox := MainGui.AddCheckbox("x+10 yp", "禁改正式")
+    NoModifyPromptCheckbox := MainGui.AddCheckbox("x+4 yp", "禁改正式")
     NoModifyPromptCheckbox.Value := AppConfig["AppendNoModifyPrompt"] ? 1 : 0
     NoModifyPromptCheckbox.OnEvent("Click", ToggleNoModifyPrompt)
 
-    CreateIssueButton := MainGui.AddButton("x148 yp-2 w54 h22", "建问题")
-    CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
+    AutoHideCheckbox := MainGui.AddCheckbox("x+4 yp", "自隐藏")
+    AutoHideCheckbox.Value := AppConfig["AutoHideAfterCreate"] ? 1 : 0
+    AutoHideCheckbox.OnEvent("Click", ToggleAutoHide)
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
@@ -283,6 +304,13 @@ HideToTray(*) {
     MainGui.Hide()
     ToolTip("AIProcess 已隐藏到托盘")
     SetTimer(() => ToolTip(), -1200)
+}
+
+MaybeAutoHide() {
+    global AutoHideCheckbox
+    if (AutoHideCheckbox && AutoHideCheckbox.Value = 1) {
+        HideToTray()
+    }
 }
 
 ExitApplication(*) {
@@ -423,6 +451,7 @@ UpdateCurrentPathDisplay() {
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
+    global NewThemeButton, AutoHideCheckbox
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -433,6 +462,8 @@ SetControlsEnabled(enabled) {
     ExecuteStrategyDropdown.Enabled := enabled
     CreateIssueButton.Enabled := enabled
     ReturnParentButton.Enabled := enabled
+    NewThemeButton.Enabled := enabled
+    AutoHideCheckbox.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -449,6 +480,14 @@ ToggleNoModifyPrompt(ctrl, *) {
     AppConfig["AppendNoModifyPrompt"] := checked
     IniWrite(checked ? "1" : "0", SettingsFile, "Prompt", "AppendNoModifyPrompt")
     ShowFeedback(checked ? "已开启禁改正式" : "已关闭禁改正式")
+}
+
+ToggleAutoHide(ctrl, *) {
+    global AppConfig, SettingsFile
+    checked := ctrl.Value = 1
+    AppConfig["AutoHideAfterCreate"] := checked
+    IniWrite(checked ? "1" : "0", SettingsFile, "Behavior", "AutoHideAfterCreate")
+    ShowFeedback(checked ? "已开启自动隐藏" : "已关闭自动隐藏")
 }
 
 CreateRequirementFile(*) {
@@ -469,6 +508,8 @@ CreateRequirementFile(*) {
     if AppConfig["OpenWithIdea"] {
         OpenFileInIdea(filePath)
     }
+
+    MaybeAutoHide()
 }
 
 CreateReplyFile(*) {
@@ -495,6 +536,8 @@ CreateReplyFile(*) {
     if AppConfig["OpenWithIdea"] {
         OpenFileInIdea(replyPath)
     }
+
+    MaybeAutoHide()
 }
 
 CopyRequirementPrompt(*) {
@@ -508,6 +551,8 @@ CopyRequirementPrompt(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("需求提示词已复制")
+
+    MaybeAutoHide()
 }
 
 CopyReplyPrompt(*) {
@@ -531,6 +576,8 @@ CopyReplyPrompt(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("回复提示词已复制")
+
+    MaybeAutoHide()
 }
 
 CopyContextRelations(*) {
@@ -542,6 +589,8 @@ CopyContextRelations(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("文件关系说明已复制")
+
+    MaybeAutoHide()
 }
 
 CopyExecutePrompt(*) {
@@ -562,6 +611,8 @@ CopyExecutePrompt(*) {
     content := StrReplace(content, "{{filePath}}", implementationPath)
     A_Clipboard := content
     ShowFeedback(strategyMeta["feedback"])
+
+    MaybeAutoHide()
 }
 
 EnsureCurrentDirectory() {
@@ -601,9 +652,9 @@ ShowFullPath(*) {
 }
 
 RefreshDirectoryStateUI() {
-    global CurrentDir, SetDirectoryButton, ReturnParentButton, CreateIssueButton, CurrentDirStateMark
+    global CurrentDir, SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton, CurrentDirStateMark
 
-    if !SetDirectoryButton || !ReturnParentButton || !CreateIssueButton || !CurrentDirStateMark {
+    if !SetDirectoryButton || !ReturnParentButton || !CreateIssueButton || !NewThemeButton || !CurrentDirStateMark {
         return
     }
 
@@ -611,6 +662,7 @@ RefreshDirectoryStateUI() {
         SetDirectoryButton.Visible := true
         ReturnParentButton.Visible := false
         CreateIssueButton.Visible := false
+        NewThemeButton.Visible := false
         CurrentDirStateMark.Visible := false
         return
     }
@@ -619,6 +671,7 @@ RefreshDirectoryStateUI() {
     SetDirectoryButton.Visible := !isIssueDir
     ReturnParentButton.Visible := isIssueDir
     CreateIssueButton.Visible := !isIssueDir
+    NewThemeButton.Visible := true
     CurrentDirStateMark.Visible := false
 }
 
@@ -680,6 +733,162 @@ CreateAndEnterIssueDir(*) {
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     ShowFeedback("已进入问题目录：" nextIssueDirName)
+
+    CreateRequirementFile()
+}
+
+ShowNewThemeDialog() {
+    global MainGui, NewThemeDialog, NewThemeDialogEdit, NewThemeDialogErrorText
+
+    if NewThemeDialog {
+        NewThemeDialogEdit.Value := ""
+        NewThemeDialogErrorText.Text := ""
+        NewThemeDialogErrorText.Visible := false
+        NewThemeDialog.Show()
+        WinActivate("ahk_id " NewThemeDialog.Hwnd)
+        NewThemeDialogEdit.Focus()
+        return
+    }
+
+    ownerHwnd := MainGui ? MainGui.Hwnd : 0
+    dialogOptions := "+AlwaysOnTop +ToolWindow"
+    if ownerHwnd {
+        dialogOptions .= " +Owner" ownerHwnd
+    }
+
+    NewThemeDialog := Gui(dialogOptions, "新建主题")
+    NewThemeDialog.BackColor := "F7F7F7"
+    NewThemeDialog.MarginX := 12
+    NewThemeDialog.MarginY := 10
+    NewThemeDialog.SetFont("s8", "Microsoft YaHei UI")
+    NewThemeDialog.OnEvent("Close", CloseNewThemeDialog)
+    NewThemeDialog.OnEvent("Escape", CloseNewThemeDialog)
+
+    NewThemeDialog.AddText("xm ym w336 h18", "新主题目录名称")
+    NewThemeDialogEdit := NewThemeDialog.AddEdit("xm y+6 w336 h24", "")
+    NewThemeDialogErrorText := NewThemeDialog.AddText("xm y+4 w336 h18 cRed Hidden", "")
+
+    okButton := NewThemeDialog.AddButton("xm y+8 w72 h24 Default", "确定")
+    okButton.OnEvent("Click", SubmitNewThemeDialog)
+
+    cancelButton := NewThemeDialog.AddButton("x+8 yp w72 h24", "取消")
+    cancelButton.OnEvent("Click", CloseNewThemeDialog)
+
+    ShowNewThemeDialogAtCenter()
+    NewThemeDialogEdit.Focus()
+}
+
+ShowNewThemeDialogAtCenter() {
+    global NewThemeDialog, MainGui
+    if !NewThemeDialog {
+        return
+    }
+
+    width := 360
+    height := 130
+    if MainGui {
+        WinGetPos(&mainX, &mainY, &mainW, &mainH, "ahk_id " MainGui.Hwnd)
+        x := mainX + Floor((mainW - width) / 2)
+        y := mainY + Floor((mainH - height) / 2)
+        NewThemeDialog.Show("w" width " h" height " x" x " y" y)
+        return
+    }
+
+    NewThemeDialog.Show("w" width " h" height)
+}
+
+CloseNewThemeDialog(*) {
+    global NewThemeDialog, NewThemeDialogEdit, NewThemeDialogErrorText
+    if !NewThemeDialog {
+        return
+    }
+    NewThemeDialog.Destroy()
+    NewThemeDialog := ""
+    NewThemeDialogEdit := ""
+    NewThemeDialogErrorText := ""
+}
+
+SubmitNewThemeDialog(*) {
+    global CurrentDir, NewThemeDialog, NewThemeDialogEdit, NewThemeDialogErrorText
+    if !NewThemeDialog {
+        return
+    }
+
+    themeName := Trim(NewThemeDialogEdit.Value)
+    if (themeName = "") {
+        ShowNewThemeDialogError("目录名不能为空")
+        return
+    }
+    if !IsValidDirName(themeName) {
+        ShowNewThemeDialogError("目录名包含非法字符")
+        return
+    }
+
+    parentDir := ""
+    SplitPath(CurrentDir,, &parentDir)
+    newDir := parentDir "\" themeName
+    if DirExist(newDir) {
+        ShowNewThemeDialogError("目录已存在：" themeName)
+        return
+    }
+
+    DirCreate(newDir)
+    CloseNewThemeDialog()
+    SwitchToNewTheme(newDir)
+}
+
+ShowNewThemeDialogError(message) {
+    global NewThemeDialogErrorText
+    if !NewThemeDialogErrorText {
+        return
+    }
+    NewThemeDialogErrorText.Text := message
+    NewThemeDialogErrorText.Visible := true
+}
+
+SwitchToNewTheme(newDir) {
+    global CurrentDir
+    CurrentDir := newDir
+    UpdateCurrentPathDisplay()
+    RefreshDirectoryStateUI()
+    CreateRequirementFile()
+}
+
+CreateNewTheme(*) {
+    global CurrentDir
+    if !EnsureCurrentDirectory() {
+        return
+    }
+
+    if IsResultIssueDir(CurrentDir) {
+        parentDir := ""
+        SplitPath(CurrentDir,, &parentDir)
+        issueRoot := parentDir
+        DirCreate(issueRoot)
+        nextIssueDirName := GetNextIssueDirName(issueRoot)
+        newDir := issueRoot "\" nextIssueDirName
+        DirCreate(newDir)
+        SwitchToNewTheme(newDir)
+        return
+    }
+
+    ShowNewThemeDialog()
+}
+
+IsValidDirName(name) {
+    if (name = "" || name = "." || name = "..") {
+        return false
+    }
+    illegal := "\/:*?<>|"
+    Loop Parse, illegal {
+        if InStr(name, A_LoopField) {
+            return false
+        }
+    }
+    if InStr(name, Chr(34)) {
+        return false
+    }
+    return true
 }
 
 ReturnToThemeDir(*) {
