@@ -1399,10 +1399,7 @@ ShowAgentWindowDialog() {
     AgentWindowDialogClassText := AgentWindowDialog.AddText("xm y+4 w300 h18", "类名：未绑定")
     AgentWindowDialogStatusText := AgentWindowDialog.AddText("xm y+4 w300 h18", "状态：未绑定")
 
-    rebindButton := AgentWindowDialog.AddButton("xm y+10 w80 h24", "重新绑定")
-    rebindButton.OnEvent("Click", AgentDialogRebind)
-
-    unbindButton := AgentWindowDialog.AddButton("x+8 yp w80 h24", "解绑")
+    unbindButton := AgentWindowDialog.AddButton("xm y+10 w80 h24", "解绑")
     unbindButton.OnEvent("Click", AgentDialogUnbind)
 
     testButton := AgentWindowDialog.AddButton("x+8 yp w80 h24", "测试激活")
@@ -1459,11 +1456,6 @@ CloseAgentWindowDialog(*) {
     if (AgentWindowDialog) {
         AgentWindowDialog.Hide()
     }
-}
-
-AgentDialogRebind(*) {
-    BindAgentWindow()
-    RefreshAgentWindowDialog()
 }
 
 AgentDialogUnbind(*) {
