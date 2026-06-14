@@ -46,6 +46,7 @@ global AgentWindowDialogActionDropdown := ""
 global HoverTooltipVisible := false
 global ResultIssueRootName := "结果微调"
 global ResultIssueStateMark := "↳"
+global StartedFromContextMenu := false
 global ExecuteStrategies := [
     Map("key", "direct", "label", "直接", "template", "execute\direct.txt", "feedback", "执行提示词已复制"),
     Map("key", "ai_judge", "label", "AI判", "template", "execute\ai_judge.txt", "feedback", "AI判断提示词已复制"),
@@ -64,20 +65,19 @@ if (!EnsureSingleInstance()) {
 
 EnsureDefaultFiles()
 LoadConfig()
-
-if (HasSetDirArg()) {
-    ; 第一个实例被右键菜单启动，直接处理设目录
-    SetCurrentDirAndOpenRequirement(GetSetDirArg())
-    ; 不创建主窗口，不注册热键，直接退出
-    ExitApp()
-}
-
 CreateTray()
 CreateMainGui()
 UpdateBindButtonState()
+
+if (HasSetDirArg()) {
+    ; 第一个实例被右键菜单启动，处理设目录后继续运行
+    SetCurrentDirAndOpenRequirement(GetSetDirArg())
+    StartedFromContextMenu := true
+}
+
 RegisterGlobalHotkey()
 OnMessage(0x4000, OnSetDirMessage)
-if AppConfig["StartVisible"] {
+if (AppConfig["StartVisible"] && !StartedFromContextMenu) {
     ShowMainWindow()
 }
 
@@ -133,10 +133,16 @@ SendSetDirToExistingInstance(dirPath) {
     }
     FileAppend(dirPath, tempFile, "UTF-8")
 
-    hwnd := WinGetID("AIProcess 快捷面板")
-    if (hwnd) {
-        SendMessage(0x4000, 0, 0, , "ahk_id " hwnd)
+    DetectHiddenWindows(true)
+    try {
+        hwnd := WinGetID("AIProcess 快捷面板")
+        if (hwnd) {
+            SendMessage(0x4000, 0, 0, , "ahk_id " hwnd)
+        }
+    } catch Error {
+        ; 没有运行的 AIProcess 实例或窗口不可访问，忽略
     }
+    DetectHiddenWindows(false)
 }
 
 OnSetDirMessage(wParam, lParam, msg, hwnd) {
@@ -292,6 +298,8 @@ LoadConfig() {
     global AppConfig, SettingsFile
     AppConfig := Map()
     AppConfig["Hotkey"] := IniRead(SettingsFile, "App", "Hotkey", "F2")
+    AppConfig["IconSource"] := IniRead(SettingsFile, "App", "IconSource", "shell32.dll")
+    AppConfig["IconIndex"] := IniRead(SettingsFile, "App", "IconIndex", "44") + 0
     AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
     AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
     if (AppConfig["WindowHeight"] < 215) {
@@ -316,7 +324,7 @@ CreateTray() {
     A_TrayMenu.Add("显示", ShowMainWindow)
     A_TrayMenu.Add("退出", ExitApplication)
     A_TrayMenu.Default := "显示"
-    TraySetIcon("shell32.dll", 44)
+    TraySetIcon(AppConfig["IconSource"], AppConfig["IconIndex"])
 }
 
 CreateMainGui() {

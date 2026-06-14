@@ -1,8 +1,36 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
+
+# 需要管理员权限才能写入注册表和开始菜单
+if (-not (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $scriptDir = Split-Path -Parent $scriptPath
+    Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$scriptPath`"" -WorkingDirectory $scriptDir -WindowStyle Hidden
+    exit
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $ahkScript = Join-Path $projectRoot "app\AIProcess.ahk"
+
+# 轻量 INI 读取辅助函数
+function Get-IniContent ($filePath) {
+    $ini = @{}
+    $section = ""
+    switch -regex -file $filePath {
+        "^\[(.+)\]$" {
+            $section = $matches[1]
+            $ini[$section] = @{}
+        }
+        "^(.+?)\s*=\s*(.*)$" {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            if ($section -ne "") {
+                $ini[$section][$name] = $value
+            }
+        }
+    }
+    return $ini
+}
 
 if (-not (Test-Path $ahkScript)) {
     Write-Error "Main script not found: $ahkScript"
@@ -87,15 +115,31 @@ Write-Host "Created shortcut: $shortcut"
 # 注册资源管理器右键菜单
 $regPath = "Registry::HKEY_CLASSES_ROOT\Directory\shell\AIProcessSetDir"
 $commandPath = "$regPath\command"
-$exePath = Join-Path $projectRoot "app\AIProcess.exe"
 
 try {
     if (Test-Path $regPath) {
         Remove-Item -Path $regPath -Recurse -Force
     }
 
+    # 读取图标配置
+    $settingsFile = Join-Path $projectRoot "app\config\settings.ini"
+    $iconSource = "shell32.dll"
+    $iconIndex = "44"
+    if (Test-Path $settingsFile) {
+        $ini = Get-IniContent $settingsFile
+        if ($ini["App"]) {
+            if ($ini["App"]["IconSource"]) { $iconSource = $ini["App"]["IconSource"] }
+            if ($ini["App"]["IconIndex"]) { $iconIndex = $ini["App"]["IconIndex"] }
+        }
+    }
+    if ($iconSource -and ($iconSource -notmatch '\\')) {
+        $iconSource = Join-Path $env:SystemRoot "System32\$iconSource"
+    }
+    $iconValue = "$iconSource," + ([int]$iconIndex - 1)
+
     New-Item -Path $regPath -Force | Out-Null
     Set-ItemProperty -Path $regPath -Name "(Default)" -Value "AIProcess 目录"
+    Set-ItemProperty -Path $regPath -Name "Icon" -Value $iconValue
     New-Item -Path $commandPath -Force | Out-Null
     Set-ItemProperty -Path $commandPath -Name "(Default)" -Value "`"$ahkExe`" `"$ahkScript`" /setdir `"%1`""
 

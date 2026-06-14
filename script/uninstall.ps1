@@ -1,11 +1,19 @@
 ﻿$ErrorActionPreference = "Stop"
 
+# 需要管理员权限才能清理注册表
+if (-not (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))) {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $scriptDir = Split-Path -Parent $scriptPath
+    Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$scriptPath`"" -WorkingDirectory $scriptDir -WindowStyle Hidden
+    exit
+}
+
 $startMenu = [Environment]::GetFolderPath('StartMenu')
 $programs = Join-Path $startMenu "Programs"
 $shortcut = Join-Path $programs "AI Process.lnk"
 
-# 检查 AIProcess 是否仍在运行
-$running = Get-Process -Name "AIProcess" -ErrorAction SilentlyContinue
+# 检查 AIProcess 是否仍在运行（实际进程为 AutoHotkey.exe/AutoHotkey64.exe）
+$running = Get-Process -Name "AutoHotkey", "AutoHotkey64" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*AIProcess*" }
 if ($running) {
     Write-Warning "AIProcess 仍在运行，请先手动结束进程，然后再运行卸载脚本。"
     Write-Host "你可以右键任务栏托盘图标选择退出，或按 Ctrl+Alt+Del 结束进程。" -ForegroundColor Yellow
