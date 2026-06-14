@@ -29,6 +29,7 @@ global CreateIssueButton := ""
 global NewThemeButton := ""
 global AutoHideCheckbox := ""
 global BindAgentWindowButton := ""
+global UnbindAgentWindowButton := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
@@ -328,7 +329,7 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, BindAgentWindowButton, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
@@ -379,6 +380,9 @@ CreateMainGui() {
 
     BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
     BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
+
+    UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
+    UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
@@ -601,7 +605,7 @@ UpdateCurrentPathDisplay() {
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
-    global NewThemeButton, AutoHideCheckbox, BindAgentWindowButton
+    global NewThemeButton, AutoHideCheckbox, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -615,6 +619,7 @@ SetControlsEnabled(enabled) {
     NewThemeButton.Enabled := enabled
     AutoHideCheckbox.Enabled := enabled
     BindAgentWindowButton.Enabled := enabled
+    UnbindAgentWindowButton.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -1347,14 +1352,16 @@ IsAgentWindowBound() {
 }
 
 UpdateBindButtonState() {
-    global BindAgentWindowButton
-    if (!BindAgentWindowButton) {
+    global BindAgentWindowButton, UnbindAgentWindowButton
+    if (!BindAgentWindowButton || !UnbindAgentWindowButton) {
         return
     }
     if (IsAgentWindowBound()) {
         BindAgentWindowButton.Text := "已绑定"
+        UnbindAgentWindowButton.Visible := true
     } else {
         BindAgentWindowButton.Text := "绑窗口"
+        UnbindAgentWindowButton.Visible := false
     }
 }
 
@@ -1463,13 +1470,23 @@ CloseAgentWindowDialog(*) {
 }
 
 AgentDialogUnbind(*) {
-    global AppConfig
+    UnbindAgentWindow()
+}
+
+OnUnbindAgentWindowButtonClick(*) {
+    UnbindAgentWindow()
+}
+
+UnbindAgentWindow() {
+    global AppConfig, AgentWindowDialog
     AppConfig["AgentWindowTitleContains"] := ""
     AppConfig["AgentWindowProcessName"] := ""
     AppConfig["AgentWindowClassName"] := ""
     SaveAgentWindowConfig()
     UpdateBindButtonState()
-    RefreshAgentWindowDialog()
+    if (AgentWindowDialog) {
+        RefreshAgentWindowDialog()
+    }
 }
 
 AgentDialogTestActivate(*) {
