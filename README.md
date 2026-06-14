@@ -1,55 +1,128 @@
 # AI Process
 
-`AI Process` 是一个基于 `AutoHotkey v2` 的 Windows 桌面快捷面板，用来减少和 AI 协作过程中的重复操作。
+`AI Process` 是一个基于 `AutoHotkey v2` 的 Windows 桌面辅助工具。它把"人向 AI Agent 发任务"的过程结构化、版本化、半自动化：帮你管理需求、提示词、回复、实施文档的迭代，减少机械操作，但保留人对每个环节的审阅和决策。
+
+## 核心工作流程
+
+```
+1. 准备：右键目录 → "AIProcess 目录" → 创建/打开 需求.txt
+2. 写需求：在 需求.txt 中描述你要什么
+3. 发任务：按 F2 打开面板 → 建需求/复需求 → 自动发送给 AI Agent
+4. 看回复：Agent 生成 对vN的回复.txt
+5. 迭代：建回复/vN.md → 继续沟通直到满意
+6. 定稿：形成 实施文档.md
+7. 执行：复执行 → Agent 按实施文档执行
+```
 
 ## 当前能力
 
-1. `F2` 全局快捷键呼出窗口
-2. 置顶小窗、托盘常驻、关闭隐藏到托盘
-3. 设置当前主题目录
-4. 创建 `需求.txt`
-5. 根据当前目录中最新的 `vX.md` 创建 `对vX的回复.txt`
-6. 复制需求提示词、回复提示词、文件关系说明
-7. 可选“创建后用 IDEA 打开文件”
-8. 提示词和快捷键通过配置文件集中维护
+### 快捷面板
+
+- `F2` 全局热键呼出/隐藏主面板。
+- 置顶小窗、托盘常驻、关闭隐藏到托盘。
+- 单实例运行：多次启动只保留一个实例，不抢占热键。
+
+### 目录管理
+
+- 资源管理器右键任意文件夹 → **"AIProcess 目录"**，自动设置 CurrentDir 并创建/打开 `需求.txt`。
+- 主面板手动"设目录"、"返"回上级。
+- 右键触发时不显示主面板，AIProcess 在后台静默处理。
+
+### 版本化沟通
+
+- **建需求**：根据 `需求.txt` 创建 `v1.md`。
+- **建回复**：根据最新 `vN.md` 创建 `v(N+1).md`。
+- **复需求 / 复回复 / 复关系 / 复执行**：复制对应提示词到剪贴板。
+- 自动生成 `对vN的回复.txt`，完整保留每一轮沟通记录。
+
+### AI Agent 集成
+
+- 主面板"绑窗口"：绑定一个 AI Agent 窗口（如 Claude Code、Kimi Code CLI）。
+- 复制提示词后，自动激活 Agent 窗口、粘贴、按 `Enter` 发送。
+- 二级面板提供四档开关：
+  - 不操作
+  - 仅激活
+  - 激活并粘贴（默认）
+  - 激活粘贴并发送
+- 支持最小化窗口检测与恢复。
+
+### 编辑器集成
+
+- 可选"创建后用 IDEA 打开文件"。
+- 提示词模板集中在 `app/templates/` 下，修改后重启生效。
+
+### 安装与维护
+
+- `script/install.bat`：创建开始菜单快捷方式 + 注册资源管理器右键菜单。
+- `script/uninstall.bat`：清理右键菜单 + 删除快捷方式。
+- 安装/卸载需要管理员权限。
+
+## 安装与运行
+
+1. 确保已安装 [AutoHotkey v2](https://www.autohotkey.com/)。
+2. 克隆或解压本项目。
+3. 双击 `script/install.bat` 安装。
+4. 安装完成后：
+   - 按 `Win` 键搜索 `AI Process` 启动；或
+   - 在资源管理器右键目录 → `AIProcess 目录` 直接启动并设目录。
+
+卸载时运行 `script/uninstall.bat`。
+
+## 配置说明
+
+配置文件位于 `app/config/settings.ini`。
+
+主要配置项：
+
+| 段 | 键 | 说明 |
+|---|---|---|
+| `App` | `Hotkey` | 呼出面板的快捷键，默认 `F2` |
+| `App` | `IconSource` | 托盘/右键菜单图标源，默认 `shell32.dll` |
+| `App` | `IconIndex` | 图标索引，默认 `44` |
+| `Window` | `Width` / `Height` | 主面板尺寸 |
+| `Behavior` | `AlwaysOnTop` | 是否置顶 |
+| `Behavior` | `StartVisible` | 启动时是否显示主面板 |
+| `Behavior` | `CloseToTray` | 关闭按钮是否最小化到托盘 |
+| `Behavior` | `MinimizeToTray` | 最小化按钮是否到托盘 |
+| `Behavior` | `AutoHideAfterCreate` | 创建文件后是否自动隐藏面板 |
+| `Editor` | `OpenWithIdea` | 是否用 IDEA 打开文件 |
+| `Editor` | `IdeaCommand` | IDEA 可执行文件路径 |
+| `Prompt` | `AppendNoModifyPrompt` | 是否追加"不要修改正式文件"约束 |
+| `AgentWindow` | `TitleContains` | 绑定窗口标题包含的字符串 |
+| `AgentWindow` | `ProcessName` | 绑定窗口的进程名 |
+| `AgentWindow` | `ClassName` | 绑定窗口的类名 |
+| `AgentWindow` | `AfterCopyAction` | 复制提示词后的行为档位：1=不操作，2=仅激活，3=激活并粘贴，4=激活粘贴并发送 |
 
 ## 项目结构
 
 ```text
-app/
-  AIProcess.ahk
-  config/
-    settings.ini
-  templates/
-    requirement_prompt.txt
-    reply_prompt.txt
-    context_relation.txt
-script/
-  install.bat
-  install.ps1
-  uninstall.ps1
-需求/
+AIProcess/
+├── app/
+│   ├── AIProcess.ahk          # 主程序
+│   ├── config/
+│   │   └── settings.ini       # 配置文件
+│   └── templates/             # 提示词模板
+│       ├── requirement_prompt.txt
+│       ├── reply_prompt.txt
+│       ├── context_relation.txt
+│       └── execute/           # 执行策略模板
+├── script/
+│   ├── install.bat            # 安装入口
+│   ├── install.ps1            # 安装逻辑
+│   ├── uninstall.bat          # 卸载入口
+│   └── uninstall.ps1          # 卸载逻辑
+├── 需求/                       # 需求讨论、实施设计、结果微调
+├── 测试/                       # 测试记录
+└── README.md
 ```
 
-## 运行方式
+## 设计原则
 
-1. 直接运行 [app/AIProcess.ahk](app/AIProcess.ahk)
-2. 或执行 [script/install.bat](script/install.bat) 将程序注册到开始菜单
-3. 安装后按 `Win` 键搜索 `AI Process` 启动
-
-## 配置位置
-
-应用配置在 [app/config/settings.ini](app/config/settings.ini)。
-
-主要项：
-
-1. `Hotkey`
-2. `OpenWithIdea`
-3. `IdeaCommand`
-4. 窗口宽高与行为开关
-
-提示词模板在 [app/templates](app/templates) 目录下，修改后重启程序即可生效。
+- **人定义目标，AI 执行草稿**：需求、价值判断、最终验收必须由人完成。
+- **人在回路**：每一轮沟通都需要人看过、确认过，才能进入下一步。不让 AI 自动闭环。
+- **副作用默认关闭**：任何可能修改文件、发送内容、改变系统的操作，默认不执行，需要人显式选择档位或确认。
+- **可审计**：`vN.md`、`对vN的回复.txt`、实施文档都保留在目录中，沟通过程可追溯。
 
 ## 需求文档
 
-完整需求讨论、版本迭代和实施设计文档都保存在 [需求](需求) 目录中。
+完整的需求讨论、版本迭代和实施设计文档保存在 [需求](需求) 目录中。
