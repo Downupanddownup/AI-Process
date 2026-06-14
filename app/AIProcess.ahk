@@ -1,5 +1,5 @@
 #Requires AutoHotkey v2.0
-#SingleInstance Force
+#SingleInstance Off
 
 Persistent
 
@@ -9,6 +9,8 @@ global TemplateDir := AppRoot "\templates"
 global SettingsFile := ConfigDir "\settings.ini"
 
 global AppConfig := Map()
+global AppMutexName := "AIProcess_SingleInstance_Mutex_7a3f9e2b"
+global AppMutex := 0
 global CurrentDir := ""
 global CurrentPathText := ""
 global CurrentPathHwnd := 0
@@ -26,6 +28,7 @@ global ReturnParentButton := ""
 global CreateIssueButton := ""
 global NewThemeButton := ""
 global AutoHideCheckbox := ""
+global BindAgentWindowButton := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
 global CreateReplyButton := ""
@@ -34,6 +37,12 @@ global CopyRelationsButton := ""
 global CopyExecuteButton := ""
 global ExecuteStrategyDropdown := ""
 global MainGui := ""
+global AgentWindowDialog := ""
+global AgentWindowDialogTitleText := ""
+global AgentWindowDialogProcessText := ""
+global AgentWindowDialogClassText := ""
+global AgentWindowDialogStatusText := ""
+global AgentWindowDialogActionDropdown := ""
 global HoverTooltipVisible := false
 global ResultIssueRootName := "结果微调"
 global ResultIssueStateMark := "↳"
@@ -44,11 +53,30 @@ global ExecuteStrategies := [
     Map("key", "steps_dir", "label", "步目", "template", "execute\steps_dir.txt", "feedback", "步骤目录提示词已复制")
 ]
 
+if (!EnsureSingleInstance()) {
+    if (HasSetDirArg()) {
+        SendSetDirToExistingInstance(GetSetDirArg())
+    } else {
+        ActivateExistingInstance()
+    }
+    ExitApp()
+}
+
 EnsureDefaultFiles()
 LoadConfig()
+
+if (HasSetDirArg()) {
+    ; 第一个实例被右键菜单启动，直接处理设目录
+    SetCurrentDirAndOpenRequirement(GetSetDirArg())
+    ; 不创建主窗口，不注册热键，直接退出
+    ExitApp()
+}
+
 CreateTray()
 CreateMainGui()
+UpdateBindButtonState()
 RegisterGlobalHotkey()
+OnMessage(0x4000, OnSetDirMessage)
 if AppConfig["StartVisible"] {
     ShowMainWindow()
 }
@@ -57,6 +85,102 @@ OnMessage(0x200, OnMouseMove)
 OnMessage(0x05, OnWindowSize)
 
 return
+
+EnsureSingleInstance() {
+    global AppMutex
+    AppMutex := DllCall("CreateMutex", "Ptr", 0, "Int", 1, "Str", AppMutexName, "Ptr")
+    return DllCall("GetLastError") != 183
+}
+
+ActivateExistingInstance() {
+    global MainGui
+    if (MainGui) {
+        ShowMainWindow()
+    }
+}
+
+HasSetDirArg() {
+    argString := DllCall("GetCommandLine", "Str")
+    return InStr(argString, "/setdir")
+}
+
+GetSetDirArg() {
+    argString := DllCall("GetCommandLine", "Str")
+    pos := InStr(argString, "/setdir")
+    if (pos = 0) {
+        return ""
+    }
+
+    rest := SubStr(argString, pos + StrLen("/setdir"))
+    rest := Trim(rest)
+
+    if (SubStr(rest, 1, 1) = "`"") {
+        rest := SubStr(rest, 2)
+    }
+    if (SubStr(rest, -1) = "`"") {
+        rest := SubStr(rest, 1, -1)
+    }
+
+    return Trim(rest)
+}
+
+SendSetDirToExistingInstance(dirPath) {
+    tempFile := A_Temp "\AIProcess_SetDir.tmp"
+    try {
+        FileDelete(tempFile)
+    } catch {
+        ; 忽略
+    }
+    FileAppend(dirPath, tempFile, "UTF-8")
+
+    hwnd := WinGetID("AIProcess 快捷面板")
+    if (hwnd) {
+        SendMessage(0x4000, 0, 0, , "ahk_id " hwnd)
+    }
+}
+
+OnSetDirMessage(wParam, lParam, msg, hwnd) {
+    dirPath := ReadSetDirTempFile()
+    if (dirPath != "") {
+        SetCurrentDirAndOpenRequirement(dirPath)
+    }
+    return 0
+}
+
+ReadSetDirTempFile() {
+    tempFile := A_Temp "\AIProcess_SetDir.tmp"
+    if (!FileExist(tempFile)) {
+        return ""
+    }
+    dirPath := FileRead(tempFile, "UTF-8")
+    try {
+        FileDelete(tempFile)
+    } catch {
+        ; 忽略
+    }
+    return Trim(dirPath)
+}
+
+SetCurrentDirAndOpenRequirement(dirPath) {
+    global CurrentDir, AppConfig
+    CurrentDir := NormalizePath(dirPath)
+
+    if (MainGui) {
+        UpdateCurrentPathDisplay()
+        SetControlsEnabled(true)
+        RefreshDirectoryStateUI()
+    }
+
+    filePath := CurrentDir "\需求.txt"
+    existed := FileExist(filePath)
+    if (!existed) {
+        FileAppend("", filePath, "UTF-8")
+    }
+
+    if (AppConfig["OpenWithIdea"]) {
+        OpenFileInIdea(filePath)
+    }
+}
 
 EnsureDefaultFiles() {
     global ConfigDir, TemplateDir, SettingsFile
@@ -68,7 +192,7 @@ EnsureDefaultFiles() {
     if !FileExist(SettingsFile) {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
         IniWrite("210", SettingsFile, "Window", "Width")
-        IniWrite("185", SettingsFile, "Window", "Height")
+        IniWrite("215", SettingsFile, "Window", "Height")
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
         IniWrite("1", SettingsFile, "Behavior", "StartVisible")
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
@@ -77,6 +201,19 @@ EnsureDefaultFiles() {
         IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
         IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
+    }
+
+    if (IniRead(SettingsFile, "AgentWindow", "AfterCopyAction", "") = "") {
+        IniWrite("3", SettingsFile, "AgentWindow", "AfterCopyAction")
+    }
+    if (IniRead(SettingsFile, "AgentWindow", "TitleContains", "") = "") {
+        IniWrite("", SettingsFile, "AgentWindow", "TitleContains")
+    }
+    if (IniRead(SettingsFile, "AgentWindow", "ProcessName", "") = "") {
+        IniWrite("", SettingsFile, "AgentWindow", "ProcessName")
+    }
+    if (IniRead(SettingsFile, "AgentWindow", "ClassName", "") = "") {
+        IniWrite("", SettingsFile, "AgentWindow", "ClassName")
     }
 
     if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
@@ -157,9 +294,13 @@ LoadConfig() {
     AppConfig["Hotkey"] := IniRead(SettingsFile, "App", "Hotkey", "F2")
     AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
     AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
-    if (AppConfig["WindowHeight"] < 180) {
-        AppConfig["WindowHeight"] := 180
+    if (AppConfig["WindowHeight"] < 215) {
+        AppConfig["WindowHeight"] := 215
     }
+    AppConfig["AgentWindowTitleContains"] := IniRead(SettingsFile, "AgentWindow", "TitleContains", "")
+    AppConfig["AgentWindowProcessName"] := IniRead(SettingsFile, "AgentWindow", "ProcessName", "")
+    AppConfig["AgentWindowClassName"] := IniRead(SettingsFile, "AgentWindow", "ClassName", "")
+    AppConfig["AgentWindowAfterCopyAction"] := IniRead(SettingsFile, "AgentWindow", "AfterCopyAction", "3") + 0
     AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
@@ -179,7 +320,7 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, BindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
@@ -227,6 +368,9 @@ CreateMainGui() {
     AutoHideCheckbox := MainGui.AddCheckbox("x+4 yp", "自隐藏")
     AutoHideCheckbox.Value := AppConfig["AutoHideAfterCreate"] ? 1 : 0
     AutoHideCheckbox.OnEvent("Click", ToggleAutoHide)
+
+    BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
+    BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
@@ -302,8 +446,6 @@ ToggleMainWindow(*) {
 HideToTray(*) {
     global MainGui
     MainGui.Hide()
-    ToolTip("AIProcess 已隐藏到托盘")
-    SetTimer(() => ToolTip(), -1200)
 }
 
 MaybeAutoHide() {
@@ -451,7 +593,7 @@ UpdateCurrentPathDisplay() {
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
-    global NewThemeButton, AutoHideCheckbox
+    global NewThemeButton, AutoHideCheckbox, BindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -464,6 +606,7 @@ SetControlsEnabled(enabled) {
     ReturnParentButton.Enabled := enabled
     NewThemeButton.Enabled := enabled
     AutoHideCheckbox.Enabled := enabled
+    BindAgentWindowButton.Enabled := enabled
 }
 
 ToggleIdeaOpen(ctrl, *) {
@@ -551,6 +694,7 @@ CopyRequirementPrompt(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("需求提示词已复制")
+    HandleAgentWindowAfterCopy()
 
     MaybeAutoHide()
 }
@@ -576,6 +720,7 @@ CopyReplyPrompt(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("回复提示词已复制")
+    HandleAgentWindowAfterCopy()
 
     MaybeAutoHide()
 }
@@ -589,6 +734,7 @@ CopyContextRelations(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("文件关系说明已复制")
+    HandleAgentWindowAfterCopy()
 
     MaybeAutoHide()
 }
@@ -611,6 +757,7 @@ CopyExecutePrompt(*) {
     content := StrReplace(content, "{{filePath}}", implementationPath)
     A_Clipboard := content
     ShowFeedback(strategyMeta["feedback"])
+    HandleAgentWindowAfterCopy()
 
     MaybeAutoHide()
 }
@@ -638,8 +785,7 @@ ShowFeedback(message, isError := false) {
         MsgBox(message, "AIProcess", "Iconx T3")
         return
     }
-    ToolTip(message)
-    SetTimer(() => ToolTip(), -1200)
+    ; 成功提示不再显示 ToolTip
 }
 
 ShowFullPath(*) {
@@ -1127,4 +1273,263 @@ JoinArray(items, separator) {
         result .= item
     }
     return result
+}
+
+OnBindAgentWindowButtonClick(*) {
+    if (IsAgentWindowBound()) {
+        ShowAgentWindowDialog()
+    } else {
+        StartBindAgentWindow()
+    }
+}
+
+StartBindAgentWindow() {
+    global MainGui
+    if (MainGui) {
+        MainGui.Hide()
+    }
+    SetTimer(DoBindAgentWindow, -500)
+}
+
+DoBindAgentWindow() {
+    BindAgentWindow()
+    ShowMainWindow()
+}
+
+BindAgentWindow(*) {
+    global AppConfig, BindAgentWindowButton
+
+    hwnd := WinGetID("A")
+    if (!hwnd) {
+        FlashBindButtonError("无窗口")
+        return
+    }
+
+    title := WinGetTitle(hwnd)
+    proc := WinGetProcessName(hwnd)
+    class := WinGetClass(hwnd)
+
+    if (class = "Progman" || class = "WorkerW" || class = "Shell_TrayWnd") {
+        FlashBindButtonError("无效窗口")
+        return
+    }
+    if (InStr(title, "AIProcess") != 0 || proc = "AutoHotkey.exe" || proc = "AutoHotkey64.exe") {
+        FlashBindButtonError("不能绑定自身")
+        return
+    }
+    if (title = "" || proc = "" || class = "") {
+        FlashBindButtonError("绑定失败")
+        return
+    }
+
+    AppConfig["AgentWindowTitleContains"] := title
+    AppConfig["AgentWindowProcessName"] := proc
+    AppConfig["AgentWindowClassName"] := class
+    SaveAgentWindowConfig()
+    UpdateBindButtonState()
+}
+
+IsAgentWindowBound() {
+    global AppConfig
+    return AppConfig["AgentWindowProcessName"] != "" && AppConfig["AgentWindowClassName"] != ""
+}
+
+UpdateBindButtonState() {
+    global BindAgentWindowButton
+    if (!BindAgentWindowButton) {
+        return
+    }
+    if (IsAgentWindowBound()) {
+        BindAgentWindowButton.Text := "已绑定"
+    } else {
+        BindAgentWindowButton.Text := "绑窗口"
+    }
+}
+
+FlashBindButtonError(message) {
+    global BindAgentWindowButton
+    if (!BindAgentWindowButton) {
+        return
+    }
+    originalText := BindAgentWindowButton.Text
+    BindAgentWindowButton.Text := message
+    SetTimer(() => BindAgentWindowButton.Text := originalText, -1000)
+}
+
+SaveAgentWindowConfig() {
+    global AppConfig, SettingsFile
+    IniWrite(AppConfig["AgentWindowTitleContains"], SettingsFile, "AgentWindow", "TitleContains")
+    IniWrite(AppConfig["AgentWindowProcessName"], SettingsFile, "AgentWindow", "ProcessName")
+    IniWrite(AppConfig["AgentWindowClassName"], SettingsFile, "AgentWindow", "ClassName")
+    IniWrite(AppConfig["AgentWindowAfterCopyAction"], SettingsFile, "AgentWindow", "AfterCopyAction")
+}
+
+ShowAgentWindowDialog() {
+    global AgentWindowDialog, AppConfig
+    global AgentWindowDialogTitleText, AgentWindowDialogProcessText
+    global AgentWindowDialogClassText, AgentWindowDialogStatusText
+    global AgentWindowDialogActionDropdown
+
+    if (AgentWindowDialog) {
+        RefreshAgentWindowDialog()
+        AgentWindowDialog.Show()
+        WinActivate("ahk_id " AgentWindowDialog.Hwnd)
+        return
+    }
+
+    AgentWindowDialog := Gui("+AlwaysOnTop +ToolWindow", "Agent 窗口管理")
+    AgentWindowDialog.BackColor := "F7F7F7"
+    AgentWindowDialog.MarginX := 12
+    AgentWindowDialog.MarginY := 10
+    AgentWindowDialog.SetFont("s8", "Microsoft YaHei UI")
+    AgentWindowDialog.OnEvent("Close", CloseAgentWindowDialog)
+    AgentWindowDialog.OnEvent("Escape", CloseAgentWindowDialog)
+
+    AgentWindowDialog.AddText("xm ym w300 h18", "当前绑定")
+    AgentWindowDialogTitleText := AgentWindowDialog.AddText("xm y+4 w300 h18", "窗口标题：未绑定")
+    AgentWindowDialogProcessText := AgentWindowDialog.AddText("xm y+4 w300 h18", "进程：未绑定")
+    AgentWindowDialogClassText := AgentWindowDialog.AddText("xm y+4 w300 h18", "类名：未绑定")
+    AgentWindowDialogStatusText := AgentWindowDialog.AddText("xm y+4 w300 h18", "状态：未绑定")
+
+    rebindButton := AgentWindowDialog.AddButton("xm y+10 w80 h24", "重新绑定")
+    rebindButton.OnEvent("Click", AgentDialogRebind)
+
+    unbindButton := AgentWindowDialog.AddButton("x+8 yp w80 h24", "解绑")
+    unbindButton.OnEvent("Click", AgentDialogUnbind)
+
+    testButton := AgentWindowDialog.AddButton("x+8 yp w80 h24", "测试激活")
+    testButton.OnEvent("Click", AgentDialogTestActivate)
+
+    AgentWindowDialog.AddText("xm y+14 w300 h18", "复制提示词后")
+    AgentWindowDialogActionDropdown := AgentWindowDialog.AddDropDownList("xm y+4 w120", ["不操作", "仅激活", "激活并粘贴", "激活粘贴并发送"])
+    AgentWindowDialogActionDropdown.OnEvent("Change", AgentDialogActionChanged)
+
+    RefreshAgentWindowDialog()
+    AgentWindowDialog.Show()
+}
+
+RefreshAgentWindowDialog() {
+    global AppConfig
+    global AgentWindowDialogTitleText, AgentWindowDialogProcessText
+    global AgentWindowDialogClassText, AgentWindowDialogStatusText
+    global AgentWindowDialogActionDropdown
+
+    if (!IsAgentWindowBound()) {
+        AgentWindowDialogTitleText.Text := "窗口标题：未绑定"
+        AgentWindowDialogProcessText.Text := "进程：未绑定"
+        AgentWindowDialogClassText.Text := "类名：未绑定"
+        AgentWindowDialogStatusText.Text := "状态：未绑定"
+        AgentWindowDialogActionDropdown.Choose(1)
+        return
+    }
+
+    title := AppConfig["AgentWindowTitleContains"]
+    proc := AppConfig["AgentWindowProcessName"]
+    class := AppConfig["AgentWindowClassName"]
+
+    AgentWindowDialogTitleText.Text := "窗口标题：" TruncateMiddle(title, 40)
+    AgentWindowDialogProcessText.Text := "进程：" proc
+    AgentWindowDialogClassText.Text := "类名：" class
+
+    hwnd := FindBoundAgentWindow()
+    if (hwnd) {
+        AgentWindowDialogStatusText.Text := "状态：在线"
+    } else {
+        AgentWindowDialogStatusText.Text := "状态：未找到"
+    }
+
+    action := AppConfig["AgentWindowAfterCopyAction"]
+    if (action >= 1 && action <= 4) {
+        AgentWindowDialogActionDropdown.Choose(action)
+    } else {
+        AgentWindowDialogActionDropdown.Choose(3)
+    }
+}
+
+CloseAgentWindowDialog(*) {
+    global AgentWindowDialog
+    if (AgentWindowDialog) {
+        AgentWindowDialog.Hide()
+    }
+}
+
+AgentDialogRebind(*) {
+    BindAgentWindow()
+    RefreshAgentWindowDialog()
+}
+
+AgentDialogUnbind(*) {
+    global AppConfig
+    AppConfig["AgentWindowTitleContains"] := ""
+    AppConfig["AgentWindowProcessName"] := ""
+    AppConfig["AgentWindowClassName"] := ""
+    SaveAgentWindowConfig()
+    UpdateBindButtonState()
+    RefreshAgentWindowDialog()
+}
+
+AgentDialogTestActivate(*) {
+    hwnd := FindBoundAgentWindow()
+    if (hwnd) {
+        WinActivate(hwnd)
+    } else {
+        ShowFeedback("未找到绑定窗口", true)
+    }
+}
+
+AgentDialogActionChanged(ctrl, *) {
+    global AppConfig
+    AppConfig["AgentWindowAfterCopyAction"] := ctrl.Value
+    SaveAgentWindowConfig()
+}
+
+FindBoundAgentWindow() {
+    global AppConfig
+    titleContains := AppConfig["AgentWindowTitleContains"]
+    procName := AppConfig["AgentWindowProcessName"]
+    className := AppConfig["AgentWindowClassName"]
+
+    if (procName = "" || className = "") {
+        return 0
+    }
+
+    if (WinExist("ahk_exe " procName " ahk_class " className)) {
+        hwnd := WinGetID()
+        if (titleContains != "" && !InStr(WinGetTitle(hwnd), titleContains)) {
+            return 0
+        }
+        return hwnd
+    }
+
+    return 0
+}
+
+HandleAgentWindowAfterCopy() {
+    global AppConfig
+    action := AppConfig["AgentWindowAfterCopyAction"]
+    if (action <= 1 || action = "") {
+        return
+    }
+
+    if (!IsAgentWindowBound()) {
+        ShowFeedback("未绑定 Agent 窗口", true)
+        return
+    }
+
+    hwnd := FindBoundAgentWindow()
+    if (!hwnd) {
+        ShowFeedback("未找到绑定的 Agent 窗口", true)
+        return
+    }
+
+    WinActivate(hwnd)
+
+    if (action >= 3) {
+        Send "^v"
+        Sleep 150
+    }
+
+    if (action >= 4) {
+        Send "{Enter}"
+    }
 }

@@ -83,4 +83,25 @@ if (-not (Test-Path $shortcut)) {
 }
 
 Write-Host "Created shortcut: $shortcut"
+
+# 注册资源管理器右键菜单
+$regPath = "Registry::HKEY_CLASSES_ROOT\Directory\shell\AIProcessSetDir"
+$commandPath = "$regPath\command"
+$exePath = Join-Path $projectRoot "app\AIProcess.exe"
+
+try {
+    if (Test-Path $regPath) {
+        Remove-Item -Path $regPath -Recurse -Force
+    }
+
+    New-Item -Path $regPath -Force | Out-Null
+    Set-ItemProperty -Path $regPath -Name "(Default)" -Value "AIProcess 目录"
+    New-Item -Path $commandPath -Force | Out-Null
+    Set-ItemProperty -Path $commandPath -Name "(Default)" -Value "`"$ahkExe`" `"$ahkScript`" /setdir `"%1`""
+
+    Write-Host "已注册右键菜单：AIProcess 目录"
+} catch {
+    Write-Warning "注册右键菜单失败：$_"
+}
+
 Write-Host "Install complete. Press Win and search for AI Process to launch it."
