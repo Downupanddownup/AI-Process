@@ -1314,6 +1314,10 @@ BindAgentWindow(*) {
     }
 
     title := WinGetTitle(hwnd)
+    ; 去掉标题开头和结尾的特殊字符，避免 Windows Terminal 图标变化导致匹配失败
+    title := RegExReplace(title, "^[^\p{L}\p{N}]+")
+    title := RegExReplace(title, "[^\p{L}\p{N}]+$")
+
     proc := WinGetProcessName(hwnd)
     class := WinGetClass(hwnd)
 
@@ -1493,15 +1497,43 @@ FindBoundAgentWindow() {
         return 0
     }
 
-    if (WinExist("ahk_exe " procName " ahk_class " className)) {
-        hwnd := WinGetID()
-        if (titleContains != "" && !InStr(WinGetTitle(hwnd), titleContains)) {
-            return 0
+    logFile := A_Temp "\AIProcess_WindowSearch.log"
+    timestamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
+    logText := "[" timestamp "] FindBoundAgentWindow called`n"
+    logText .= "  TitleContains: " titleContains "`n"
+    logText .= "  ProcessName: " procName "`n"
+    logText .= "  ClassName: " className "`n"
+
+    DetectHiddenWindows(true)
+    logText .= "  DetectHiddenWindows: true`n"
+
+    hwnd := 0
+    ids := WinGetList("ahk_exe " procName " ahk_class " className)
+    logText .= "  Found windows: " ids.Length "`n"
+
+    for id in ids {
+        title := WinGetTitle(id)
+        visible := DllCall("IsWindowVisible", "Ptr", id)
+        iconic := DllCall("IsIconic", "Ptr", id)
+        logText .= "    HWND=" id ", Title=`"" title "`", Visible=" visible ", Iconic=" iconic "`n"
+
+        if (hwnd = 0) {
+            if (titleContains = "" || InStr(title, titleContains) || title = "") {
+                hwnd := id
+            }
         }
-        return hwnd
     }
 
-    return 0
+    logText .= "  Selected HWND: " hwnd "`n`n"
+
+    try {
+        FileAppend(logText, logFile, "UTF-8")
+    } catch {
+        ; 忽略日志写入失败
+    }
+
+    DetectHiddenWindows(false)
+    return hwnd
 }
 
 HandleAgentWindowAfterCopy() {
