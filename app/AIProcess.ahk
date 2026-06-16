@@ -21,6 +21,7 @@ global NewThemeDialog := ""
 global NewThemeDialogEdit := ""
 global NewThemeDialogErrorText := ""
 global OpenWithIdeaCheckbox := ""
+global OpenMdWithIdeaCheckbox := ""
 global NoModifyPromptCheckbox := ""
 global ReplyImplementationTailCheckbox := ""
 global SetDirectoryButton := ""
@@ -206,6 +207,7 @@ EnsureDefaultFiles() {
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
         IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
         IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
+        IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
         IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
     }
@@ -229,6 +231,10 @@ EnsureDefaultFiles() {
 
     if (IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "") = "") {
         IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
+    }
+
+    if (IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
     }
 
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
@@ -316,6 +322,8 @@ LoadConfig() {
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
     AppConfig["AutoHideAfterCreate"] := IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "0") = "1"
     AppConfig["OpenWithIdea"] := IniRead(SettingsFile, "Editor", "OpenWithIdea", "1") = "1"
+    AppConfig["OpenMdWithIdea"] := IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "1") = "1"
+    AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
     AppConfig["AppendNoModifyPrompt"] := IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "1") = "1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
 }
@@ -329,7 +337,7 @@ CreateTray() {
 }
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, OpenMdWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
@@ -378,7 +386,11 @@ CreateMainGui() {
     AutoHideCheckbox.Value := AppConfig["AutoHideAfterCreate"] ? 1 : 0
     AutoHideCheckbox.OnEvent("Click", ToggleAutoHide)
 
-    BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
+    OpenMdWithIdeaCheckbox := MainGui.AddCheckbox("xm y+8 h" actionButtonHeight, "MD开")
+    OpenMdWithIdeaCheckbox.Value := AppConfig["OpenMdWithIdea"] ? 1 : 0
+    OpenMdWithIdeaCheckbox.OnEvent("Click", ToggleOpenMdWithIdea)
+
+    BindAgentWindowButton := MainGui.AddButton("x+4 yp w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
     BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
 
     UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
@@ -605,7 +617,7 @@ UpdateCurrentPathDisplay() {
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
-    global NewThemeButton, AutoHideCheckbox, BindAgentWindowButton, UnbindAgentWindowButton
+    global NewThemeButton, AutoHideCheckbox, OpenMdWithIdeaCheckbox, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -618,6 +630,7 @@ SetControlsEnabled(enabled) {
     ReturnParentButton.Enabled := enabled
     NewThemeButton.Enabled := enabled
     AutoHideCheckbox.Enabled := enabled
+    OpenMdWithIdeaCheckbox.Enabled := enabled
     BindAgentWindowButton.Enabled := enabled
     UnbindAgentWindowButton.Enabled := enabled
 }
@@ -644,6 +657,14 @@ ToggleAutoHide(ctrl, *) {
     AppConfig["AutoHideAfterCreate"] := checked
     IniWrite(checked ? "1" : "0", SettingsFile, "Behavior", "AutoHideAfterCreate")
     ShowFeedback(checked ? "已开启自动隐藏" : "已关闭自动隐藏")
+}
+
+ToggleOpenMdWithIdea(ctrl, *) {
+    global AppConfig, SettingsFile
+    checked := ctrl.Value = 1
+    AppConfig["OpenMdWithIdea"] := checked
+    IniWrite(checked ? "1" : "0", SettingsFile, "Editor", "OpenMdWithIdea")
+    ShowFeedback(checked ? "已开启MD开" : "已关闭MD开")
 }
 
 CreateRequirementFile(*) {
@@ -705,6 +726,7 @@ CopyRequirementPrompt(*) {
     content := LoadTemplate("requirement_prompt.txt")
     content := StrReplace(content, "{{filePath}}", CurrentDir "\需求.txt")
     content := AppendNoModifyPromptIfNeeded(content)
+    content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("需求提示词已复制")
     HandleAgentWindowAfterCopy()
@@ -731,6 +753,7 @@ CopyReplyPrompt(*) {
     content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
     content := AppendReplyImplementationTailIfNeeded(content)
     content := AppendNoModifyPromptIfNeeded(content)
+    content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("回复提示词已复制")
     HandleAgentWindowAfterCopy()
@@ -745,6 +768,7 @@ CopyContextRelations(*) {
 
     content := BuildContextRelationsText()
     content := AppendNoModifyPromptIfNeeded(content)
+    content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
     ShowFeedback("文件关系说明已复制")
     HandleAgentWindowAfterCopy()
@@ -1139,6 +1163,24 @@ AppendReplyImplementationTailIfNeeded(content) {
 
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n" tailContent
+}
+
+AppendOpenMdPromptIfNeeded(content) {
+    global AppConfig, TemplateDir
+    if (!AppConfig["OpenMdWithIdea"]) {
+        return content
+    }
+
+    templatePath := TemplateDir "\open_md_prompt.txt"
+    if (!FileExist(templatePath)) {
+        return content
+    }
+
+    template := FileRead(templatePath, "UTF-8")
+    template := StrReplace(template, "{{scriptPath}}", AppConfig["OpenMdScriptPath"])
+
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n`r`n" template
 }
 
 BuildContextRelationsText() {
