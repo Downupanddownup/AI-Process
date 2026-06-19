@@ -92,6 +92,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window1", "ExecuteStrategy", "") = "") {
         IniWrite("ai_judge", SettingsFile, "Window1", "ExecuteStrategy")
     }
+    if (IniRead(SettingsFile, "Window1", "ShowExecuteNotification", "") = "") {
+        IniWrite("0", SettingsFile, "Window1", "ShowExecuteNotification")
+    }
 
     ; [Window2] 段
     if (IniRead(SettingsFile, "Window2", "CurrentDir", "") = "") {
@@ -126,6 +129,9 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Window2", "ExecuteStrategy", "") = "") {
         IniWrite("ai_judge", SettingsFile, "Window2", "ExecuteStrategy")
+    }
+    if (IniRead(SettingsFile, "Window2", "ShowExecuteNotification", "") = "") {
+        IniWrite("0", SettingsFile, "Window2", "ShowExecuteNotification")
     }
 
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
@@ -184,6 +190,18 @@ EnsureDefaultFiles() {
         , executeStepsDirTemplate, "UTF-8")
     }
 
+    executeTweakTemplate := executeTemplateDir "\tweak.txt"
+    if !FileExist(executeTweakTemplate) {
+        FileAppend("改吧", executeTweakTemplate, "UTF-8")
+    }
+
+    executeNotificationTemplate := TemplateDir "\execute_notification_prompt.txt"
+    if !FileExist(executeNotificationTemplate) {
+        FileAppend(
+        "补充指令：当你完成本次执行后，请立即调用以下命令显示一个完成通知。`n`npowershell -ExecutionPolicy Bypass -File `"{{scriptPath}}`" -WindowId `"{{windowId}}`""
+        , executeNotificationTemplate, "UTF-8")
+    }
+
     noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
     if !FileExist(noModifyTemplate) {
         FileAppend(
@@ -211,6 +229,7 @@ LoadConfig() {
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
     AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
+    AppConfig["NotificationScriptPath"] := AppRoot "\ShowNotification.ps1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
 }
 
@@ -238,6 +257,7 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AutoHideAfterCreate"] := IniRead(SettingsFile, section, "AutoHideAfterCreate", "0") = "1"
         WindowSessions[windowId]["AppendImplementationTail"] := IniRead(SettingsFile, section, "AppendImplementationTail", "1") = "1"
         WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "ai_judge")
+        WindowSessions[windowId]["ShowExecuteNotification"] := IniRead(SettingsFile, section, "ShowExecuteNotification", "0") = "1"
     }
 }
 
@@ -256,6 +276,7 @@ SaveWindowSession(windowId) {
     IniWrite(WindowSessions[windowId]["AutoHideAfterCreate"] ? "1" : "0", SettingsFile, section, "AutoHideAfterCreate")
     IniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
     IniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
+    IniWrite(WindowSessions[windowId]["ShowExecuteNotification"] ? "1" : "0", SettingsFile, section, "ShowExecuteNotification")
 }
 
 ; 保存 2 号窗口启用状态

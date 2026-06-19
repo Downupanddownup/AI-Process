@@ -91,7 +91,7 @@ CreateMainGui() {
     CopyExecuteButton.OnEvent("Click", CopyExecutePrompt)
 
     executeStrategyOptions := BuildExecuteStrategyOptions()
-    ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w44", executeStrategyOptions)
+    ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", executeStrategyOptions)
     ExecuteStrategyDropdown.OnEvent("Change", OnExecuteStrategyChange)
     windowId := GetActiveWindowId()
     strategyKey := GetSession(windowId, "ExecuteStrategy")

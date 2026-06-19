@@ -18,7 +18,8 @@ global WindowSessions := Map(
         "AppendNoModifyPrompt", true,
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
-        "ExecuteStrategy", "ai_judge"
+        "ExecuteStrategy", "ai_judge",
+        "ShowExecuteNotification", false
     ),
     2, Map(
         "CurrentDir", "",
@@ -31,7 +32,8 @@ global WindowSessions := Map(
         "AppendNoModifyPrompt", true,
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
-        "ExecuteStrategy", "ai_judge"
+        "ExecuteStrategy", "ai_judge",
+        "ShowExecuteNotification", false
     )
 )
 

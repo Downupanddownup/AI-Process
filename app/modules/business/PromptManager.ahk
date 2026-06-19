@@ -6,7 +6,8 @@ global ExecuteStrategies := [
     Map("key", "direct", "label", "直接", "template", "execute\direct.txt", "feedback", "执行提示词已复制"),
     Map("key", "ai_judge", "label", "AI判", "template", "execute\ai_judge.txt", "feedback", "AI判断提示词已复制"),
     Map("key", "steps_file", "label", "步文", "template", "execute\steps_file.txt", "feedback", "步骤文档提示词已复制"),
-    Map("key", "steps_dir", "label", "步目", "template", "execute\steps_dir.txt", "feedback", "步骤目录提示词已复制")
+    Map("key", "steps_dir", "label", "步目", "template", "execute\steps_dir.txt", "feedback", "步骤目录提示词已复制"),
+    Map("key", "tweak", "label", "改吧", "template", "execute\tweak.txt", "feedback", "改吧提示词已复制")
 ]
 
 
@@ -98,6 +99,27 @@ AppendReplyImplementationTailIfNeeded(content) {
 
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n" tailContent
+}
+
+
+
+AppendExecuteNotificationIfNeeded(content) {
+    global AppConfig, TemplateDir
+    if (!GetSession(GetActiveWindowId(), "ShowExecuteNotification")) {
+        return content
+    }
+
+    templatePath := TemplateDir "\execute_notification_prompt.txt"
+    if (!FileExist(templatePath)) {
+        return content
+    }
+
+    template := FileRead(templatePath, "UTF-8")
+    template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
+    template := StrReplace(template, "{{windowId}}", GetActiveWindowId())
+
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n`r`n" template
 }
 
 
@@ -220,16 +242,25 @@ CopyExecutePrompt(*) {
     }
 
     currentDir := GetCurrentDir()
-    implementationPath := currentDir "\实施文档.md"
-    if !FileExist(implementationPath) {
-        ShowFeedback("当前目录下未找到 实施文档.md", true)
-        return
-    }
-
     selectedStrategy := GetSelectedExecuteStrategy()
     strategyMeta := GetExecuteStrategyMeta(selectedStrategy)
-    content := LoadTemplate(strategyMeta["template"])
-    content := StrReplace(content, "{{filePath}}", implementationPath)
+
+    if (selectedStrategy = "tweak") {
+        ; "改吧"策略：不需要实施文档.md
+        content := LoadTemplate(strategyMeta["template"])
+    } else {
+        ; 原有 4 种策略：必须存在实施文档.md
+        implementationPath := currentDir "\实施文档.md"
+        if !FileExist(implementationPath) {
+            ShowFeedback("当前目录下未找到 实施文档.md", true)
+            return
+        }
+        content := LoadTemplate(strategyMeta["template"])
+        content := StrReplace(content, "{{filePath}}", implementationPath)
+    }
+
+    content := AppendExecuteNotificationIfNeeded(content)
+
     A_Clipboard := content
     ShowFeedback(strategyMeta["feedback"])
     HandleAgentWindowAfterCopy()

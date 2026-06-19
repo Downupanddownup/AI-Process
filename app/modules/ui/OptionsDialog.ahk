@@ -7,10 +7,11 @@ global OptionsIdeaCheckbox := ""
 global OptionsMdCheckbox := ""
 global OptionsNoModifyCheckbox := ""
 global OptionsAutoHideCheckbox := ""
+global OptionsExecuteNotificationCheckbox := ""
 
 CreateOptionsDialog() {
     global OptionsDialog, OptionsIdeaCheckbox, OptionsMdCheckbox
-    global OptionsNoModifyCheckbox, OptionsAutoHideCheckbox, MainGui
+    global OptionsNoModifyCheckbox, OptionsAutoHideCheckbox, OptionsExecuteNotificationCheckbox, MainGui
 
     ownerHwnd := MainGui ? MainGui.Hwnd : 0
     dialogOptions := "+AlwaysOnTop +ToolWindow"
@@ -38,6 +39,9 @@ CreateOptionsDialog() {
     OptionsAutoHideCheckbox := OptionsDialog.AddCheckbox("xm y+4 w220 h20", "创建文件后自动隐藏面板")
     OptionsAutoHideCheckbox.OnEvent("Click", OnOptionsAutoHideToggle)
 
+    OptionsExecuteNotificationCheckbox := OptionsDialog.AddCheckbox("xm y+4 w220 h20", "执行完成后显示窗口通知")
+    OptionsExecuteNotificationCheckbox.OnEvent("Click", OnOptionsExecuteNotificationToggle)
+
     closeButton := OptionsDialog.AddButton("xm+160 y+10 w60 h24", "关闭")
     closeButton.OnEvent("Click", CloseOptionsDialog)
 }
@@ -48,19 +52,20 @@ ShowOptionsDialog(*) {
         CreateOptionsDialog()
     }
     RefreshOptionsDialog()
-    OptionsDialog.Show("w260 h168")
+    OptionsDialog.Show("w260 h190")
     WinActivate("ahk_id " OptionsDialog.Hwnd)
 }
 
 RefreshOptionsDialog() {
     global OptionsIdeaCheckbox, OptionsMdCheckbox
-    global OptionsNoModifyCheckbox, OptionsAutoHideCheckbox
+    global OptionsNoModifyCheckbox, OptionsAutoHideCheckbox, OptionsExecuteNotificationCheckbox
 
     windowId := GetActiveWindowId()
     OptionsIdeaCheckbox.Value := GetSession(windowId, "OpenWithIdea") ? 1 : 0
     OptionsMdCheckbox.Value := GetSession(windowId, "OpenMdWithIdea") ? 1 : 0
     OptionsNoModifyCheckbox.Value := GetSession(windowId, "AppendNoModifyPrompt") ? 1 : 0
     OptionsAutoHideCheckbox.Value := GetSession(windowId, "AutoHideAfterCreate") ? 1 : 0
+    OptionsExecuteNotificationCheckbox.Value := GetSession(windowId, "ShowExecuteNotification") ? 1 : 0
 }
 
 CloseOptionsDialog(*) {
@@ -87,5 +92,10 @@ OnOptionsNoModifyToggle(ctrl, *) {
 
 OnOptionsAutoHideToggle(ctrl, *) {
     SetSession(GetActiveWindowId(), "AutoHideAfterCreate", ctrl.Value = 1)
+    SaveWindowSession(GetActiveWindowId())
+}
+
+OnOptionsExecuteNotificationToggle(ctrl, *) {
+    SetSession(GetActiveWindowId(), "ShowExecuteNotification", ctrl.Value = 1)
     SaveWindowSession(GetActiveWindowId())
 }
