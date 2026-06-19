@@ -96,7 +96,6 @@ GetOrderedContextFiles(dirPath) {
 
 
 CreateRequirementFile(*) {
-    global AppConfig
     if !EnsureCurrentDirectory() {
         return
     }
@@ -110,7 +109,7 @@ CreateRequirementFile(*) {
         ShowFeedback("文件已存在：需求.txt", true)
     }
 
-    if AppConfig["OpenWithIdea"] {
+    if GetSession(GetActiveWindowId(), "OpenWithIdea") {
         OpenFileInIdea(filePath)
     }
 
@@ -120,7 +119,6 @@ CreateRequirementFile(*) {
 
 
 CreateReplyFile(*) {
-    global AppConfig
     if !EnsureCurrentDirectory() {
         return
     }
@@ -141,7 +139,7 @@ CreateReplyFile(*) {
         ShowFeedback("文件已存在：" ExtractFileName(replyPath), true)
     }
 
-    if AppConfig["OpenWithIdea"] {
+    if GetSession(GetActiveWindowId(), "OpenWithIdea") {
         OpenFileInIdea(replyPath)
     }
 

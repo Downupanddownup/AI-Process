@@ -6,7 +6,6 @@ global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
 
 SetCurrentDirAndOpenRequirement(dirPath) {
-    global AppConfig
     SetCurrentDir(NormalizePath(dirPath))
     SaveWindowSession(GetActiveWindowId())
 
@@ -22,7 +21,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
         FileAppend("", filePath, "UTF-8")
     }
 
-    if (AppConfig["OpenWithIdea"]) {
+    if (GetSession(GetActiveWindowId(), "OpenWithIdea")) {
         OpenFileInIdea(filePath)
     }
 }

@@ -33,12 +33,7 @@ BuildExecuteStrategyOptions() {
 
 
 GetSelectedExecuteStrategy() {
-    global ExecuteStrategyDropdown, ExecuteStrategies
-    selectedIndex := ExecuteStrategyDropdown.Value
-    if (selectedIndex < 1 || selectedIndex > ExecuteStrategies.Length) {
-        return ExecuteStrategies[1]["key"]
-    }
-    return ExecuteStrategies[selectedIndex]["key"]
+    return GetSession(GetActiveWindowId(), "ExecuteStrategy")
 }
 
 
@@ -56,8 +51,7 @@ GetExecuteStrategyMeta(strategyKey) {
 
 
 AppendNoModifyPromptIfNeeded(content) {
-    global AppConfig
-    if !AppConfig["AppendNoModifyPrompt"] {
+    if !GetSession(GetActiveWindowId(), "AppendNoModifyPrompt") {
         return content
     }
 
@@ -74,7 +68,7 @@ AppendNoModifyPromptIfNeeded(content) {
 
 AppendOpenMdPromptIfNeeded(content) {
     global AppConfig, TemplateDir
-    if (!AppConfig["OpenMdWithIdea"]) {
+    if (!GetSession(GetActiveWindowId(), "OpenMdWithIdea")) {
         return content
     }
 
@@ -93,8 +87,7 @@ AppendOpenMdPromptIfNeeded(content) {
 
 
 AppendReplyImplementationTailIfNeeded(content) {
-    global ReplyImplementationTailCheckbox
-    if !ReplyImplementationTailCheckbox || ReplyImplementationTailCheckbox.Value != 1 {
+    if !GetSession(GetActiveWindowId(), "AppendImplementationTail") {
         return content
     }
 
@@ -222,7 +215,6 @@ CopyContextRelations(*) {
 
 
 CopyExecutePrompt(*) {
-    global ExecuteStrategyDropdown
     if !EnsureCurrentDirectory() {
         return
     }

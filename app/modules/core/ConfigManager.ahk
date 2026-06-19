@@ -29,7 +29,7 @@ EnsureDefaultFiles() {
         IniWrite("210", SettingsFile, "Window", "Width")
     }
     if (IniRead(SettingsFile, "Window", "Height", "") = "") {
-        IniWrite("215", SettingsFile, "Window", "Height")
+        IniWrite("190", SettingsFile, "Window", "Height")
     }
     if (IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
@@ -42,18 +42,6 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Behavior", "MinimizeToTray", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
-    }
-    if (IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "") = "") {
-        IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
-    }
-    if (IniRead(SettingsFile, "Editor", "OpenWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
-    }
-    if (IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
-    }
-    if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
-        IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
     }
     if (IniRead(SettingsFile, "Editor", "IdeaCommand", "") = "") {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
@@ -86,6 +74,24 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window1", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window1", "AgentAfterCopyAction")
     }
+    if (IniRead(SettingsFile, "Window1", "OpenWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Window1", "OpenWithIdea")
+    }
+    if (IniRead(SettingsFile, "Window1", "OpenMdWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Window1", "OpenMdWithIdea")
+    }
+    if (IniRead(SettingsFile, "Window1", "AppendNoModifyPrompt", "") = "") {
+        IniWrite("1", SettingsFile, "Window1", "AppendNoModifyPrompt")
+    }
+    if (IniRead(SettingsFile, "Window1", "AutoHideAfterCreate", "") = "") {
+        IniWrite("0", SettingsFile, "Window1", "AutoHideAfterCreate")
+    }
+    if (IniRead(SettingsFile, "Window1", "AppendImplementationTail", "") = "") {
+        IniWrite("1", SettingsFile, "Window1", "AppendImplementationTail")
+    }
+    if (IniRead(SettingsFile, "Window1", "ExecuteStrategy", "") = "") {
+        IniWrite("ai_judge", SettingsFile, "Window1", "ExecuteStrategy")
+    }
 
     ; [Window2] 段
     if (IniRead(SettingsFile, "Window2", "CurrentDir", "") = "") {
@@ -103,17 +109,23 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window2", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window2", "AgentAfterCopyAction")
     }
-
-    if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
-        IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
+    if (IniRead(SettingsFile, "Window2", "OpenWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Window2", "OpenWithIdea")
     }
-
-    if (IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "") = "") {
-        IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
+    if (IniRead(SettingsFile, "Window2", "OpenMdWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Window2", "OpenMdWithIdea")
     }
-
-    if (IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
+    if (IniRead(SettingsFile, "Window2", "AppendNoModifyPrompt", "") = "") {
+        IniWrite("1", SettingsFile, "Window2", "AppendNoModifyPrompt")
+    }
+    if (IniRead(SettingsFile, "Window2", "AutoHideAfterCreate", "") = "") {
+        IniWrite("0", SettingsFile, "Window2", "AutoHideAfterCreate")
+    }
+    if (IniRead(SettingsFile, "Window2", "AppendImplementationTail", "") = "") {
+        IniWrite("1", SettingsFile, "Window2", "AppendImplementationTail")
+    }
+    if (IniRead(SettingsFile, "Window2", "ExecuteStrategy", "") = "") {
+        IniWrite("ai_judge", SettingsFile, "Window2", "ExecuteStrategy")
     }
 
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
@@ -189,8 +201,8 @@ LoadConfig() {
     AppConfig["IconIndex"] := IniRead(SettingsFile, "App", "IconIndex", "44") + 0
     AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
     AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
-    if (AppConfig["WindowHeight"] < 215) {
-        AppConfig["WindowHeight"] := 215
+    if (AppConfig["WindowHeight"] < 190) {
+        AppConfig["WindowHeight"] := 190
     }
     LoadHotkeyConfig()
     LoadWindowSessions()
@@ -198,11 +210,7 @@ LoadConfig() {
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
-    AppConfig["AutoHideAfterCreate"] := IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "0") = "1"
-    AppConfig["OpenWithIdea"] := IniRead(SettingsFile, "Editor", "OpenWithIdea", "1") = "1"
-    AppConfig["OpenMdWithIdea"] := IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "1") = "1"
     AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
-    AppConfig["AppendNoModifyPrompt"] := IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "1") = "1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
 }
 
@@ -224,6 +232,12 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AgentProcessName"] := IniRead(SettingsFile, section, "AgentProcessName", "")
         WindowSessions[windowId]["AgentClassName"] := IniRead(SettingsFile, section, "AgentClassName", "")
         WindowSessions[windowId]["AgentAfterCopyAction"] := IniRead(SettingsFile, section, "AgentAfterCopyAction", "3") + 0
+        WindowSessions[windowId]["OpenWithIdea"] := IniRead(SettingsFile, section, "OpenWithIdea", "1") = "1"
+        WindowSessions[windowId]["OpenMdWithIdea"] := IniRead(SettingsFile, section, "OpenMdWithIdea", "1") = "1"
+        WindowSessions[windowId]["AppendNoModifyPrompt"] := IniRead(SettingsFile, section, "AppendNoModifyPrompt", "1") = "1"
+        WindowSessions[windowId]["AutoHideAfterCreate"] := IniRead(SettingsFile, section, "AutoHideAfterCreate", "0") = "1"
+        WindowSessions[windowId]["AppendImplementationTail"] := IniRead(SettingsFile, section, "AppendImplementationTail", "1") = "1"
+        WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "ai_judge")
     }
 }
 
@@ -236,6 +250,12 @@ SaveWindowSession(windowId) {
     IniWrite(WindowSessions[windowId]["AgentProcessName"], SettingsFile, section, "AgentProcessName")
     IniWrite(WindowSessions[windowId]["AgentClassName"], SettingsFile, section, "AgentClassName")
     IniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
+    IniWrite(WindowSessions[windowId]["OpenWithIdea"] ? "1" : "0", SettingsFile, section, "OpenWithIdea")
+    IniWrite(WindowSessions[windowId]["OpenMdWithIdea"] ? "1" : "0", SettingsFile, section, "OpenMdWithIdea")
+    IniWrite(WindowSessions[windowId]["AppendNoModifyPrompt"] ? "1" : "0", SettingsFile, section, "AppendNoModifyPrompt")
+    IniWrite(WindowSessions[windowId]["AutoHideAfterCreate"] ? "1" : "0", SettingsFile, section, "AutoHideAfterCreate")
+    IniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
+    IniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
 }
 
 ; 保存 2 号窗口启用状态

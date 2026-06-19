@@ -22,6 +22,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk
 #Include %A_ScriptDir%\modules\ui\ConfigDialog.ahk
+#Include %A_ScriptDir%\modules\ui\OptionsDialog.ahk
 #Include %A_ScriptDir%\modules\ui\HotkeyManager.ahk
 
 if (!EnsureSingleInstance()) {
@@ -35,7 +36,6 @@ if (!EnsureSingleInstance()) {
 
 EnsureDefaultFiles()
 LoadConfig()
-LoadWindowSessions()
 CreateTray()
 CreateMainGui()
 UpdateBindButtonState()

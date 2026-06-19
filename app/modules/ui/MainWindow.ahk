@@ -5,15 +5,11 @@
 global CurrentPathText := ""
 global CurrentPathHwnd := 0
 global CurrentDirStateMark := ""
-global OpenWithIdeaCheckbox := ""
-global OpenMdWithIdeaCheckbox := ""
-global NoModifyPromptCheckbox := ""
 global ReplyImplementationTailCheckbox := ""
 global SetDirectoryButton := ""
 global ReturnParentButton := ""
 global CreateIssueButton := ""
 global NewThemeButton := ""
-global AutoHideCheckbox := ""
 global BindAgentWindowButton := ""
 global UnbindAgentWindowButton := ""
 global CreateRequirementButton := ""
@@ -27,7 +23,7 @@ global MainGui := ""
 global HoverTooltipVisible := false
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, OpenWithIdeaCheckbox, OpenMdWithIdeaCheckbox, NoModifyPromptCheckbox, ReplyImplementationTailCheckbox, AutoHideCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
@@ -58,29 +54,16 @@ CreateMainGui() {
     ReturnParentButton := MainGui.AddButton("x148 ym w54 h22 Hidden", "返")
     ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
 
-    NewThemeButton := MainGui.AddButton("xm y+6 w54 h22", "新主题")
+    OptionsButton := MainGui.AddButton("xm y+6 w54 h22", "选项")
+    OptionsButton.OnEvent("Click", ShowOptionsDialog)
+
+    NewThemeButton := MainGui.AddButton("x+6 yp w54 h22", "新主题")
     NewThemeButton.OnEvent("Click", CreateNewTheme)
 
     CreateIssueButton := MainGui.AddButton("x+6 yp w54 h22", "建问题")
     CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
 
-    OpenWithIdeaCheckbox := MainGui.AddCheckbox("xm y+6", "IDEA开")
-    OpenWithIdeaCheckbox.Value := AppConfig["OpenWithIdea"] ? 1 : 0
-    OpenWithIdeaCheckbox.OnEvent("Click", ToggleIdeaOpen)
-
-    NoModifyPromptCheckbox := MainGui.AddCheckbox("x+4 yp", "禁改正式")
-    NoModifyPromptCheckbox.Value := AppConfig["AppendNoModifyPrompt"] ? 1 : 0
-    NoModifyPromptCheckbox.OnEvent("Click", ToggleNoModifyPrompt)
-
-    AutoHideCheckbox := MainGui.AddCheckbox("x+4 yp", "自隐藏")
-    AutoHideCheckbox.Value := AppConfig["AutoHideAfterCreate"] ? 1 : 0
-    AutoHideCheckbox.OnEvent("Click", ToggleAutoHide)
-
-    OpenMdWithIdeaCheckbox := MainGui.AddCheckbox("xm y+8 h" actionButtonHeight, "MD开")
-    OpenMdWithIdeaCheckbox.Value := AppConfig["OpenMdWithIdea"] ? 1 : 0
-    OpenMdWithIdeaCheckbox.OnEvent("Click", ToggleOpenMdWithIdea)
-
-    BindAgentWindowButton := MainGui.AddButton("x+4 yp w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
+    BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
     BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
 
     UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
@@ -99,6 +82,7 @@ CreateMainGui() {
     CopyReplyPromptButton.OnEvent("Click", CopyReplyPrompt)
 
     ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
+    ReplyImplementationTailCheckbox.OnEvent("Click", OnImplementationTailToggle)
 
     CopyRelationsButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "复关系")
     CopyRelationsButton.OnEvent("Click", CopyContextRelations)
@@ -108,7 +92,17 @@ CreateMainGui() {
 
     executeStrategyOptions := BuildExecuteStrategyOptions()
     ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w44", executeStrategyOptions)
-    ExecuteStrategyDropdown.Choose(2)
+    ExecuteStrategyDropdown.OnEvent("Change", OnExecuteStrategyChange)
+    windowId := GetActiveWindowId()
+    strategyKey := GetSession(windowId, "ExecuteStrategy")
+    initialIndex := 1
+    for index, strategy in ExecuteStrategies {
+        if (strategy["key"] = strategyKey) {
+            initialIndex := index
+            break
+        }
+    }
+    ExecuteStrategyDropdown.Choose(initialIndex)
 
     SetControlsEnabled(false)
     RefreshDirectoryStateUI()
@@ -124,6 +118,10 @@ ShowMainWindow(*) {
     }
 
     RefreshMainWindow()
+
+    if (GetCurrentDir() != "") {
+        SetControlsEnabled(true)
+    }
 
     width := AppConfig["WindowWidth"]
     height := AppConfig["WindowHeight"]
@@ -145,7 +143,8 @@ SwitchToWindow(windowId) {
 }
 
 RefreshMainWindow() {
-    global MainGui
+    global MainGui, ReplyImplementationTailCheckbox, ExecuteStrategyDropdown, ExecuteStrategies
+
     if (!MainGui) {
         return
     }
@@ -157,6 +156,22 @@ RefreshMainWindow() {
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     UpdateBindButtonState()
+
+    ; 同步"实" checkbox
+    if (ReplyImplementationTailCheckbox) {
+        ReplyImplementationTailCheckbox.Value := GetSession(windowId, "AppendImplementationTail") ? 1 : 0
+    }
+
+    ; 同步执行策略下拉框
+    if (ExecuteStrategyDropdown) {
+        strategyKey := GetSession(windowId, "ExecuteStrategy")
+        for index, strategy in ExecuteStrategies {
+            if (strategy["key"] = strategyKey) {
+                ExecuteStrategyDropdown.Choose(index)
+                break
+            }
+        }
+    }
 }
 
 
@@ -188,7 +203,7 @@ HandleClose(*) {
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
-    global NewThemeButton, AutoHideCheckbox, OpenMdWithIdeaCheckbox, BindAgentWindowButton, UnbindAgentWindowButton
+    global NewThemeButton, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
@@ -200,8 +215,6 @@ SetControlsEnabled(enabled) {
     CreateIssueButton.Enabled := enabled
     ReturnParentButton.Enabled := enabled
     NewThemeButton.Enabled := enabled
-    AutoHideCheckbox.Enabled := enabled
-    OpenMdWithIdeaCheckbox.Enabled := enabled
     BindAgentWindowButton.Enabled := enabled
     UnbindAgentWindowButton.Enabled := enabled
 }
@@ -238,48 +251,23 @@ OnWindowSize(wParam, lParam, msg, hwnd) {
 
 
 MaybeAutoHide() {
-    global AutoHideCheckbox
-    if (AutoHideCheckbox && AutoHideCheckbox.Value = 1) {
+    if (GetSession(GetActiveWindowId(), "AutoHideAfterCreate")) {
         HideToTray()
     }
 }
 
-ToggleIdeaOpen(ctrl, *) {
-    global AppConfig, SettingsFile
-    checked := ctrl.Value = 1
-    AppConfig["OpenWithIdea"] := checked
-    IniWrite(checked ? "1" : "0", SettingsFile, "Editor", "OpenWithIdea")
-    ShowFeedback(checked ? "已开启 IDEA 打开" : "已关闭 IDEA 打开")
+OnImplementationTailToggle(ctrl, *) {
+    SetSession(GetActiveWindowId(), "AppendImplementationTail", ctrl.Value = 1)
+    SaveWindowSession(GetActiveWindowId())
 }
 
-
-
-ToggleNoModifyPrompt(ctrl, *) {
-    global AppConfig, SettingsFile
-    checked := ctrl.Value = 1
-    AppConfig["AppendNoModifyPrompt"] := checked
-    IniWrite(checked ? "1" : "0", SettingsFile, "Prompt", "AppendNoModifyPrompt")
-    ShowFeedback(checked ? "已开启禁改正式" : "已关闭禁改正式")
-}
-
-
-
-ToggleAutoHide(ctrl, *) {
-    global AppConfig, SettingsFile
-    checked := ctrl.Value = 1
-    AppConfig["AutoHideAfterCreate"] := checked
-    IniWrite(checked ? "1" : "0", SettingsFile, "Behavior", "AutoHideAfterCreate")
-    ShowFeedback(checked ? "已开启自动隐藏" : "已关闭自动隐藏")
-}
-
-
-
-ToggleOpenMdWithIdea(ctrl, *) {
-    global AppConfig, SettingsFile
-    checked := ctrl.Value = 1
-    AppConfig["OpenMdWithIdea"] := checked
-    IniWrite(checked ? "1" : "0", SettingsFile, "Editor", "OpenMdWithIdea")
-    ShowFeedback(checked ? "已开启MD开" : "已关闭MD开")
+OnExecuteStrategyChange(ctrl, *) {
+    global ExecuteStrategies
+    selectedIndex := ctrl.Value
+    if (selectedIndex >= 1 && selectedIndex <= ExecuteStrategies.Length) {
+        SetSession(GetActiveWindowId(), "ExecuteStrategy", ExecuteStrategies[selectedIndex]["key"])
+        SaveWindowSession(GetActiveWindowId())
+    }
 }
 
 ShowFeedback(message, isError := false) {
