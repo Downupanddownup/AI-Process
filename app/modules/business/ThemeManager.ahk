@@ -11,14 +11,14 @@ global ResultIssueStateMark := "↳"
 
 
 CreateNewTheme(*) {
-    global CurrentDir
     if !EnsureCurrentDirectory() {
         return
     }
 
-    if IsResultIssueDir(CurrentDir) {
+    currentDir := GetCurrentDir()
+    if IsResultIssueDir(currentDir) {
         parentDir := ""
-        SplitPath(CurrentDir,, &parentDir)
+        SplitPath(currentDir,, &parentDir)
         issueRoot := parentDir
         DirCreate(issueRoot)
         nextIssueDirName := GetNextIssueDirName(issueRoot)
@@ -30,6 +30,7 @@ CreateNewTheme(*) {
 
     ShowNewThemeDialog()
 }
+
 
 
 
@@ -98,7 +99,7 @@ ShowNewThemeDialogAtCenter() {
 
 
 SubmitNewThemeDialog(*) {
-    global CurrentDir, NewThemeDialog, NewThemeDialogEdit, NewThemeDialogErrorText
+    global NewThemeDialog, NewThemeDialogEdit, NewThemeDialogErrorText
     if !NewThemeDialog {
         return
     }
@@ -113,8 +114,9 @@ SubmitNewThemeDialog(*) {
         return
     }
 
+    currentDir := GetCurrentDir()
     parentDir := ""
-    SplitPath(CurrentDir,, &parentDir)
+    SplitPath(currentDir,, &parentDir)
     newDir := parentDir "\" themeName
     if DirExist(newDir) {
         ShowNewThemeDialogError("目录已存在：" themeName)
@@ -141,23 +143,25 @@ CloseNewThemeDialog(*) {
 
 
 CreateAndEnterIssueDir(*) {
-    global CurrentDir, ResultIssueRootName
+    global ResultIssueRootName
     if !EnsureCurrentDirectory() {
         return
     }
 
-    if IsResultIssueDir(CurrentDir) {
+    currentDir := GetCurrentDir()
+    if IsResultIssueDir(currentDir) {
         ShowFeedback("请先返回主题目录", true)
         return
     }
 
-    issueRoot := GetResultIssueRoot(CurrentDir)
+    issueRoot := GetResultIssueRoot(currentDir)
     DirCreate(issueRoot)
     nextIssueDirName := GetNextIssueDirName(issueRoot)
     nextIssueDirPath := issueRoot "\" nextIssueDirName
     DirCreate(nextIssueDirPath)
 
-    CurrentDir := nextIssueDirPath
+    SetCurrentDir(nextIssueDirPath)
+    SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     ShowFeedback("已进入问题目录：" nextIssueDirName)
@@ -177,8 +181,8 @@ ShowNewThemeDialogError(message) {
 
 
 SwitchToNewTheme(newDir) {
-    global CurrentDir
-    CurrentDir := newDir
+    SetCurrentDir(newDir)
+    SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     CreateRequirementFile()

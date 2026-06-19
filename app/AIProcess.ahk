@@ -21,6 +21,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\ThemeManager.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk
+#Include %A_ScriptDir%\modules\ui\ConfigDialog.ahk
 #Include %A_ScriptDir%\modules\ui\HotkeyManager.ahk
 
 if (!EnsureSingleInstance()) {
@@ -34,12 +35,14 @@ if (!EnsureSingleInstance()) {
 
 EnsureDefaultFiles()
 LoadConfig()
+LoadWindowSessions()
 CreateTray()
 CreateMainGui()
 UpdateBindButtonState()
 
 if (HasSetDirArg()) {
     ; 第一个实例被右键菜单启动，处理设目录后继续运行
+    SetActiveWindowId(1)
     SetCurrentDirAndOpenRequirement(GetSetDirArg())
     StartedFromContextMenu := true
 }

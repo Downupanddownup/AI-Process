@@ -55,7 +55,7 @@ SendSetDirToExistingInstance(dirPath) {
 
     DetectHiddenWindows(true)
     try {
-        hwnd := WinGetID("AIProcess 快捷面板")
+        hwnd := WinGetID("一窗")
         if (hwnd) {
             SendMessage(0x4000, 0, 0, , "ahk_id " hwnd)
         }
@@ -68,7 +68,9 @@ SendSetDirToExistingInstance(dirPath) {
 OnSetDirMessage(wParam, lParam, msg, hwnd) {
     dirPath := ReadSetDirTempFile()
     if (dirPath != "") {
+        SetActiveWindowId(1)
         SetCurrentDirAndOpenRequirement(dirPath)
+        RefreshMainWindow()
     }
     return 0
 }

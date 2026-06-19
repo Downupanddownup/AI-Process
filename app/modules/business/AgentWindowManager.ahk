@@ -66,9 +66,10 @@ BindAgentWindow(*) {
         return
     }
 
-    AppConfig["AgentWindowTitleContains"] := title
-    AppConfig["AgentWindowProcessName"] := proc
-    AppConfig["AgentWindowClassName"] := class
+    windowId := GetActiveWindowId()
+    SetSession(windowId, "AgentTitleContains", title)
+    SetSession(windowId, "AgentProcessName", proc)
+    SetSession(windowId, "AgentClassName", class)
     SaveAgentWindowConfig()
     UpdateBindButtonState()
 }
@@ -76,8 +77,8 @@ BindAgentWindow(*) {
 
 
 IsAgentWindowBound() {
-    global AppConfig
-    return AppConfig["AgentWindowProcessName"] != "" && AppConfig["AgentWindowClassName"] != ""
+    windowId := GetActiveWindowId()
+    return GetSession(windowId, "AgentProcessName") != "" && GetSession(windowId, "AgentClassName") != ""
 }
 
 
@@ -111,11 +112,7 @@ FlashBindButtonError(message) {
 
 
 SaveAgentWindowConfig() {
-    global AppConfig, SettingsFile
-    IniWrite(AppConfig["AgentWindowTitleContains"], SettingsFile, "AgentWindow", "TitleContains")
-    IniWrite(AppConfig["AgentWindowProcessName"], SettingsFile, "AgentWindow", "ProcessName")
-    IniWrite(AppConfig["AgentWindowClassName"], SettingsFile, "AgentWindow", "ClassName")
-    IniWrite(AppConfig["AgentWindowAfterCopyAction"], SettingsFile, "AgentWindow", "AfterCopyAction")
+    SaveWindowSession(GetActiveWindowId())
 }
 
 
@@ -178,9 +175,10 @@ RefreshAgentWindowDialog() {
         return
     }
 
-    title := AppConfig["AgentWindowTitleContains"]
-    proc := AppConfig["AgentWindowProcessName"]
-    class := AppConfig["AgentWindowClassName"]
+    windowId := GetActiveWindowId()
+    title := GetSession(windowId, "AgentTitleContains")
+    proc := GetSession(windowId, "AgentProcessName")
+    class := GetSession(windowId, "AgentClassName")
 
     AgentWindowDialogTitleText.Text := "窗口标题：" TruncateMiddle(title, 40)
     AgentWindowDialogProcessText.Text := "进程：" proc
@@ -193,7 +191,7 @@ RefreshAgentWindowDialog() {
         AgentWindowDialogStatusText.Text := "状态：未找到"
     }
 
-    action := AppConfig["AgentWindowAfterCopyAction"]
+    action := GetSession(GetActiveWindowId(), "AgentAfterCopyAction")
     if (action >= 1 && action <= 4) {
         AgentWindowDialogActionDropdown.Choose(action)
     } else {
@@ -230,18 +228,17 @@ AgentDialogTestActivate(*) {
 
 
 AgentDialogActionChanged(ctrl, *) {
-    global AppConfig
-    AppConfig["AgentWindowAfterCopyAction"] := ctrl.Value
+    SetSession(GetActiveWindowId(), "AgentAfterCopyAction", ctrl.Value)
     SaveAgentWindowConfig()
 }
 
 
 
 FindBoundAgentWindow() {
-    global AppConfig
-    titleContains := AppConfig["AgentWindowTitleContains"]
-    procName := AppConfig["AgentWindowProcessName"]
-    className := AppConfig["AgentWindowClassName"]
+    agentConfig := GetCurrentAgentConfig()
+    titleContains := agentConfig["TitleContains"]
+    procName := agentConfig["ProcessName"]
+    className := agentConfig["ClassName"]
 
     if (procName = "" || className = "") {
         return 0
@@ -289,8 +286,8 @@ FindBoundAgentWindow() {
 
 
 HandleAgentWindowAfterCopy() {
-    global AppConfig
-    action := AppConfig["AgentWindowAfterCopyAction"]
+    agentConfig := GetCurrentAgentConfig()
+    action := agentConfig["AfterCopyAction"]
     if (action <= 1 || action = "") {
         return
     }
@@ -320,10 +317,11 @@ HandleAgentWindowAfterCopy() {
 
 
 UnbindAgentWindow() {
-    global AppConfig, AgentWindowDialog
-    AppConfig["AgentWindowTitleContains"] := ""
-    AppConfig["AgentWindowProcessName"] := ""
-    AppConfig["AgentWindowClassName"] := ""
+    global AgentWindowDialog
+    windowId := GetActiveWindowId()
+    SetSession(windowId, "AgentTitleContains", "")
+    SetSession(windowId, "AgentProcessName", "")
+    SetSession(windowId, "AgentClassName", "")
     SaveAgentWindowConfig()
     UpdateBindButtonState()
     if (AgentWindowDialog) {

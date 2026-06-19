@@ -28,17 +28,49 @@ EnsureDefaultFiles() {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
     }
 
-    if (IniRead(SettingsFile, "AgentWindow", "AfterCopyAction", "") = "") {
-        IniWrite("3", SettingsFile, "AgentWindow", "AfterCopyAction")
+    ; [Hotkey] 段
+    if (IniRead(SettingsFile, "Hotkey", "Window1Hotkey", "") = "") {
+        IniWrite("F2", SettingsFile, "Hotkey", "Window1Hotkey")
     }
-    if (IniRead(SettingsFile, "AgentWindow", "TitleContains", "") = "") {
-        IniWrite("", SettingsFile, "AgentWindow", "TitleContains")
+    if (IniRead(SettingsFile, "Hotkey", "Window2Hotkey", "") = "") {
+        IniWrite("F3", SettingsFile, "Hotkey", "Window2Hotkey")
     }
-    if (IniRead(SettingsFile, "AgentWindow", "ProcessName", "") = "") {
-        IniWrite("", SettingsFile, "AgentWindow", "ProcessName")
+    if (IniRead(SettingsFile, "Hotkey", "EnableWindow2", "") = "") {
+        IniWrite("0", SettingsFile, "Hotkey", "EnableWindow2")
     }
-    if (IniRead(SettingsFile, "AgentWindow", "ClassName", "") = "") {
-        IniWrite("", SettingsFile, "AgentWindow", "ClassName")
+
+    ; [Window1] 段
+    if (IniRead(SettingsFile, "Window1", "CurrentDir", "") = "") {
+        IniWrite("", SettingsFile, "Window1", "CurrentDir")
+    }
+    if (IniRead(SettingsFile, "Window1", "AgentTitleContains", "") = "") {
+        IniWrite("", SettingsFile, "Window1", "AgentTitleContains")
+    }
+    if (IniRead(SettingsFile, "Window1", "AgentProcessName", "") = "") {
+        IniWrite("", SettingsFile, "Window1", "AgentProcessName")
+    }
+    if (IniRead(SettingsFile, "Window1", "AgentClassName", "") = "") {
+        IniWrite("", SettingsFile, "Window1", "AgentClassName")
+    }
+    if (IniRead(SettingsFile, "Window1", "AgentAfterCopyAction", "") = "") {
+        IniWrite("3", SettingsFile, "Window1", "AgentAfterCopyAction")
+    }
+
+    ; [Window2] 段
+    if (IniRead(SettingsFile, "Window2", "CurrentDir", "") = "") {
+        IniWrite("", SettingsFile, "Window2", "CurrentDir")
+    }
+    if (IniRead(SettingsFile, "Window2", "AgentTitleContains", "") = "") {
+        IniWrite("", SettingsFile, "Window2", "AgentTitleContains")
+    }
+    if (IniRead(SettingsFile, "Window2", "AgentProcessName", "") = "") {
+        IniWrite("", SettingsFile, "Window2", "AgentProcessName")
+    }
+    if (IniRead(SettingsFile, "Window2", "AgentClassName", "") = "") {
+        IniWrite("", SettingsFile, "Window2", "AgentClassName")
+    }
+    if (IniRead(SettingsFile, "Window2", "AgentAfterCopyAction", "") = "") {
+        IniWrite("3", SettingsFile, "Window2", "AgentAfterCopyAction")
     }
 
     if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
@@ -129,10 +161,8 @@ LoadConfig() {
     if (AppConfig["WindowHeight"] < 215) {
         AppConfig["WindowHeight"] := 215
     }
-    AppConfig["AgentWindowTitleContains"] := IniRead(SettingsFile, "AgentWindow", "TitleContains", "")
-    AppConfig["AgentWindowProcessName"] := IniRead(SettingsFile, "AgentWindow", "ProcessName", "")
-    AppConfig["AgentWindowClassName"] := IniRead(SettingsFile, "AgentWindow", "ClassName", "")
-    AppConfig["AgentWindowAfterCopyAction"] := IniRead(SettingsFile, "AgentWindow", "AfterCopyAction", "3") + 0
+    LoadHotkeyConfig()
+    LoadWindowSessions()
     AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
@@ -143,4 +173,42 @@ LoadConfig() {
     AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
     AppConfig["AppendNoModifyPrompt"] := IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "1") = "1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
+}
+
+; 加载热键配置
+LoadHotkeyConfig() {
+    global AppConfig, SettingsFile
+    AppConfig["Window1Hotkey"] := IniRead(SettingsFile, "Hotkey", "Window1Hotkey", "F2")
+    AppConfig["Window2Hotkey"] := IniRead(SettingsFile, "Hotkey", "Window2Hotkey", "F3")
+    AppConfig["EnableWindow2"] := IniRead(SettingsFile, "Hotkey", "EnableWindow2", "0") = "1"
+}
+
+; 加载各窗口会话数据
+LoadWindowSessions() {
+    global WindowSessions, SettingsFile
+    for windowId in [1, 2] {
+        section := "Window" windowId
+        WindowSessions[windowId]["CurrentDir"] := IniRead(SettingsFile, section, "CurrentDir", "")
+        WindowSessions[windowId]["AgentTitleContains"] := IniRead(SettingsFile, section, "AgentTitleContains", "")
+        WindowSessions[windowId]["AgentProcessName"] := IniRead(SettingsFile, section, "AgentProcessName", "")
+        WindowSessions[windowId]["AgentClassName"] := IniRead(SettingsFile, section, "AgentClassName", "")
+        WindowSessions[windowId]["AgentAfterCopyAction"] := IniRead(SettingsFile, section, "AgentAfterCopyAction", "3") + 0
+    }
+}
+
+; 保存指定窗口的会话数据
+SaveWindowSession(windowId) {
+    global WindowSessions, SettingsFile
+    section := "Window" windowId
+    IniWrite(WindowSessions[windowId]["CurrentDir"], SettingsFile, section, "CurrentDir")
+    IniWrite(WindowSessions[windowId]["AgentTitleContains"], SettingsFile, section, "AgentTitleContains")
+    IniWrite(WindowSessions[windowId]["AgentProcessName"], SettingsFile, section, "AgentProcessName")
+    IniWrite(WindowSessions[windowId]["AgentClassName"], SettingsFile, section, "AgentClassName")
+    IniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
+}
+
+; 保存 2 号窗口启用状态
+SaveEnableWindow2(enabled) {
+    global SettingsFile
+    IniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow2")
 }

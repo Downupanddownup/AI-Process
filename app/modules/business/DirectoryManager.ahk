@@ -6,8 +6,9 @@ global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
 
 SetCurrentDirAndOpenRequirement(dirPath) {
-    global CurrentDir, AppConfig
-    CurrentDir := NormalizePath(dirPath)
+    global AppConfig
+    SetCurrentDir(NormalizePath(dirPath))
+    SaveWindowSession(GetActiveWindowId())
 
     if (MainGui) {
         UpdateCurrentPathDisplay()
@@ -15,7 +16,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
         RefreshDirectoryStateUI()
     }
 
-    filePath := CurrentDir "\需求.txt"
+    filePath := GetCurrentDir() "\需求.txt"
     existed := FileExist(filePath)
     if (!existed) {
         FileAppend("", filePath, "UTF-8")
@@ -28,14 +29,14 @@ SetCurrentDirAndOpenRequirement(dirPath) {
 
 
 PromptForDirectory(*) {
-    global CurrentDir, DirectoryDialog, DirectoryDialogEdit, MainGui
+    global DirectoryDialog, DirectoryDialogEdit, MainGui
     if DirectoryDialog {
         DirectoryDialog.Show()
         WinActivate("ahk_id " DirectoryDialog.Hwnd)
         return
     }
 
-    defaultValue := CurrentDir != "" ? CurrentDir : ""
+    defaultValue := GetCurrentDir() != "" ? GetCurrentDir() : ""
     ownerHwnd := MainGui ? MainGui.Hwnd : 0
     dialogOptions := "+AlwaysOnTop +ToolWindow"
     if ownerHwnd {
@@ -87,7 +88,7 @@ ShowDirectoryDialog() {
 
 
 SubmitDirectoryDialog(*) {
-    global CurrentDir, DirectoryDialog, DirectoryDialogEdit
+    global DirectoryDialog, DirectoryDialogEdit
     if !DirectoryDialog {
         return
     }
@@ -103,7 +104,8 @@ SubmitDirectoryDialog(*) {
         return
     }
 
-    CurrentDir := NormalizePath(rawPath)
+    SetCurrentDir(NormalizePath(rawPath))
+    SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
     RefreshDirectoryStateUI()
@@ -127,15 +129,16 @@ CloseDirectoryDialog(*) {
 
 
 UpdateCurrentPathDisplay() {
-    global CurrentDir, CurrentPathText, CurrentDirStateMark
-    if CurrentDir = "" {
+    global CurrentPathText, CurrentDirStateMark
+    currentDir := GetCurrentDir()
+    if currentDir = "" {
         CurrentPathText.Text := "当前：未设置"
         CurrentDirStateMark.Text := ""
         return
     }
 
-    split := StrSplit(CurrentDir, "\")
-    dirName := split.Length ? split[split.Length] : CurrentDir
+    split := StrSplit(currentDir, "\")
+    dirName := split.Length ? split[split.Length] : currentDir
     CurrentPathText.Text := "当前：" dirName
     CurrentDirStateMark.Text := ""
 }
@@ -182,24 +185,25 @@ GetNextIssueDirName(issueRootPath) {
 
 
 ShowFullPath(*) {
-    global CurrentDir
-    if CurrentDir = "" {
+    currentDir := GetCurrentDir()
+    if currentDir = "" {
         ShowFeedback("请先设置当前主题目录", true)
         return
     }
-    MsgBox(CurrentDir, "当前完整路径", "Iconi")
+    MsgBox(currentDir, "当前完整路径", "Iconi")
 }
 
 
 
 RefreshDirectoryStateUI() {
-    global CurrentDir, SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton, CurrentDirStateMark
+    global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton, CurrentDirStateMark
 
     if !SetDirectoryButton || !ReturnParentButton || !CreateIssueButton || !NewThemeButton || !CurrentDirStateMark {
         return
     }
 
-    if (CurrentDir = "") {
+    currentDir := GetCurrentDir()
+    if (currentDir = "") {
         SetDirectoryButton.Visible := true
         ReturnParentButton.Visible := false
         CreateIssueButton.Visible := false
@@ -208,7 +212,7 @@ RefreshDirectoryStateUI() {
         return
     }
 
-    isIssueDir := IsResultIssueDir(CurrentDir)
+    isIssueDir := IsResultIssueDir(currentDir)
     SetDirectoryButton.Visible := !isIssueDir
     ReturnParentButton.Visible := isIssueDir
     CreateIssueButton.Visible := !isIssueDir
@@ -218,17 +222,18 @@ RefreshDirectoryStateUI() {
 
 
 ReturnToThemeDir(*) {
-    global CurrentDir
     if !EnsureCurrentDirectory() {
         return
     }
 
-    if !IsResultIssueDir(CurrentDir) {
+    currentDir := GetCurrentDir()
+    if !IsResultIssueDir(currentDir) {
         ShowFeedback("当前不在问题子目录", true)
         return
     }
 
-    CurrentDir := GetThemeRootFromIssueDir(CurrentDir)
+    SetCurrentDir(GetThemeRootFromIssueDir(currentDir))
+    SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     ShowFeedback("已返回主题目录")

@@ -110,11 +110,11 @@ AppendReplyImplementationTailIfNeeded(content) {
 
 
 BuildContextRelationsText() {
-    global CurrentDir
+    currentDir := GetCurrentDir()
 
-    orderedFiles := GetOrderedContextFiles(CurrentDir)
+    orderedFiles := GetOrderedContextFiles(currentDir)
     if (orderedFiles.Length = 0) {
-        return "当前主题目录：" CurrentDir "`n`n当前目录下未找到可用于上下文重建的关键文件。"
+        return "当前主题目录：" currentDir "`n`n当前目录下未找到可用于上下文重建的关键文件。"
     }
 
     readingNames := []
@@ -134,7 +134,7 @@ BuildContextRelationsText() {
         }
     }
 
-    intro := "当前主题目录：" CurrentDir
+    intro := "当前主题目录：" currentDir
     orderLine := "请优先按时间顺序阅读：" JoinArray(readingNames, " -> ")
     roleLines := []
 
@@ -157,13 +157,13 @@ BuildContextRelationsText() {
 
 
 CopyRequirementPrompt(*) {
-    global CurrentDir
     if !EnsureCurrentDirectory() {
         return
     }
 
+    currentDir := GetCurrentDir()
     content := LoadTemplate("requirement_prompt.txt")
-    content := StrReplace(content, "{{filePath}}", CurrentDir "\需求.txt")
+    content := StrReplace(content, "{{filePath}}", currentDir "\需求.txt")
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
@@ -176,18 +176,18 @@ CopyRequirementPrompt(*) {
 
 
 CopyReplyPrompt(*) {
-    global CurrentDir
     if !EnsureCurrentDirectory() {
         return
     }
 
-    latestVersion := GetLatestVersionNumber(CurrentDir)
+    currentDir := GetCurrentDir()
+    latestVersion := GetLatestVersionNumber(currentDir)
     if (latestVersion = 0) {
         ShowFeedback("当前目录下未找到 vX.md 文件", true)
         return
     }
 
-    currentReplyFile := CurrentDir "\对v" latestVersion "的回复.txt"
+    currentReplyFile := currentDir "\对v" latestVersion "的回复.txt"
     nextVersionFile := "v" (latestVersion + 1) ".md"
     content := LoadTemplate("reply_prompt.txt")
     content := StrReplace(content, "{{filePath}}", currentReplyFile)
@@ -222,12 +222,13 @@ CopyContextRelations(*) {
 
 
 CopyExecutePrompt(*) {
-    global CurrentDir, ExecuteStrategyDropdown
+    global ExecuteStrategyDropdown
     if !EnsureCurrentDirectory() {
         return
     }
 
-    implementationPath := CurrentDir "\实施文档.md"
+    currentDir := GetCurrentDir()
+    implementationPath := currentDir "\实施文档.md"
     if !FileExist(implementationPath) {
         ShowFeedback("当前目录下未找到 实施文档.md", true)
         return

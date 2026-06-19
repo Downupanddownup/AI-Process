@@ -40,7 +40,7 @@ CreateMainGui() {
         guiOptions .= " +AlwaysOnTop"
     }
 
-    MainGui := Gui(guiOptions, "AIProcess 快捷面板")
+    MainGui := Gui(guiOptions, "一窗")
     MainGui.BackColor := "F7F7F7"
     MainGui.MarginX := 8
     MainGui.MarginY := 8
@@ -118,13 +118,15 @@ CreateMainGui() {
 
 ShowMainWindow(*) {
     global MainGui, AppConfig
-    width := AppConfig["WindowWidth"]
-    height := AppConfig["WindowHeight"]
 
     if !MainGui {
         return
     }
 
+    RefreshMainWindow()
+
+    width := AppConfig["WindowWidth"]
+    height := AppConfig["WindowHeight"]
     screenWidth := A_ScreenWidth
     screenHeight := A_ScreenHeight
     x := Max(0, Floor((screenWidth - width) / 2))
@@ -134,6 +136,27 @@ ShowMainWindow(*) {
         WinSetAlwaysOnTop(1, "ahk_id " MainGui.Hwnd)
     }
     WinActivate("ahk_id " MainGui.Hwnd)
+}
+
+SwitchToWindow(windowId) {
+    SetActiveWindowId(windowId)
+    RefreshMainWindow()
+    ShowMainWindow()
+}
+
+RefreshMainWindow() {
+    global MainGui
+    if (!MainGui) {
+        return
+    }
+
+    windowId := GetActiveWindowId()
+    title := windowId = 1 ? "一窗" : "二窗"
+    MainGui.Title := title
+
+    UpdateCurrentPathDisplay()
+    RefreshDirectoryStateUI()
+    UpdateBindButtonState()
 }
 
 
@@ -186,10 +209,11 @@ SetControlsEnabled(enabled) {
 
 
 OnMouseMove(wParam, lParam, msg, hwnd) {
-    global CurrentDir, CurrentPathHwnd, HoverTooltipVisible
+    global CurrentPathHwnd, HoverTooltipVisible
 
-    if (hwnd = CurrentPathHwnd && CurrentDir != "") {
-        ToolTip(CurrentDir)
+    currentDir := GetCurrentDir()
+    if (hwnd = CurrentPathHwnd && currentDir != "") {
+        ToolTip(currentDir)
         HoverTooltipVisible := true
         return
     }

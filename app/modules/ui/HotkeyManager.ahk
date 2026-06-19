@@ -2,13 +2,32 @@
 
 ; 热键管理
 
-
 RegisterGlobalHotkey() {
     global AppConfig
+
+    ; 1 号窗口热键永远注册
     try {
-        Hotkey(AppConfig["Hotkey"], ToggleMainWindow)
+        Hotkey(AppConfig["Window1Hotkey"], ToggleWindow1)
     } catch Error as err {
-        MsgBox("全局快捷键注册失败：" AppConfig["Hotkey"] "`n" err.Message, "AIProcess", "Iconx")
+        MsgBox("1 号窗口热键注册失败：" AppConfig["Window1Hotkey"] "`n" err.Message, "AIProcess", "Iconx")
+    }
+
+    ; 2 号窗口热键仅在启用且不冲突时注册
+    if (AppConfig["EnableWindow2"]) {
+        if (AppConfig["Window1Hotkey"] != AppConfig["Window2Hotkey"]) {
+            try {
+                Hotkey(AppConfig["Window2Hotkey"], ToggleWindow2)
+            } catch Error as err {
+                MsgBox("2 号窗口热键注册失败：" AppConfig["Window2Hotkey"] "`n" err.Message, "AIProcess", "Iconx")
+            }
+        }
     }
 }
 
+ToggleWindow1(*) {
+    SwitchToWindow(1)
+}
+
+ToggleWindow2(*) {
+    SwitchToWindow(2)
+}

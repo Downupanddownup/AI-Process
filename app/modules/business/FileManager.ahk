@@ -15,8 +15,7 @@ OpenFileInIdea(filePath) {
 
 
 EnsureCurrentDirectory() {
-    global CurrentDir
-    if CurrentDir = "" {
+    if GetCurrentDir() = "" {
         ShowFeedback("请先设置当前主题目录", true)
         return false
     }
@@ -97,12 +96,12 @@ GetOrderedContextFiles(dirPath) {
 
 
 CreateRequirementFile(*) {
-    global CurrentDir, AppConfig
+    global AppConfig
     if !EnsureCurrentDirectory() {
         return
     }
 
-    filePath := CurrentDir "\需求.txt"
+    filePath := GetCurrentDir() "\需求.txt"
     existed := FileExist(filePath)
     if !existed {
         FileAppend("", filePath, "UTF-8")
@@ -121,18 +120,19 @@ CreateRequirementFile(*) {
 
 
 CreateReplyFile(*) {
-    global CurrentDir, AppConfig
+    global AppConfig
     if !EnsureCurrentDirectory() {
         return
     }
 
-    latestVersion := GetLatestVersionNumber(CurrentDir)
+    currentDir := GetCurrentDir()
+    latestVersion := GetLatestVersionNumber(currentDir)
     if (latestVersion = 0) {
         ShowFeedback("当前目录下未找到 vX.md 文件", true)
         return
     }
 
-    replyPath := CurrentDir "\对v" latestVersion "的回复.txt"
+    replyPath := currentDir "\对v" latestVersion "的回复.txt"
     existed := FileExist(replyPath)
     if !existed {
         FileAppend("", replyPath, "UTF-8")
