@@ -14,17 +14,48 @@ EnsureDefaultFiles() {
     DirCreate(executeTemplateDir)
 
     if !FileExist(SettingsFile) {
+        ; 创建带 BOM 的 UTF-16 LE 空文件，确保后续 IniWrite 中文不乱码
+        FileAppend("", SettingsFile, "UTF-16")
+    }
+
+    ; 确保 settings.ini 是 UTF-16 LE 带 BOM 格式
+    EnsureIniUtf16Bom(SettingsFile)
+
+    ; 写入默认配置
+    if (IniRead(SettingsFile, "App", "Hotkey", "") = "") {
         IniWrite("F2", SettingsFile, "App", "Hotkey")
+    }
+    if (IniRead(SettingsFile, "Window", "Width", "") = "") {
         IniWrite("210", SettingsFile, "Window", "Width")
+    }
+    if (IniRead(SettingsFile, "Window", "Height", "") = "") {
         IniWrite("215", SettingsFile, "Window", "Height")
+    }
+    if (IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
+    }
+    if (IniRead(SettingsFile, "Behavior", "StartVisible", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "StartVisible")
+    }
+    if (IniRead(SettingsFile, "Behavior", "CloseToTray", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
+    }
+    if (IniRead(SettingsFile, "Behavior", "MinimizeToTray", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
+    }
+    if (IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "") = "") {
         IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
+    }
+    if (IniRead(SettingsFile, "Editor", "OpenWithIdea", "") = "") {
         IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
+    }
+    if (IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "") = "") {
         IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
+    }
+    if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
         IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
+    }
+    if (IniRead(SettingsFile, "Editor", "IdeaCommand", "") = "") {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
     }
 
@@ -211,4 +242,26 @@ SaveWindowSession(windowId) {
 SaveEnableWindow2(enabled) {
     global SettingsFile
     IniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow2")
+}
+
+; 确保 INI 文件使用 UTF-16 LE 带 BOM 格式，避免中文乱码
+EnsureIniUtf16Bom(filePath) {
+    ; 读取文件前几个字节判断是否有 UTF-16 LE BOM (FF FE)
+    try {
+        raw := FileRead(filePath, "RAW")
+        if (raw.Length >= 2 && raw[1] = 0xFF && raw[2] = 0xFE) {
+            return  ; 已经是 UTF-16 LE BOM
+        }
+    } catch {
+        return
+    }
+
+    ; 读取当前内容（按系统默认编码），重新写入为 UTF-16 LE 带 BOM
+    try {
+        text := FileRead(filePath)
+        FileDelete(filePath)
+        FileAppend(text, filePath, "UTF-16")
+    } catch {
+        ; 忽略转换失败
+    }
 }
