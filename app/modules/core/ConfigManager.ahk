@@ -1,0 +1,146 @@
+#Requires AutoHotkey v2.0
+
+; 全局配置
+
+global AppConfig := Map()
+global SettingsFile := ConfigDir "\settings.ini"
+
+; 确保默认文件和配置存在
+EnsureDefaultFiles() {
+    global ConfigDir, TemplateDir, SettingsFile
+    DirCreate(ConfigDir)
+    DirCreate(TemplateDir)
+    executeTemplateDir := TemplateDir "\execute"
+    DirCreate(executeTemplateDir)
+
+    if !FileExist(SettingsFile) {
+        IniWrite("F2", SettingsFile, "App", "Hotkey")
+        IniWrite("210", SettingsFile, "Window", "Width")
+        IniWrite("215", SettingsFile, "Window", "Height")
+        IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
+        IniWrite("1", SettingsFile, "Behavior", "StartVisible")
+        IniWrite("1", SettingsFile, "Behavior", "CloseToTray")
+        IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
+        IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
+        IniWrite("1", SettingsFile, "Editor", "OpenWithIdea")
+        IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
+        IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
+        IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
+    }
+
+    if (IniRead(SettingsFile, "AgentWindow", "AfterCopyAction", "") = "") {
+        IniWrite("3", SettingsFile, "AgentWindow", "AfterCopyAction")
+    }
+    if (IniRead(SettingsFile, "AgentWindow", "TitleContains", "") = "") {
+        IniWrite("", SettingsFile, "AgentWindow", "TitleContains")
+    }
+    if (IniRead(SettingsFile, "AgentWindow", "ProcessName", "") = "") {
+        IniWrite("", SettingsFile, "AgentWindow", "ProcessName")
+    }
+    if (IniRead(SettingsFile, "AgentWindow", "ClassName", "") = "") {
+        IniWrite("", SettingsFile, "AgentWindow", "ClassName")
+    }
+
+    if (IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "") = "") {
+        IniWrite("1", SettingsFile, "Prompt", "AppendNoModifyPrompt")
+    }
+
+    if (IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "") = "") {
+        IniWrite("0", SettingsFile, "Behavior", "AutoHideAfterCreate")
+    }
+
+    if (IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Editor", "OpenMdWithIdea")
+    }
+
+    requirementTemplate := TemplateDir "\requirement_prompt.txt"
+    if !FileExist(requirementTemplate) {
+        FileAppend(
+        "这是一个需求文件，请你查看这个文件：{{filePath}}。如果你有新的想法或问题，请创建 v1.md；如果没有新的问题，请创建 实施文档.md。"
+        , requirementTemplate, "UTF-8")
+    }
+
+    replyTemplate := TemplateDir "\reply_prompt.txt"
+    if !FileExist(replyTemplate) {
+        FileAppend(
+        "这是一个回复文件，请你查看这个文件：{{filePath}}。如果你还有新的想法或问题，请创建 {{nextVersionFile}}。"
+        , replyTemplate, "UTF-8")
+    }
+
+    replyImplementationTailTemplate := TemplateDir "\reply_prompt_impl_tail.txt"
+    if !FileExist(replyImplementationTailTemplate) {
+        FileAppend(
+        "如果没有新的问题，请创建 实施文档.md。"
+        , replyImplementationTailTemplate, "UTF-8")
+    }
+
+    relationTemplate := TemplateDir "\context_relation.txt"
+    if !FileExist(relationTemplate) {
+        FileAppend(
+        "当前目录中的 需求.txt 是原始需求说明；vX.md 是 AI 沟通过程中的版本文档；对vX的回复.txt 是用户对对应版本的回复；实施文档.md 是整个需求沟通收敛后的最终结论文件，也是后续正式实施时最重要的执行依据。这些文件按时间顺序构成完整沟通过程。新会话接管时，应优先阅读这些文件并完成上下文重建。"
+        , relationTemplate, "UTF-8")
+    }
+
+    executeDirectTemplate := executeTemplateDir "\direct.txt"
+    if !FileExist(executeDirectTemplate) {
+        FileAppend(
+        "请你根据当前的实施文档：{{filePath}}，修改正式代码和文件，完成整个方案的落地。"
+        , executeDirectTemplate, "UTF-8")
+    }
+
+    executeAiJudgeTemplate := executeTemplateDir "\ai_judge.txt"
+    if !FileExist(executeAiJudgeTemplate) {
+        FileAppend(
+        "请你查看当前的实施文档：{{filePath}}。`n`n请先判断该方案的内容复杂度，是否需要拆解为多个实施步骤：`n- 如果不需要拆解，请直接修改正式代码和文件，完成整个方案的落地。`n- 如果需要拆解，请在当前目录下按照合理的执行顺序创建多个步骤 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。不要进入步骤目录模式，也不要在未获得我确认前直接修改正式代码。"
+        , executeAiJudgeTemplate, "UTF-8")
+    }
+
+    executeStepsFileTemplate := executeTemplateDir "\steps_file.txt"
+    if !FileExist(executeStepsFileTemplate) {
+        FileAppend(
+        "请你查看当前的实施文档：{{filePath}}。`n`n请不要直接修改正式代码。请在当前目录下按照合理的执行顺序创建多个步骤 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。"
+        , executeStepsFileTemplate, "UTF-8")
+    }
+
+    executeStepsDirTemplate := executeTemplateDir "\steps_dir.txt"
+    if !FileExist(executeStepsDirTemplate) {
+        FileAppend(
+        "请你查看当前的实施文档：{{filePath}}。`n`n请不要直接修改正式代码。请在当前目录下按照合理的执行顺序创建多个步骤目录，目录名格式如 01-xxx、02-xxx 等，并在每个目录中创建一个与目录同名的 md 文档（例如 01-xxx\\01-xxx.md）。确保所有步骤目录和文档合起来覆盖实施文档的全部内容。写完后请先停下来，告诉我已经写好，等待我验收。"
+        , executeStepsDirTemplate, "UTF-8")
+    }
+
+    noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
+    if !FileExist(noModifyTemplate) {
+        FileAppend(
+        "补充约束：当前阶段不要修改正式代码，不要修改已有正式文件。你可以按当前要求创建新的 vX.md 或 实施文档.md；如果你认为需要进入正式修改阶段，请先明确说明并等待确认。"
+        , noModifyTemplate, "UTF-8")
+    }
+}
+
+; 加载配置
+LoadConfig() {
+    global AppConfig, SettingsFile, AppRoot
+    AppConfig := Map()
+    AppConfig["Hotkey"] := IniRead(SettingsFile, "App", "Hotkey", "F2")
+    AppConfig["IconSource"] := IniRead(SettingsFile, "App", "IconSource", "shell32.dll")
+    AppConfig["IconIndex"] := IniRead(SettingsFile, "App", "IconIndex", "44") + 0
+    AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
+    AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
+    if (AppConfig["WindowHeight"] < 215) {
+        AppConfig["WindowHeight"] := 215
+    }
+    AppConfig["AgentWindowTitleContains"] := IniRead(SettingsFile, "AgentWindow", "TitleContains", "")
+    AppConfig["AgentWindowProcessName"] := IniRead(SettingsFile, "AgentWindow", "ProcessName", "")
+    AppConfig["AgentWindowClassName"] := IniRead(SettingsFile, "AgentWindow", "ClassName", "")
+    AppConfig["AgentWindowAfterCopyAction"] := IniRead(SettingsFile, "AgentWindow", "AfterCopyAction", "3") + 0
+    AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
+    AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
+    AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
+    AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
+    AppConfig["AutoHideAfterCreate"] := IniRead(SettingsFile, "Behavior", "AutoHideAfterCreate", "0") = "1"
+    AppConfig["OpenWithIdea"] := IniRead(SettingsFile, "Editor", "OpenWithIdea", "1") = "1"
+    AppConfig["OpenMdWithIdea"] := IniRead(SettingsFile, "Editor", "OpenMdWithIdea", "1") = "1"
+    AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
+    AppConfig["AppendNoModifyPrompt"] := IniRead(SettingsFile, "Prompt", "AppendNoModifyPrompt", "1") = "1"
+    AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
+}
