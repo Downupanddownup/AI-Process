@@ -37,7 +37,7 @@ CreateMainGui() {
     }
 
     MainGui := Gui(guiOptions, "一窗")
-    MainGui.BackColor := "F7F7F7"
+    MainGui.BackColor := GetActiveWindowId() = 1 ? "F7F7F7" : "E8E3F5"
     MainGui.MarginX := 8
     MainGui.MarginY := 8
     MainGui.SetFont("s8", "Microsoft YaHei UI")
@@ -152,6 +152,7 @@ RefreshMainWindow() {
     windowId := GetActiveWindowId()
     title := windowId = 1 ? "一窗" : "二窗"
     MainGui.Title := title
+    MainGui.BackColor := windowId = 1 ? "F7F7F7" : "E8E3F5"
 
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
