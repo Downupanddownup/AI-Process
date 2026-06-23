@@ -70,6 +70,7 @@ BindAgentWindow(*) {
     SetSession(windowId, "AgentTitleContains", title)
     SetSession(windowId, "AgentProcessName", proc)
     SetSession(windowId, "AgentClassName", class)
+    SetSession(windowId, "AgentHwnd", hwnd)
     SaveAgentWindowConfig()
     UpdateBindButtonState()
 }
@@ -239,6 +240,7 @@ FindBoundAgentWindow() {
     titleContains := agentConfig["TitleContains"]
     procName := agentConfig["ProcessName"]
     className := agentConfig["ClassName"]
+    storedHwnd := agentConfig["Hwnd"]
 
     if (procName = "" || className = "") {
         return 0
@@ -250,11 +252,44 @@ FindBoundAgentWindow() {
     logText .= "  TitleContains: " titleContains "`n"
     logText .= "  ProcessName: " procName "`n"
     logText .= "  ClassName: " className "`n"
+    logText .= "  StoredHwnd: " storedHwnd "`n"
 
     DetectHiddenWindows(true)
     logText .= "  DetectHiddenWindows: true`n"
 
     hwnd := 0
+
+    ; 阶段一：HWND 优先
+    if (storedHwnd != "") {
+        hwnd := WinExist("ahk_id " storedHwnd)
+        if (hwnd) {
+            currentProc := WinGetProcessName(hwnd)
+            currentClass := WinGetClass(hwnd)
+            if (currentProc = procName && currentClass = className) {
+                matchedTitle := WinGetTitle(hwnd)
+                matchedVisible := DllCall("IsWindowVisible", "Ptr", hwnd)
+                matchedIconic := DllCall("IsIconic", "Ptr", hwnd)
+                logText .= "  Hwnd matched: true`n"
+                logText .= "  Found windows: 1`n"
+                logText .= Format("    HWND={}, Title={}, Visible={}, Iconic={}`n", hwnd, matchedTitle, matchedVisible, matchedIconic)
+                logText .= "  Selected HWND: " hwnd "`n`n"
+
+                try {
+                    FileAppend(logText, logFile, "UTF-8")
+                } catch {
+                    ; 忽略日志写入失败
+                }
+
+                DetectHiddenWindows(false)
+                return hwnd
+            }
+        }
+        hwnd := 0
+    }
+
+    logText .= "  Hwnd matched: false`n"
+
+    ; 阶段二：兜底规则
     ids := WinGetList("ahk_exe " procName " ahk_class " className)
     logText .= "  Found windows: " ids.Length "`n"
 
@@ -267,6 +302,9 @@ FindBoundAgentWindow() {
         if (hwnd = 0) {
             if (titleContains = "" || InStr(title, titleContains) || title = "") {
                 hwnd := id
+                ; 兜底命中后更新 HWND，下次优先命中
+                SetSession(GetActiveWindowId(), "AgentHwnd", hwnd)
+                SaveAgentWindowConfig()
             }
         }
     }
@@ -322,6 +360,7 @@ UnbindAgentWindow() {
     SetSession(windowId, "AgentTitleContains", "")
     SetSession(windowId, "AgentProcessName", "")
     SetSession(windowId, "AgentClassName", "")
+    SetSession(windowId, "AgentHwnd", "")
     SaveAgentWindowConfig()
     UpdateBindButtonState()
     if (AgentWindowDialog) {

@@ -12,6 +12,7 @@ global WindowSessions := Map(
         "AgentTitleContains", "",
         "AgentProcessName", "",
         "AgentClassName", "",
+        "AgentHwnd", "",
         "AgentAfterCopyAction", 3,
         "OpenWithIdea", true,
         "OpenMdWithIdea", true,
@@ -26,6 +27,7 @@ global WindowSessions := Map(
         "AgentTitleContains", "",
         "AgentProcessName", "",
         "AgentClassName", "",
+        "AgentHwnd", "",
         "AgentAfterCopyAction", 3,
         "OpenWithIdea", true,
         "OpenMdWithIdea", true,
@@ -89,6 +91,7 @@ GetCurrentAgentConfig() {
         "TitleContains", GetSession(windowId, "AgentTitleContains"),
         "ProcessName", GetSession(windowId, "AgentProcessName"),
         "ClassName", GetSession(windowId, "AgentClassName"),
+        "Hwnd", GetSession(windowId, "AgentHwnd"),
         "AfterCopyAction", GetSession(windowId, "AgentAfterCopyAction")
     )
 }
