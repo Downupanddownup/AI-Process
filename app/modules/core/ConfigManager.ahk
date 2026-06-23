@@ -43,6 +43,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Behavior", "MinimizeToTray", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
     }
+    if (IniRead(SettingsFile, "Behavior", "MdActivationMode", "") = "") {
+        IniWrite("activate", SettingsFile, "Behavior", "MdActivationMode")
+    }
     if (IniRead(SettingsFile, "Editor", "IdeaCommand", "") = "") {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
     }
@@ -234,8 +237,9 @@ LoadConfig() {
     AppConfig["StartVisible"] := IniRead(SettingsFile, "Behavior", "StartVisible", "1") = "1"
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
-    AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
-    AppConfig["NotificationScriptPath"] := AppRoot "\ShowCenterNotification.ps1"
+    AppConfig["OpenMdScriptPath"] := AppRoot "\powershell\markdown\OpenMarkdown.ps1"
+    AppConfig["NotificationScriptPath"] := AppRoot "\powershell\notification\ShowCenterNotification.ps1"
+    AppConfig["MdActivationMode"] := IniRead(SettingsFile, "Behavior", "MdActivationMode", "activate")
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
 }
 

@@ -80,6 +80,7 @@ AppendOpenMdPromptIfNeeded(content) {
 
     template := FileRead(templatePath, "UTF-8")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["OpenMdScriptPath"])
+    template := StrReplace(template, "{{windowId}}", GetActiveWindowId())
 
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n`r`n" template

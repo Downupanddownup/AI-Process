@@ -19,6 +19,7 @@ global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
 global CopyExecuteButton := ""
 global ExecuteStrategyDropdown := ""
+global MdActivationModeDropdown := ""
 global MainGui := ""
 global HoverTooltipVisible := false
 
@@ -26,7 +27,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies, MdActivationModeDropdown
     actionButtonWidth := 60
     actionButtonHeight := 24
     actionGap := 6
@@ -68,6 +69,14 @@ CreateMainGui() {
 
     UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
     UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
+
+    MdActivationModeDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", ["MD激活", "MD后台"])
+    MdActivationModeDropdown.OnEvent("Change", OnMdActivationModeChange)
+    if (AppConfig["MdActivationMode"] = "background") {
+        MdActivationModeDropdown.Choose(2)
+    } else {
+        MdActivationModeDropdown.Choose(1)
+    }
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
@@ -173,6 +182,15 @@ RefreshMainWindow() {
             }
         }
     }
+
+    ; 同步 MD 激活模式下拉框
+    if (MdActivationModeDropdown) {
+        if (AppConfig["MdActivationMode"] = "background") {
+            MdActivationModeDropdown.Choose(2)
+        } else {
+            MdActivationModeDropdown.Choose(1)
+        }
+    }
 }
 
 
@@ -269,6 +287,13 @@ OnExecuteStrategyChange(ctrl, *) {
         SetSession(GetActiveWindowId(), "ExecuteStrategy", ExecuteStrategies[selectedIndex]["key"])
         SaveWindowSession(GetActiveWindowId())
     }
+}
+
+OnMdActivationModeChange(ctrl, *) {
+    global SettingsFile, AppConfig
+    mode := ctrl.Value = 2 ? "background" : "activate"
+    AppConfig["MdActivationMode"] := mode
+    IniWrite(mode, SettingsFile, "Behavior", "MdActivationMode")
 }
 
 ShowFeedback(message, isError := false) {
