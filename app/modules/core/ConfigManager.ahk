@@ -46,6 +46,15 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Behavior", "MdActivationMode", "") = "") {
         IniWrite("activate", SettingsFile, "Behavior", "MdActivationMode")
     }
+
+    ; [PendingMd] 段：存储 MD 后台模式下待打开的 Markdown 文件路径
+    if (IniRead(SettingsFile, "PendingMd", "Window1PendingMd", "__NOT_FOUND__") = "__NOT_FOUND__") {
+        IniWrite("", SettingsFile, "PendingMd", "Window1PendingMd")
+    }
+    if (IniRead(SettingsFile, "PendingMd", "Window2PendingMd", "__NOT_FOUND__") = "__NOT_FOUND__") {
+        IniWrite("", SettingsFile, "PendingMd", "Window2PendingMd")
+    }
+
     if (IniRead(SettingsFile, "Editor", "IdeaCommand", "") = "") {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
     }

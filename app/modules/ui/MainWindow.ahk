@@ -149,6 +149,22 @@ SwitchToWindow(windowId) {
     SetActiveWindowId(windowId)
     RefreshMainWindow()
     ShowMainWindow()
+    OpenPendingMarkdownIfAny(windowId)
+}
+
+OpenPendingMarkdownIfAny(windowId) {
+    global SettingsFile
+    key := "Window" windowId "PendingMd"
+    pendingPath := IniRead(SettingsFile, "PendingMd", key, "")
+    if (pendingPath = "") {
+        return
+    }
+    if (!FileExist(pendingPath)) {
+        IniWrite("", SettingsFile, "PendingMd", key)
+        return
+    }
+    OpenFileInIdea(pendingPath)
+    IniWrite("", SettingsFile, "PendingMd", key)
 }
 
 RefreshMainWindow() {
