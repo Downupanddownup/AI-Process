@@ -235,7 +235,7 @@ LoadConfig() {
     AppConfig["CloseToTray"] := IniRead(SettingsFile, "Behavior", "CloseToTray", "1") = "1"
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
     AppConfig["OpenMdScriptPath"] := AppRoot "\OpenMarkdown.ps1"
-    AppConfig["NotificationScriptPath"] := AppRoot "\ShowNotification.ps1"
+    AppConfig["NotificationScriptPath"] := AppRoot "\ShowCenterNotification.ps1"
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
 }
 
