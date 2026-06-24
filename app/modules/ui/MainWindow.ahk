@@ -152,6 +152,25 @@ SwitchToWindow(windowId) {
     OpenPendingMarkdownIfAny(windowId)
 }
 
+ToggleWindow(windowId) {
+    if (ShouldHideOnToggle(windowId)) {
+        HideToTray()
+        return
+    }
+    SwitchToWindow(windowId)
+}
+
+ShouldHideOnToggle(windowId) {
+    global MainGui
+    if (!MainGui) {
+        return false
+    }
+    if (GetActiveWindowId() != windowId) {
+        return false
+    }
+    return WinActive("ahk_id " MainGui.Hwnd)
+}
+
 OpenPendingMarkdownIfAny(windowId) {
     global SettingsFile
     key := "Window" windowId "PendingMd"

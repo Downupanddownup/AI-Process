@@ -27,9 +27,9 @@ RegisterGlobalHotkey() {
 }
 
 ToggleWindow1(*) {
-    SwitchToWindow(1)
+    ToggleWindow(1)
 }
 
 ToggleWindow2(*) {
-    SwitchToWindow(2)
+    ToggleWindow(2)
 }
