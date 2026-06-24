@@ -38,60 +38,145 @@ GetLatestVersionNumber(dirPath) {
 }
 
 
-GetOrderedContextFiles(dirPath) {
-    orderedFiles := []
-    requirementPath := dirPath "\需求.txt"
-    implementationPath := dirPath "\实施文档.md"
-
-    if FileExist(requirementPath) {
-        orderedFiles.Push(requirementPath)
+SortIntegers(arr) {
+    if (arr.Length <= 1) {
+        return
     }
-
-    versions := []
-    Loop Files, dirPath "\v*.md", "F" {
-        if RegExMatch(A_LoopFileName, "^v(\d+)\.md$", &match) {
-            version := match[1] + 0
-            versions.Push(Map(
-                "version", version,
-                "path", A_LoopFileFullPath,
-                "replyPath", dirPath "\对v" version "的回复.txt"
-            ))
-        }
-    }
-
-    if (versions.Length > 1) {
-        loopCount := versions.Length - 1
-        Loop loopCount {
-            changed := false
-            index := 1
-            while (index <= versions.Length - A_Index) {
-                if (versions[index]["version"] > versions[index + 1]["version"]) {
-                    temp := versions[index]
-                    versions[index] := versions[index + 1]
-                    versions[index + 1] := temp
-                    changed := true
-                }
-                index += 1
+    loopCount := arr.Length - 1
+    Loop loopCount {
+        changed := false
+        i := 1
+        while (i <= arr.Length - A_Index) {
+            if (arr[i] > arr[i + 1]) {
+                tmp := arr[i]
+                arr[i] := arr[i + 1]
+                arr[i + 1] := tmp
+                changed := true
             }
-            if !changed {
-                break
-            }
+            i += 1
+        }
+        if !changed {
+            break
         }
     }
-
-    for item in versions {
-        orderedFiles.Push(item["path"])
-        if FileExist(item["replyPath"]) {
-            orderedFiles.Push(item["replyPath"])
-        }
-    }
-
-    if FileExist(implementationPath) {
-        orderedFiles.Push(implementationPath)
-    }
-
-    return orderedFiles
 }
+
+
+SortByConvention(fullPaths) {
+    requirementFile := ""
+    vMap := Map()
+    replyMap := Map()
+    implDocFile := ""
+    otherFiles := []
+
+    for path in fullPaths {
+        name := ExtractFileName(path)
+        if (name = "需求.txt") {
+            requirementFile := path
+        } else if RegExMatch(name, "^v(\d+)\.md$", &m) {
+            vMap[Integer(m[1])] := path
+        } else if RegExMatch(name, "^对v(\d+)的回复\.txt$", &m) {
+            replyMap[Integer(m[1])] := path
+        } else if (name = "实施文档.md") {
+            implDocFile := path
+        } else {
+            otherFiles.Push(path)
+        }
+    }
+
+    allVersions := []
+    for ver in vMap {
+        allVersions.Push(ver)
+    }
+    for ver in replyMap {
+        if !vMap.Has(ver) {
+            allVersions.Push(ver)
+        }
+    }
+    SortIntegers(allVersions)
+
+    result := []
+    if (requirementFile != "") {
+        result.Push(requirementFile)
+    }
+    for ver in allVersions {
+        if vMap.Has(ver) {
+            result.Push(vMap[ver])
+        }
+        if replyMap.Has(ver) {
+            result.Push(replyMap[ver])
+        }
+    }
+    if (implDocFile != "") {
+        result.Push(implDocFile)
+    }
+    for path in otherFiles {
+        result.Push(path)
+    }
+    return result
+}
+
+
+SortSubdirsByConvention(fullPaths) {
+    stepsDir := ""
+    tweakDir := ""
+    otherDirs := []
+
+    for path in fullPaths {
+        name := ExtractFileName(path)
+        if (name = "实施步骤") {
+            stepsDir := path
+        } else if (name = "结果微调") {
+            tweakDir := path
+        } else {
+            otherDirs.Push(path)
+        }
+    }
+
+    result := []
+    if (stepsDir != "") {
+        result.Push(stepsDir)
+    }
+    if (tweakDir != "") {
+        result.Push(tweakDir)
+    }
+    for path in otherDirs {
+        result.Push(path)
+    }
+    return result
+}
+
+
+GetAllFilesRecursive(dirPath) {
+    result := []
+    files := []
+    subdirs := []
+
+    Loop Files, dirPath "\*", "FD" {
+        if InStr(A_LoopFileAttrib, "D") {
+            subdirs.Push(A_LoopFileFullPath)
+        } else {
+            files.Push(A_LoopFileFullPath)
+        }
+    }
+
+    sortedFiles := SortByConvention(files)
+    sortedSubdirs := SortSubdirsByConvention(subdirs)
+
+    for filePath in sortedFiles {
+        result.Push(filePath)
+    }
+    for dir in sortedSubdirs {
+        subResult := GetAllFilesRecursive(dir)
+        for subPath in subResult {
+            result.Push(subPath)
+        }
+    }
+
+    return result
+}
+
+
 
 
 

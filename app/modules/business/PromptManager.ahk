@@ -128,46 +128,21 @@ AppendExecuteNotificationIfNeeded(content) {
 BuildContextRelationsText() {
     currentDir := GetCurrentDir()
 
-    orderedFiles := GetOrderedContextFiles(currentDir)
-    if (orderedFiles.Length = 0) {
-        return "当前主题目录：" currentDir "`n`n当前目录下未找到可用于上下文重建的关键文件。"
+    allFiles := GetAllFilesRecursive(currentDir)
+    if (allFiles.Length = 0) {
+        return "当前主题目录：" currentDir "`n`n当前目录下未找到任何文件。"
     }
 
-    readingNames := []
-    detailLines := []
-    foundRequirement := false
-    foundImplementation := false
+    universalGuide := LoadTemplate("context_relation.txt")
 
-    for filePath in orderedFiles {
-        fileName := ExtractFileName(filePath)
-        readingNames.Push(fileName)
-        detailLines.Push(fileName "：" filePath)
-
-        if (fileName = "需求.txt") {
-            foundRequirement := true
-        } else if (fileName = "实施文档.md") {
-            foundImplementation := true
-        }
+    fileTree := ""
+    for path in allFiles {
+        fileTree .= path "`n"
     }
 
-    intro := "当前主题目录：" currentDir
-    orderLine := "请优先按时间顺序阅读：" JoinArray(readingNames, " -> ")
-    roleLines := []
-
-    if foundRequirement {
-        roleLines.Push("需求.txt：原始需求说明。")
-    }
-    roleLines.Push("vX.md：AI 沟通过程中的版本文档。")
-    roleLines.Push("对vX的回复.txt：用户对对应版本的回复。")
-    if foundImplementation {
-        roleLines.Push("实施文档.md：需求沟通收敛后的最终结论文件，也是后续正式实施时最重要的执行依据。")
-    }
-    roleLines.Push("你的首要任务是基于以上文件完成上下文重建，不要跳过文件整理和阅读步骤。")
-
-    return intro
-        . "`n`n" . orderLine
-        . "`n`n关键文件路径：`n" . JoinArray(detailLines, "`n")
-        . "`n`n文件说明：`n" . JoinArray(roleLines, "`n")
+    return "当前主题目录：" currentDir
+        . "`n`n## 通用解读提示`n" . universalGuide
+        . "`n`n## 当前目录完整文件清单`n" . fileTree
 }
 
 
