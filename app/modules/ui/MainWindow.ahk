@@ -314,7 +314,8 @@ OnMdActivationModeChange(ctrl, *) {
 
 ShowFeedback(message, isError := false) {
     if isError {
-        MsgBox(message, "AIProcess", "Iconx T3")
+        ownerHwnd := MainGui ? MainGui.Hwnd : 0
+        MsgBox(message, "AIProcess", "Iconx T3 Owner" ownerHwnd)
         return
     }
     ; 成功提示不再显示 ToolTip

@@ -9,7 +9,8 @@ RegisterGlobalHotkey() {
     try {
         Hotkey(AppConfig["Window1Hotkey"], ToggleWindow1)
     } catch Error as err {
-        MsgBox("1 号窗口热键注册失败：" AppConfig["Window1Hotkey"] "`n" err.Message, "AIProcess", "Iconx")
+        ownerHwnd := MainGui ? MainGui.Hwnd : 0
+        MsgBox("1 号窗口热键注册失败：" AppConfig["Window1Hotkey"] "`n" err.Message, "AIProcess", "Iconx Owner" ownerHwnd)
     }
 
     ; 2 号窗口热键仅在启用且不冲突时注册
@@ -18,7 +19,8 @@ RegisterGlobalHotkey() {
             try {
                 Hotkey(AppConfig["Window2Hotkey"], ToggleWindow2)
             } catch Error as err {
-                MsgBox("2 号窗口热键注册失败：" AppConfig["Window2Hotkey"] "`n" err.Message, "AIProcess", "Iconx")
+                ownerHwnd := MainGui ? MainGui.Hwnd : 0
+                MsgBox("2 号窗口热键注册失败：" AppConfig["Window2Hotkey"] "`n" err.Message, "AIProcess", "Iconx Owner" ownerHwnd)
             }
         }
     }

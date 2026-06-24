@@ -189,7 +189,8 @@ ShowFullPath(*) {
         ShowFeedback("请先设置当前主题目录", true)
         return
     }
-    MsgBox(currentDir, "当前完整路径", "Iconi")
+    ownerHwnd := MainGui ? MainGui.Hwnd : 0
+    MsgBox(currentDir, "当前完整路径", "Iconi Owner" ownerHwnd)
 }
 
 
