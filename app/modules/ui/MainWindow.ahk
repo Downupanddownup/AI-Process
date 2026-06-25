@@ -38,7 +38,7 @@ CreateMainGui() {
     }
 
     MainGui := Gui(guiOptions, "一窗")
-    MainGui.BackColor := GetActiveWindowId() = 1 ? "F7F7F7" : "E8E3F5"
+    MainGui.BackColor := GetWindowStyle(GetActiveWindowId())["BackColor"]
     MainGui.MarginX := 8
     MainGui.MarginY := 8
     MainGui.SetFont("s8", "Microsoft YaHei UI")
@@ -52,23 +52,30 @@ CreateMainGui() {
 
     SetDirectoryButton := MainGui.AddButton("x148 ym w54 h22", "设目录")
     SetDirectoryButton.OnEvent("Click", PromptForDirectory)
+    ApplyButtonStyle(SetDirectoryButton)
     ReturnParentButton := MainGui.AddButton("x148 ym w54 h22 Hidden", "返")
     ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
+    ApplyButtonStyle(ReturnParentButton)
 
     OptionsButton := MainGui.AddButton("xm y+6 w54 h22", "选项")
     OptionsButton.OnEvent("Click", ShowOptionsDialog)
+    ApplyButtonStyle(OptionsButton)
 
     NewThemeButton := MainGui.AddButton("x+6 yp w54 h22", "新主题")
     NewThemeButton.OnEvent("Click", CreateNewTheme)
+    ApplyButtonStyle(NewThemeButton)
 
     CreateIssueButton := MainGui.AddButton("x+6 yp w54 h22", "建问题")
     CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
+    ApplyButtonStyle(CreateIssueButton)
 
     BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
     BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
+    ApplyButtonStyle(BindAgentWindowButton)
 
     UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
     UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
+    ApplyButtonStyle(UnbindAgentWindowButton)
 
     MdActivationModeDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", ["MD激活", "MD后台"])
     MdActivationModeDropdown.OnEvent("Change", OnMdActivationModeChange)
@@ -80,24 +87,30 @@ CreateMainGui() {
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
+    ApplyButtonStyle(CreateRequirementButton)
 
     CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
     CopyRequirementPromptButton.OnEvent("Click", CopyRequirementPrompt)
+    ApplyButtonStyle(CopyRequirementPromptButton)
 
     CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
     CreateReplyButton.OnEvent("Click", CreateReplyFile)
+    ApplyButtonStyle(CreateReplyButton)
 
     CopyReplyPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复回复")
     CopyReplyPromptButton.OnEvent("Click", CopyReplyPrompt)
+    ApplyButtonStyle(CopyReplyPromptButton)
 
     ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
     ReplyImplementationTailCheckbox.OnEvent("Click", OnImplementationTailToggle)
 
     CopyRelationsButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "复关系")
     CopyRelationsButton.OnEvent("Click", CopyContextRelations)
+    ApplyButtonStyle(CopyRelationsButton)
 
     CopyExecuteButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复执行")
     CopyExecuteButton.OnEvent("Click", CopyExecutePrompt)
+    ApplyButtonStyle(CopyExecuteButton)
 
     executeStrategyOptions := BuildExecuteStrategyOptions()
     ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", executeStrategyOptions)
@@ -194,18 +207,7 @@ RefreshMainWindow() {
     }
 
     windowId := GetActiveWindowId()
-    if (windowId = 1) {
-        title := "一窗"
-        color := "F7F7F7"
-    } else if (windowId = 2) {
-        title := "二窗"
-        color := "E8E3F5"
-    } else {
-        title := "三窗"
-        color := "E0F2E9"
-    }
-    MainGui.Title := title
-    MainGui.BackColor := color
+    ApplyMainWindowStyle(windowId, MainGui)
 
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
