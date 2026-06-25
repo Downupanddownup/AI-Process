@@ -30,12 +30,17 @@ ShowConfigDialog(*) {
 
     ConfigDialog.AddText("xm ym w240 h18", "窗口列表")
 
-    ConfigDialogListView := ConfigDialog.AddListView("xm y+6 w240 h80 Checked", ["窗口", "热键"])
+    ConfigDialogListView := ConfigDialog.AddListView("xm y+6 w240 h110 Checked", ["窗口", "热键"])
     ConfigDialogListView.Add("Check", "1 号窗", AppConfig["Window1Hotkey"])
     if (AppConfig["EnableWindow2"]) {
         ConfigDialogListView.Add("Check", "2 号窗", AppConfig["Window2Hotkey"])
     } else {
         ConfigDialogListView.Add("", "2 号窗", AppConfig["Window2Hotkey"])
+    }
+    if (AppConfig["EnableWindow3"]) {
+        ConfigDialogListView.Add("Check", "3 号窗", AppConfig["Window3Hotkey"])
+    } else {
+        ConfigDialogListView.Add("", "3 号窗", AppConfig["Window3Hotkey"])
     }
     ConfigDialogListView.OnEvent("ItemCheck", OnConfigDialogItemCheck)
 
@@ -62,6 +67,10 @@ OnConfigDialogItemCheck(ctrl, itemIndex, checked) {
     if (itemIndex = 2) {
         AppConfig["EnableWindow2"] := checked
         SaveEnableWindow2(checked)
+    }
+    if (itemIndex = 3) {
+        AppConfig["EnableWindow3"] := checked
+        SaveEnableWindow3(checked)
     }
 }
 

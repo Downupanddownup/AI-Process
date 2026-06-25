@@ -36,6 +36,21 @@ global WindowSessions := Map(
         "AppendImplementationTail", true,
         "ExecuteStrategy", "ai_judge",
         "ShowExecuteNotification", false
+    ),
+    3, Map(
+        "CurrentDir", "",
+        "AgentTitleContains", "",
+        "AgentProcessName", "",
+        "AgentClassName", "",
+        "AgentHwnd", "",
+        "AgentAfterCopyAction", 3,
+        "OpenWithIdea", true,
+        "OpenMdWithIdea", true,
+        "AppendNoModifyPrompt", true,
+        "AutoHideAfterCreate", false,
+        "AppendImplementationTail", true,
+        "ExecuteStrategy", "ai_judge",
+        "ShowExecuteNotification", false
     )
 )
 

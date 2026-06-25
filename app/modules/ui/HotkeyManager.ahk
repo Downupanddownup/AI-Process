@@ -24,6 +24,19 @@ RegisterGlobalHotkey() {
             }
         }
     }
+
+    ; 3 号窗口热键仅在启用且不冲突时注册
+    if (AppConfig["EnableWindow3"]) {
+        if (AppConfig["Window3Hotkey"] != AppConfig["Window1Hotkey"]
+            && AppConfig["Window3Hotkey"] != AppConfig["Window2Hotkey"]) {
+            try {
+                Hotkey(AppConfig["Window3Hotkey"], ToggleWindow3)
+            } catch Error as err {
+                ownerHwnd := MainGui ? MainGui.Hwnd : 0
+                MsgBox("3 号窗口热键注册失败：" AppConfig["Window3Hotkey"] "`n" err.Message, "AIProcess", "Iconx Owner" ownerHwnd)
+            }
+        }
+    }
 }
 
 ToggleWindow1(*) {
@@ -32,4 +45,8 @@ ToggleWindow1(*) {
 
 ToggleWindow2(*) {
     ToggleWindow(2)
+}
+
+ToggleWindow3(*) {
+    ToggleWindow(3)
 }

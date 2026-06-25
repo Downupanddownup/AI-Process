@@ -7,16 +7,16 @@
     The script exits immediately after showing the notification and does not wait for user interaction.
 
 .PARAMETER WindowId
-    The AI Process window identifier (1 or 2) whose task has completed.
+    The AI Process window identifier (1, 2, or 3) whose task has completed.
 #>
 [CmdletBinding()]
 param(
     [Parameter(
         Mandatory = $true,
         Position = 0,
-        HelpMessage = "AI Process window identifier (1 or 2)"
+        HelpMessage = "AI Process window identifier (1, 2, or 3)"
     )]
-    [ValidateSet("1", "2")]
+    [ValidateSet("1", "2", "3")]
     [string]$WindowId
 )
 

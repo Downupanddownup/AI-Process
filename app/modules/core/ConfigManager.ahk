@@ -54,6 +54,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "PendingMd", "Window2PendingMd", "__NOT_FOUND__") = "__NOT_FOUND__") {
         IniWrite("", SettingsFile, "PendingMd", "Window2PendingMd")
     }
+    if (IniRead(SettingsFile, "PendingMd", "Window3PendingMd", "__NOT_FOUND__") = "__NOT_FOUND__") {
+        IniWrite("", SettingsFile, "PendingMd", "Window3PendingMd")
+    }
 
     if (IniRead(SettingsFile, "Editor", "IdeaCommand", "") = "") {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
@@ -68,6 +71,12 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Hotkey", "EnableWindow2", "") = "") {
         IniWrite("0", SettingsFile, "Hotkey", "EnableWindow2")
+    }
+    if (IniRead(SettingsFile, "Hotkey", "Window3Hotkey", "") = "") {
+        IniWrite("F4", SettingsFile, "Hotkey", "Window3Hotkey")
+    }
+    if (IniRead(SettingsFile, "Hotkey", "EnableWindow3", "") = "") {
+        IniWrite("0", SettingsFile, "Hotkey", "EnableWindow3")
     }
 
     ; [Window1] 段
@@ -150,6 +159,47 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Window2", "ShowExecuteNotification", "") = "") {
         IniWrite("0", SettingsFile, "Window2", "ShowExecuteNotification")
+    }
+
+    ; [Window3] 段
+    if (IniRead(SettingsFile, "Window3", "CurrentDir", "") = "") {
+        IniWrite("", SettingsFile, "Window3", "CurrentDir")
+    }
+    if (IniRead(SettingsFile, "Window3", "AgentTitleContains", "") = "") {
+        IniWrite("", SettingsFile, "Window3", "AgentTitleContains")
+    }
+    if (IniRead(SettingsFile, "Window3", "AgentProcessName", "") = "") {
+        IniWrite("", SettingsFile, "Window3", "AgentProcessName")
+    }
+    if (IniRead(SettingsFile, "Window3", "AgentClassName", "") = "") {
+        IniWrite("", SettingsFile, "Window3", "AgentClassName")
+    }
+    if (IniRead(SettingsFile, "Window3", "AgentHwnd", "") = "") {
+        IniWrite("", SettingsFile, "Window3", "AgentHwnd")
+    }
+    if (IniRead(SettingsFile, "Window3", "AgentAfterCopyAction", "") = "") {
+        IniWrite("3", SettingsFile, "Window3", "AgentAfterCopyAction")
+    }
+    if (IniRead(SettingsFile, "Window3", "OpenWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Window3", "OpenWithIdea")
+    }
+    if (IniRead(SettingsFile, "Window3", "OpenMdWithIdea", "") = "") {
+        IniWrite("1", SettingsFile, "Window3", "OpenMdWithIdea")
+    }
+    if (IniRead(SettingsFile, "Window3", "AppendNoModifyPrompt", "") = "") {
+        IniWrite("1", SettingsFile, "Window3", "AppendNoModifyPrompt")
+    }
+    if (IniRead(SettingsFile, "Window3", "AutoHideAfterCreate", "") = "") {
+        IniWrite("0", SettingsFile, "Window3", "AutoHideAfterCreate")
+    }
+    if (IniRead(SettingsFile, "Window3", "AppendImplementationTail", "") = "") {
+        IniWrite("1", SettingsFile, "Window3", "AppendImplementationTail")
+    }
+    if (IniRead(SettingsFile, "Window3", "ExecuteStrategy", "") = "") {
+        IniWrite("ai_judge", SettingsFile, "Window3", "ExecuteStrategy")
+    }
+    if (IniRead(SettingsFile, "Window3", "ShowExecuteNotification", "") = "") {
+        IniWrite("0", SettingsFile, "Window3", "ShowExecuteNotification")
     }
 
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
@@ -257,13 +307,15 @@ LoadHotkeyConfig() {
     global AppConfig, SettingsFile
     AppConfig["Window1Hotkey"] := IniRead(SettingsFile, "Hotkey", "Window1Hotkey", "F2")
     AppConfig["Window2Hotkey"] := IniRead(SettingsFile, "Hotkey", "Window2Hotkey", "F3")
+    AppConfig["Window3Hotkey"] := IniRead(SettingsFile, "Hotkey", "Window3Hotkey", "F4")
     AppConfig["EnableWindow2"] := IniRead(SettingsFile, "Hotkey", "EnableWindow2", "0") = "1"
+    AppConfig["EnableWindow3"] := IniRead(SettingsFile, "Hotkey", "EnableWindow3", "0") = "1"
 }
 
 ; 加载各窗口会话数据
 LoadWindowSessions() {
     global WindowSessions, SettingsFile
-    for windowId in [1, 2] {
+    for windowId in [1, 2, 3] {
         section := "Window" windowId
         WindowSessions[windowId]["CurrentDir"] := IniRead(SettingsFile, section, "CurrentDir", "")
         WindowSessions[windowId]["AgentTitleContains"] := IniRead(SettingsFile, section, "AgentTitleContains", "")
@@ -304,6 +356,12 @@ SaveWindowSession(windowId) {
 SaveEnableWindow2(enabled) {
     global SettingsFile
     IniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow2")
+}
+
+; 保存 3 号窗口启用状态
+SaveEnableWindow3(enabled) {
+    global SettingsFile
+    IniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow3")
 }
 
 ; 确保 INI 文件使用 UTF-16 LE 带 BOM 格式，避免中文乱码

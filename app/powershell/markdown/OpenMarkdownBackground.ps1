@@ -19,7 +19,7 @@ param(
     [string]$FilePath,
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("1", "2")]
+    [ValidateSet("1", "2", "3")]
     [string]$WindowId = ""
 )
 

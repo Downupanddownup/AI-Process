@@ -194,9 +194,18 @@ RefreshMainWindow() {
     }
 
     windowId := GetActiveWindowId()
-    title := windowId = 1 ? "一窗" : "二窗"
+    if (windowId = 1) {
+        title := "一窗"
+        color := "F7F7F7"
+    } else if (windowId = 2) {
+        title := "二窗"
+        color := "E8E3F5"
+    } else {
+        title := "三窗"
+        color := "E0F2E9"
+    }
     MainGui.Title := title
-    MainGui.BackColor := windowId = 1 ? "F7F7F7" : "E8E3F5"
+    MainGui.BackColor := color
 
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
