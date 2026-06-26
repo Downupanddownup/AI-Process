@@ -9,7 +9,7 @@ global WindowStyles := Map(
     ),
     2, Map(
         "Title", "二窗",
-        "BackColor", "E2D9F2"
+        "BackColor", "E3F2FD"
     ),
     3, Map(
         "Title", "三窗",
