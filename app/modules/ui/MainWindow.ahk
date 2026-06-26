@@ -44,6 +44,7 @@ CreateMainGui() {
     MainGui.SetFont("s8", "Microsoft YaHei UI")
     MainGui.OnEvent("Close", HandleClose)
     MainGui.OnEvent("Escape", HideToTray)
+    RegisterWindowPositionTracking(MainGui.Hwnd)
 
     CurrentPathText := MainGui.AddText("xm ym+2 w126 h18 +0x200", "当前：未设置")
     CurrentPathText.OnEvent("Click", ShowFullPath)
@@ -135,7 +136,10 @@ CreateMainGui() {
 ShowMainWindow(*) {
     global MainGui, AppConfig
 
+    LogDebug("ShowMainWindow called")
+
     if !MainGui {
+        LogDebug("ShowMainWindow: MainGui is null")
         return
     }
 
@@ -149,9 +153,18 @@ ShowMainWindow(*) {
     height := AppConfig["WindowHeight"]
     screenWidth := A_ScreenWidth
     screenHeight := A_ScreenHeight
-    x := Max(0, Floor((screenWidth - width) / 2))
-    y := Max(0, Floor((screenHeight - height) / 2))
-    MainGui.Show("w" width " h" height " x" x " y" y)
+    pos := GetSavedWindowPosition()
+    if (pos.Length >= 2) {
+        savedX := pos[1]
+        savedY := pos[2]
+        LogDebug("ShowMainWindow: using saved position x=" savedX " y=" savedY)
+        MainGui.Show("w" width " h" height " x" savedX " y" savedY)
+    } else {
+        LogDebug("ShowMainWindow: using center position")
+        x := Max(0, Floor((screenWidth - width) / 2))
+        y := Max(0, Floor((screenHeight - height) / 2))
+        MainGui.Show("w" width " h" height " x" x " y" y)
+    }
     if AppConfig["AlwaysOnTop"] {
         WinSetAlwaysOnTop(1, "ahk_id " MainGui.Hwnd)
     }
@@ -159,6 +172,7 @@ ShowMainWindow(*) {
 }
 
 SwitchToWindow(windowId) {
+    LogDebug("SwitchToWindow called windowId=" windowId)
     SetActiveWindowId(windowId)
     RefreshMainWindow()
     ShowMainWindow()
@@ -166,22 +180,29 @@ SwitchToWindow(windowId) {
 }
 
 ToggleWindow(windowId) {
+    LogDebug("ToggleWindow called windowId=" windowId)
     if (ShouldHideOnToggle(windowId)) {
+        LogDebug("ToggleWindow: hiding")
         HideToTray()
         return
     }
+    LogDebug("ToggleWindow: switching")
     SwitchToWindow(windowId)
 }
 
 ShouldHideOnToggle(windowId) {
     global MainGui
     if (!MainGui) {
+        LogDebug("ShouldHideOnToggle: MainGui is null")
         return false
     }
     if (GetActiveWindowId() != windowId) {
+        LogDebug("ShouldHideOnToggle: activeWindowId mismatch, current=" GetActiveWindowId() " requested=" windowId)
         return false
     }
-    return WinActive("ahk_id " MainGui.Hwnd)
+    isActive := WinActive("ahk_id " MainGui.Hwnd)
+    LogDebug("ShouldHideOnToggle: isActive=" isActive)
+    return isActive
 }
 
 OpenPendingMarkdownIfAny(windowId) {
@@ -243,6 +264,8 @@ RefreshMainWindow() {
 
 HideToTray(*) {
     global MainGui
+    LogDebug("HideToTray called")
+    SaveWindowPosition()
     MainGui.Hide()
 }
 
@@ -257,6 +280,8 @@ ToggleMainWindow(*) {
 
 HandleClose(*) {
     global AppConfig
+    LogDebug("HandleClose called")
+    SaveWindowPosition()
     if AppConfig["CloseToTray"] {
         HideToTray()
         return

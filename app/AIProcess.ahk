@@ -10,8 +10,10 @@ global ModulesDir := AppRoot "\modules"
 global DataDir := AppRoot "\data"
 global LibDir := AppRoot "\lib"
 
+#Include %A_ScriptDir%\modules\core\Logger.ahk
 #Include %A_ScriptDir%\modules\core\DataFileUtils.ahk
 #Include %A_ScriptDir%\modules\core\ConfigManager.ahk
+#Include %A_ScriptDir%\modules\core\WindowPositionManager.ahk
 #Include %A_ScriptDir%\modules\core\AppBootstrap.ahk
 #Include %A_ScriptDir%\modules\session\Session.ahk
 #Include %A_ScriptDir%\modules\ui\TrayManager.ahk

@@ -31,6 +31,12 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window", "Height", "") = "") {
         IniWrite("190", SettingsFile, "Window", "Height")
     }
+    if (IniRead(SettingsFile, "Window", "PosX", "") = "") {
+        IniWrite("", SettingsFile, "Window", "PosX")
+    }
+    if (IniRead(SettingsFile, "Window", "PosY", "") = "") {
+        IniWrite("", SettingsFile, "Window", "PosY")
+    }
     if (IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "AlwaysOnTop")
     }
@@ -290,6 +296,8 @@ LoadConfig() {
     if (AppConfig["WindowHeight"] < 190) {
         AppConfig["WindowHeight"] := 190
     }
+    AppConfig["WindowPosX"] := IniRead(SettingsFile, "Window", "PosX", "")
+    AppConfig["WindowPosY"] := IniRead(SettingsFile, "Window", "PosY", "")
     LoadHotkeyConfig()
     LoadWindowSessions()
     AppConfig["AlwaysOnTop"] := IniRead(SettingsFile, "Behavior", "AlwaysOnTop", "1") = "1"
@@ -350,6 +358,15 @@ SaveWindowSession(windowId) {
     IniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
     IniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
     IniWrite(WindowSessions[windowId]["ShowExecuteNotification"] ? "1" : "0", SettingsFile, section, "ShowExecuteNotification")
+}
+
+; 保存窗口位置到配置文件，并同步更新 AppConfig
+SaveWindowPositionToConfig(x, y) {
+    global SettingsFile, AppConfig
+    IniWrite(x, SettingsFile, "Window", "PosX")
+    IniWrite(y, SettingsFile, "Window", "PosY")
+    AppConfig["WindowPosX"] := x
+    AppConfig["WindowPosY"] := y
 }
 
 ; 保存 2 号窗口启用状态
