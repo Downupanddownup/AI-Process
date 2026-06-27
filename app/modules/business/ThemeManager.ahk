@@ -185,6 +185,7 @@ SwitchToNewTheme(newDir) {
     SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
+    LogThemeIndex(newDir, "新主题")
     CreateRequirementFile()
 }
 

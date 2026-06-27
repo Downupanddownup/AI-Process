@@ -8,6 +8,7 @@ global DirectoryDialogEdit := ""
 SetCurrentDirAndOpenRequirement(dirPath) {
     SetCurrentDir(NormalizePath(dirPath))
     SaveWindowSession(GetActiveWindowId())
+    LogThemeIndex(GetCurrentDir(), "右键")
 
     if (MainGui) {
         UpdateCurrentPathDisplay()
@@ -110,6 +111,7 @@ SubmitDirectoryDialog(*) {
     RefreshDirectoryStateUI()
     CloseDirectoryDialog()
     ShowFeedback("当前目录已切换")
+    LogThemeIndex(GetCurrentDir(), "面板")
 }
 
 

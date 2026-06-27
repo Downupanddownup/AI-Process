@@ -10,6 +10,7 @@ global ModulesDir := AppRoot "\modules"
 global DataDir := AppRoot "\data"
 global LibDir := AppRoot "\lib"
 
+#Include %A_ScriptDir%\lib\JSON.ahk
 #Include %A_ScriptDir%\modules\core\Logger.ahk
 #Include %A_ScriptDir%\modules\core\DataFileUtils.ahk
 #Include %A_ScriptDir%\modules\core\ConfigManager.ahk
@@ -21,6 +22,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\PromptManager.ahk
 #Include %A_ScriptDir%\modules\business\DirectoryManager.ahk
 #Include %A_ScriptDir%\modules\business\ThemeManager.ahk
+#Include %A_ScriptDir%\modules\business\HistoryIndexManager.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
 #Include %A_ScriptDir%\modules\ui\StyleManager.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk
