@@ -13,6 +13,9 @@ global SummaryRebindButton := ""
 global SummaryUnbindButton := ""
 global SummaryRefreshButton := ""
 global SummaryFilterButtons := ""
+global SummaryDateRangeText := ""
+global SummaryReportFilter := ""
+global SummaryReportFilterValue := "全部"
 global SummaryCurrentFilter := "今天"
 global SummaryCustomStartDate := ""
 global SummaryCustomEndDate := ""
@@ -41,9 +44,9 @@ ShowSummaryWindow(*) {
 CreateSummaryGui() {
     global SummaryGui, SummaryListView, SummaryStatusBar, SummaryAgentStatusText
     global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
-    global SummaryRefreshButton, SummaryFilterButtons
+    global SummaryRefreshButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
 
-    SummaryGui := Gui("+MinSize750x600 -Resize", "经验总结")
+    SummaryGui := Gui("+Resize +MinSize750x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
     SummaryGui.OnEvent("Close", SummaryGuiClose)
     SummaryGui.OnEvent("Size", SummaryGuiSize)
@@ -59,13 +62,35 @@ CreateSummaryGui() {
         xPos += 54
     }
 
-    customBtn := SummaryGui.Add("Button", "x" xPos " ym w80 h22", "自定义...")
+    customBtn := SummaryGui.Add("Button", "x" xPos " ym w80 h22", "自定义")
     customBtn.OnEvent("Click", SummaryCustomFilterClick)
     SummaryFilterButtons.Push(customBtn)
     xPos += 78
 
+    ; 在自定义按钮和日期范围之间增加空隙
+    xPos += 30
+
+    SummaryDateRangeText := SummaryGui.Add("Text", "x" xPos " ym w180 h22", "")
+    xPos += 184
+
     SummaryRefreshButton := SummaryGui.Add("Button", "x" xPos " ym w50 h22", "刷新")
     SummaryRefreshButton.OnEvent("Click", SummaryRefreshClick)
+
+    ; 第二行：报告状态 + Agent 绑定
+    SummaryGui.Add("Text", "xm y+8 w60 h18", "报告状态：")
+    SummaryReportFilter := SummaryGui.Add("DropDownList", "x+4 yp w80 Choose1", ["全部", "已生成", "未生成"])
+    SummaryReportFilter.OnEvent("Change", SummaryReportFilterChange)
+
+    SummaryGui.Add("Text", "x+20 yp w80 h18", "Agent 绑定：")
+    SummaryAgentStatusText := SummaryGui.Add("Text", "x+4 yp w120 h18", "未绑定")
+    SummaryBindButton := SummaryGui.Add("Button", "x+4 yp w70 h24", "绑定窗口")
+    SummaryBindButton.OnEvent("Click", SummaryBindAgentClick)
+    SummaryActivateButton := SummaryGui.Add("Button", "x+4 yp w70 h24 Hidden", "激活窗口")
+    SummaryActivateButton.OnEvent("Click", SummaryActivateAgentClick)
+    SummaryRebindButton := SummaryGui.Add("Button", "x+4 yp w70 h24 Hidden", "重新绑定")
+    SummaryRebindButton.OnEvent("Click", SummaryRebindAgentClick)
+    SummaryUnbindButton := SummaryGui.Add("Button", "x+4 yp w70 h24 Hidden", "解绑")
+    SummaryUnbindButton.OnEvent("Click", SummaryUnbindAgentClick)
 
     ; ListView
     SummaryListView := SummaryGui.Add("ListView", "xm y+8 w710 h380 Grid -Multi", ["主题名称", "最后访问时间", "总结状态", "目录状态"])
@@ -76,18 +101,6 @@ CreateSummaryGui() {
     SummaryListView.OnEvent("Click", SummaryListViewClick)
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
-
-    ; Agent 绑定区
-    SummaryGui.Add("Text", "xm y+8 w80 h18", "Agent 绑定：")
-    SummaryAgentStatusText := SummaryGui.Add("Text", "x80 yp w500 h18", "未绑定")
-    SummaryBindButton := SummaryGui.Add("Button", "xm y+6 w80 h24", "绑定窗口")
-    SummaryBindButton.OnEvent("Click", SummaryBindAgentClick)
-    SummaryActivateButton := SummaryGui.Add("Button", "x+8 yp w80 h24 Hidden", "激活窗口")
-    SummaryActivateButton.OnEvent("Click", SummaryActivateAgentClick)
-    SummaryRebindButton := SummaryGui.Add("Button", "x+8 yp w80 h24 Hidden", "重新绑定")
-    SummaryRebindButton.OnEvent("Click", SummaryRebindAgentClick)
-    SummaryUnbindButton := SummaryGui.Add("Button", "x+8 yp w80 h24 Hidden", "解绑")
-    SummaryUnbindButton.OnEvent("Click", SummaryUnbindAgentClick)
 
     ; 状态栏
     SummaryStatusBar := SummaryGui.Add("Text", "xm y+8 w710 h18", "状态：准备就绪")
@@ -115,8 +128,27 @@ SummaryGuiClose(*) {
 }
 
 SummaryGuiSize(gui, minMax, width, height) {
-    ; 窗口不可调整大小，此事件不再处理布局
-    return
+    global SummaryListView, SummaryStatusBar
+
+    if (minMax = -1 || !SummaryListView) {
+        return
+    }
+
+    topReserved := 70      ; 筛选条件区高度 + 边距（两行）
+    bottomReserved := 50   ; 状态栏 + 边距
+    minListHeight := 200
+
+    newWidth := width - 40
+    newHeight := height - topReserved - bottomReserved
+    if (newHeight < minListHeight) {
+        newHeight := minListHeight
+    }
+
+    SummaryListView.Move(10, topReserved, newWidth, newHeight)
+
+    if (SummaryStatusBar) {
+        SummaryStatusBar.Move(10,, newWidth)
+    }
 }
 
 ; ============================================================
@@ -138,10 +170,16 @@ SummaryRefreshClick(*) {
     RefreshSummaryWindow()
 }
 
+SummaryReportFilterChange(ctrl, *) {
+    global SummaryReportFilterValue
+    SummaryReportFilterValue := ctrl.Text
+    RefreshSummaryWindow()
+}
+
 UpdateFilterButtonState() {
     global SummaryFilterButtons, SummaryCurrentFilter
     for btn in SummaryFilterButtons {
-        if (btn.Text = SummaryCurrentFilter || (SummaryCurrentFilter = "自定义" && btn.Text = "自定义...")) {
+        if (btn.Text = SummaryCurrentFilter || (SummaryCurrentFilter = "自定义" && btn.Text = "自定义")) {
             btn.Enabled := false
         } else {
             btn.Enabled := true
@@ -207,14 +245,37 @@ ApplyCustomDate(dialog, startCtrl, endCtrl, nowCtrl) {
 ; ============================================================
 
 RefreshSummaryWindow() {
+    UpdateDateRangeText()
     RenderThemeList()
     RefreshAgentStatusUI()
+}
+
+UpdateDateRangeText() {
+    global SummaryDateRangeText, SummaryCurrentFilter
+    global SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
+
+    dateRange := GetFilterDateRange(SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
+    if (SummaryDateRangeText) {
+        SummaryDateRangeText.Text := FormatDateRangeText(dateRange)
+    }
+}
+
+FormatDateRangeText(dateRange) {
+    startDate := dateRange["startDate"]
+    endDate := dateRange["endDate"]
+    if (startDate = "" && endDate = "") {
+        return ""
+    }
+    if (startDate = endDate) {
+        return startDate
+    }
+    return startDate " ~ " endDate
 }
 
 RenderThemeList() {
     global SummaryListView, SummaryStatusBar, SummaryCurrentFilter
     global SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
-    global SummaryRowPathMap, SummarySelectedThemePath
+    global SummaryRowPathMap, SummarySelectedThemePath, SummaryReportFilterValue
 
     SummaryListView.Delete()
     SummaryRowPathMap.Clear()
@@ -222,8 +283,21 @@ RenderThemeList() {
     dateRange := GetFilterDateRange(SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
     themes := LoadThemes(dateRange)
 
-    notExistCount := 0
+    ; 应用报告状态过滤
+    filteredThemes := []
     for theme in themes {
+        summaryExists := FileExist(theme.path "\Summary.md")
+        if (SummaryReportFilterValue = "已生成" && !summaryExists) {
+            continue
+        }
+        if (SummaryReportFilterValue = "未生成" && summaryExists) {
+            continue
+        }
+        filteredThemes.Push(theme)
+    }
+
+    notExistCount := 0
+    for theme in filteredThemes {
         rowIndex := SummaryListView.Add(, theme.name, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
         SummaryRowPathMap[rowIndex] := theme.path
         if (theme.dirStatus = "不存在") {
@@ -231,7 +305,7 @@ RenderThemeList() {
         }
     }
 
-    totalCount := themes.Length
+    totalCount := filteredThemes.Length
     if (notExistCount > 0) {
         SummaryStatusBar.Text := "状态：共 " totalCount " 个主题（目录不存在 " notExistCount " 个）"
     } else {
@@ -297,7 +371,7 @@ LoadThemes(dateRange) {
     themes := []
     for themeDir, lastTime in themeMap {
         SplitPath(themeDir, &themeName)
-        summaryFile := themeDir "\.aiprocess\总结.md"
+        summaryFile := themeDir "\Summary.md"
         summaryStatus := FileExist(summaryFile) ? "已总结" : "未总结"
         dirStatus := DirExist(themeDir) ? "存在" : "不存在"
 
@@ -479,7 +553,7 @@ ShowThemeDetailDialog(path) {
     }
 
     SplitPath(path, &themeName)
-    summaryFile := path "\.aiprocess\总结.md"
+    summaryFile := path "\Summary.md"
     dirExists := DirExist(path)
     summaryExists := FileExist(summaryFile)
 
@@ -612,7 +686,7 @@ ViewThemeSummary(themePath) {
     if (themePath = "") {
         return
     }
-    summaryFile := themePath "\.aiprocess\总结.md"
+    summaryFile := themePath "\Summary.md"
     if (!FileExist(summaryFile)) {
         MsgBox("总结文件不存在", "AIProcess", "Iconx")
         return
@@ -629,5 +703,6 @@ GenerateThemeSummary(themePath) {
         MsgBox("未绑定 Agent，请先绑定经验总结 Agent。", "AIProcess", "Iconx")
         return
     }
-    MsgBox("后续将实现提示词发送逻辑（当前未实现）。", "AIProcess", "Iconi")
+    MsgBox("后续将实现提示词发送逻辑，生成结果将写入：" themePath "\Summary.md", "AIProcess", "Iconi")
 }
+
