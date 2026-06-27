@@ -5,8 +5,8 @@
 
 global SummaryGui := ""
 global SummaryListView := ""
-global SummaryStatusBar := ""
 global SummaryAgentStatusText := ""
+global SummaryTotalCountText := ""
 global SummaryBindButton := ""
 global SummaryActivateButton := ""
 global SummaryRebindButton := ""
@@ -42,7 +42,7 @@ ShowSummaryWindow(*) {
 }
 
 CreateSummaryGui() {
-    global SummaryGui, SummaryListView, SummaryStatusBar, SummaryAgentStatusText
+    global SummaryGui, SummaryListView, SummaryAgentStatusText, SummaryTotalCountText
     global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
     global SummaryRefreshButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
 
@@ -82,28 +82,28 @@ CreateSummaryGui() {
     SummaryReportFilter.OnEvent("Change", SummaryReportFilterChange)
 
     SummaryGui.Add("Text", "x+20 yp w80 h18", "Agent 绑定：")
-    SummaryAgentStatusText := SummaryGui.Add("Text", "x+4 yp w120 h18", "未绑定")
-    SummaryBindButton := SummaryGui.Add("Button", "x+4 yp w70 h24", "绑定窗口")
+    SummaryAgentStatusText := SummaryGui.Add("Text", "x+4 yp w100 h18", "未绑定")
+    SummaryBindButton := SummaryGui.Add("Button", "x+4 yp w60 h24", "绑定窗口")
     SummaryBindButton.OnEvent("Click", SummaryBindAgentClick)
-    SummaryActivateButton := SummaryGui.Add("Button", "x+4 yp w70 h24 Hidden", "激活窗口")
+    SummaryActivateButton := SummaryGui.Add("Button", "x+4 yp w60 h24 Hidden", "激活窗口")
     SummaryActivateButton.OnEvent("Click", SummaryActivateAgentClick)
-    SummaryRebindButton := SummaryGui.Add("Button", "x+4 yp w70 h24 Hidden", "重新绑定")
+    SummaryRebindButton := SummaryGui.Add("Button", "x+4 yp w60 h24 Hidden", "重绑")
     SummaryRebindButton.OnEvent("Click", SummaryRebindAgentClick)
-    SummaryUnbindButton := SummaryGui.Add("Button", "x+4 yp w70 h24 Hidden", "解绑")
+    SummaryUnbindButton := SummaryGui.Add("Button", "x+4 yp w60 h24 Hidden", "解绑")
     SummaryUnbindButton.OnEvent("Click", SummaryUnbindAgentClick)
 
+    SummaryTotalCountText := SummaryGui.Add("Text", "x+10 yp w80 h18", "")
+
     ; ListView
-    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w710 h380 Grid -Multi", ["主题名称", "最后访问时间", "总结状态", "目录状态"])
-    SummaryListView.ModifyCol(1, 220)  ; 主题名称
-    SummaryListView.ModifyCol(2, 140)  ; 最后访问时间
-    SummaryListView.ModifyCol(3, 70)   ; 总结状态
-    SummaryListView.ModifyCol(4, 70)   ; 目录状态
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w710 h380 Grid -Multi", ["序号", "主题名称", "最后访问时间", "总结状态", "目录状态"])
+    SummaryListView.ModifyCol(1, 40)   ; 序号
+    SummaryListView.ModifyCol(2, 200)  ; 主题名称
+    SummaryListView.ModifyCol(3, 140)  ; 最后访问时间
+    SummaryListView.ModifyCol(4, 70)   ; 总结状态
+    SummaryListView.ModifyCol(5, 70)   ; 目录状态
     SummaryListView.OnEvent("Click", SummaryListViewClick)
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
-
-    ; 状态栏
-    SummaryStatusBar := SummaryGui.Add("Text", "xm y+8 w710 h18", "状态：准备就绪")
 
     ; 计算窗口尺寸：固定 750×650，主屏幕居中
     width := 750
@@ -128,14 +128,14 @@ SummaryGuiClose(*) {
 }
 
 SummaryGuiSize(gui, minMax, width, height) {
-    global SummaryListView, SummaryStatusBar
+    global SummaryListView
 
     if (minMax = -1 || !SummaryListView) {
         return
     }
 
     topReserved := 70      ; 筛选条件区高度 + 边距（两行）
-    bottomReserved := 50   ; 状态栏 + 边距
+    bottomReserved := 20   ; 底部边距
     minListHeight := 200
 
     newWidth := width - 40
@@ -145,10 +145,6 @@ SummaryGuiSize(gui, minMax, width, height) {
     }
 
     SummaryListView.Move(10, topReserved, newWidth, newHeight)
-
-    if (SummaryStatusBar) {
-        SummaryStatusBar.Move(10,, newWidth)
-    }
 }
 
 ; ============================================================
@@ -273,7 +269,7 @@ FormatDateRangeText(dateRange) {
 }
 
 RenderThemeList() {
-    global SummaryListView, SummaryStatusBar, SummaryCurrentFilter
+    global SummaryListView, SummaryTotalCountText, SummaryCurrentFilter
     global SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
     global SummaryRowPathMap, SummarySelectedThemePath, SummaryReportFilterValue
 
@@ -296,20 +292,14 @@ RenderThemeList() {
         filteredThemes.Push(theme)
     }
 
-    notExistCount := 0
-    for theme in filteredThemes {
-        rowIndex := SummaryListView.Add(, theme.name, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
+    for index, theme in filteredThemes {
+        rowIndex := SummaryListView.Add(, index, theme.name, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
         SummaryRowPathMap[rowIndex] := theme.path
-        if (theme.dirStatus = "不存在") {
-            notExistCount += 1
-        }
     }
 
     totalCount := filteredThemes.Length
-    if (notExistCount > 0) {
-        SummaryStatusBar.Text := "状态：共 " totalCount " 个主题（目录不存在 " notExistCount " 个）"
-    } else {
-        SummaryStatusBar.Text := "状态：共 " totalCount " 个主题"
+    if (SummaryTotalCountText) {
+        SummaryTotalCountText.Text := "共 " totalCount " 个主题"
     }
 
     SummarySelectedThemePath := ""
