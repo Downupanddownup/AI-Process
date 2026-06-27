@@ -17,6 +17,8 @@ param(
     [string]$WindowId = ""
 )
 
+$scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
 
 $csharpCode = @"
@@ -266,3 +268,9 @@ Add-Type -TypeDefinition $csharpCode -ReferencedAssemblies PresentationFramework
 $window = New-Object NotificationWindow $WindowId
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+# 通知显示完成后，写入操作日志
+$activityLogScript = Join-Path $scriptDirectory "..\activity\WriteActivityLog.ps1"
+if (Test-Path $activityLogScript) {
+    & powershell -ExecutionPolicy Bypass -File "$activityLogScript" -WindowId $WindowId -Action "完成通知"
+}

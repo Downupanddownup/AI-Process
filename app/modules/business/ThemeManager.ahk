@@ -166,6 +166,7 @@ CreateAndEnterIssueDir(*) {
     RefreshDirectoryStateUI()
     ShowFeedback("已进入问题目录：" nextIssueDirName)
 
+    LogActivity("建问题", "")
     CreateRequirementFile()
 }
 

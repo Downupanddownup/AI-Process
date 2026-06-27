@@ -158,6 +158,7 @@ CopyRequirementPrompt(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
+    LogActivity("复需求", content)
     ShowFeedback("需求提示词已复制")
     HandleAgentWindowAfterCopy()
 
@@ -186,7 +187,14 @@ CopyReplyPrompt(*) {
     content := AppendReplyImplementationTailIfNeeded(content)
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
+
+    properties := Map()
+    if (GetSession(GetActiveWindowId(), "AppendImplementationTail")) {
+        properties["实"] := true
+    }
+
     A_Clipboard := content
+    LogActivity("复回复", content, properties)
     ShowFeedback("回复提示词已复制")
     HandleAgentWindowAfterCopy()
 
@@ -204,6 +212,7 @@ CopyContextRelations(*) {
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
+    LogActivity("复关系", content)
     ShowFeedback("文件关系说明已复制")
     HandleAgentWindowAfterCopy()
 
@@ -237,7 +246,10 @@ CopyExecutePrompt(*) {
 
     content := AppendExecuteNotificationIfNeeded(content)
 
+    properties := Map("执行策略", strategyMeta["label"])
+
     A_Clipboard := content
+    LogActivity("复执行", content, properties)
     ShowFeedback(strategyMeta["feedback"])
     HandleAgentWindowAfterCopy()
 

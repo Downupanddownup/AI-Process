@@ -194,6 +194,8 @@ CreateRequirementFile(*) {
         ShowFeedback("文件已存在：需求.txt", true)
     }
 
+    LogActivity("建需求", "")
+
     if GetSession(GetActiveWindowId(), "OpenWithIdea") {
         OpenFileInIdea(filePath)
     }
@@ -223,6 +225,8 @@ CreateReplyFile(*) {
     } else {
         ShowFeedback("文件已存在：" ExtractFileName(replyPath), true)
     }
+
+    LogActivity("建回复", "")
 
     if GetSession(GetActiveWindowId(), "OpenWithIdea") {
         OpenFileInIdea(replyPath)
