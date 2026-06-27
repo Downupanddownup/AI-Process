@@ -25,6 +25,8 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\HistoryIndexManager.ahk
 #Include %A_ScriptDir%\modules\business\ActivityLogger.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
+#Include %A_ScriptDir%\modules\business\AgentDispatcher.ahk
+#Include %A_ScriptDir%\modules\business\SummaryWindow.ahk
 #Include %A_ScriptDir%\modules\ui\StyleManager.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk
 #Include %A_ScriptDir%\modules\ui\ConfigDialog.ahk

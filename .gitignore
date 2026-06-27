@@ -26,3 +26,8 @@ Desktop.ini
 /需求/历史财富/
 /需求/测试啊/需求.txt
 /history/
+
+# 工具目录：放置本地开发工具，不提交到 GitHub，但保留 README.md 说明
+/tools/*
+!/tools/README.md
+/需求/测试啊/

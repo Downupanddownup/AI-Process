@@ -1,0 +1,633 @@
+#Requires AutoHotkey v2.0
+
+; SummaryWindow.ahk
+; 经验总结窗口：基于 AHK 原生 Gui 实现
+
+global SummaryGui := ""
+global SummaryListView := ""
+global SummaryStatusBar := ""
+global SummaryAgentStatusText := ""
+global SummaryBindButton := ""
+global SummaryActivateButton := ""
+global SummaryRebindButton := ""
+global SummaryUnbindButton := ""
+global SummaryRefreshButton := ""
+global SummaryFilterButtons := ""
+global SummaryCurrentFilter := "今天"
+global SummaryCustomStartDate := ""
+global SummaryCustomEndDate := ""
+global SummaryCustomEndIsNow := true
+global SummarySelectedThemePath := ""
+global SummaryFilterAreaHeight := 0
+global SummaryRowPathMap := Map()
+
+; 筛选选项
+FILTER_OPTIONS := ["今天", "本周", "上周", "本月", "上月", "本年"]
+
+ShowSummaryWindow(*) {
+    global SummaryGui
+
+    if (SummaryGui) {
+        SummaryGui.Show()
+        WinActivate("经验总结")
+        RefreshSummaryWindow()
+        return
+    }
+
+    CreateSummaryGui()
+    RefreshSummaryWindow()
+}
+
+CreateSummaryGui() {
+    global SummaryGui, SummaryListView, SummaryStatusBar, SummaryAgentStatusText
+    global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
+    global SummaryRefreshButton, SummaryFilterButtons
+
+    SummaryGui := Gui("+MinSize750x600 -Resize", "经验总结")
+    SummaryGui.SetFont("s9", "Microsoft YaHei UI")
+    SummaryGui.OnEvent("Close", SummaryGuiClose)
+    SummaryGui.OnEvent("Size", SummaryGuiSize)
+
+    ; 筛选条件区
+    SummaryGui.Add("Text", "xm ym w80 h18", "筛选条件：")
+    SummaryFilterButtons := []
+    xPos := 80
+    for filterName in FILTER_OPTIONS {
+        btn := SummaryGui.Add("Button", "x" xPos " ym w50 h22", filterName)
+        btn.OnEvent("Click", SummaryFilterButtonClick)
+        SummaryFilterButtons.Push(btn)
+        xPos += 54
+    }
+
+    customBtn := SummaryGui.Add("Button", "x" xPos " ym w80 h22", "自定义...")
+    customBtn.OnEvent("Click", SummaryCustomFilterClick)
+    SummaryFilterButtons.Push(customBtn)
+    xPos += 78
+
+    SummaryRefreshButton := SummaryGui.Add("Button", "x" xPos " ym w50 h22", "刷新")
+    SummaryRefreshButton.OnEvent("Click", SummaryRefreshClick)
+
+    ; ListView
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w710 h380 Grid -Multi", ["主题名称", "最后访问时间", "总结状态", "目录状态"])
+    SummaryListView.ModifyCol(1, 220)  ; 主题名称
+    SummaryListView.ModifyCol(2, 140)  ; 最后访问时间
+    SummaryListView.ModifyCol(3, 70)   ; 总结状态
+    SummaryListView.ModifyCol(4, 70)   ; 目录状态
+    SummaryListView.OnEvent("Click", SummaryListViewClick)
+    SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
+    SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
+
+    ; Agent 绑定区
+    SummaryGui.Add("Text", "xm y+8 w80 h18", "Agent 绑定：")
+    SummaryAgentStatusText := SummaryGui.Add("Text", "x80 yp w500 h18", "未绑定")
+    SummaryBindButton := SummaryGui.Add("Button", "xm y+6 w80 h24", "绑定窗口")
+    SummaryBindButton.OnEvent("Click", SummaryBindAgentClick)
+    SummaryActivateButton := SummaryGui.Add("Button", "x+8 yp w80 h24 Hidden", "激活窗口")
+    SummaryActivateButton.OnEvent("Click", SummaryActivateAgentClick)
+    SummaryRebindButton := SummaryGui.Add("Button", "x+8 yp w80 h24 Hidden", "重新绑定")
+    SummaryRebindButton.OnEvent("Click", SummaryRebindAgentClick)
+    SummaryUnbindButton := SummaryGui.Add("Button", "x+8 yp w80 h24 Hidden", "解绑")
+    SummaryUnbindButton.OnEvent("Click", SummaryUnbindAgentClick)
+
+    ; 状态栏
+    SummaryStatusBar := SummaryGui.Add("Text", "xm y+8 w710 h18", "状态：准备就绪")
+
+    ; 计算窗口尺寸：固定 750×650，主屏幕居中
+    width := 750
+    height := 650
+    x := Integer((A_ScreenWidth - width) / 2)
+    y := Integer((A_ScreenHeight - height) / 2)
+    SummaryGui.Show(Format("w{} h{} x{} y{}", width, height, x, y))
+
+    ; 默认选中“今天”
+    UpdateFilterButtonState()
+}
+
+; ============================================================
+; 窗口事件处理
+; ============================================================
+
+SummaryGuiClose(*) {
+    global SummaryGui
+    if (SummaryGui) {
+        SummaryGui.Hide()
+    }
+}
+
+SummaryGuiSize(gui, minMax, width, height) {
+    ; 窗口不可调整大小，此事件不再处理布局
+    return
+}
+
+; ============================================================
+; 筛选条件处理
+; ============================================================
+
+SummaryFilterButtonClick(ctrl, *) {
+    global SummaryCurrentFilter
+    SummaryCurrentFilter := ctrl.Text
+    UpdateFilterButtonState()
+    RefreshSummaryWindow()
+}
+
+SummaryCustomFilterClick(*) {
+    ShowCustomDateDialog()
+}
+
+SummaryRefreshClick(*) {
+    RefreshSummaryWindow()
+}
+
+UpdateFilterButtonState() {
+    global SummaryFilterButtons, SummaryCurrentFilter
+    for btn in SummaryFilterButtons {
+        if (btn.Text = SummaryCurrentFilter || (SummaryCurrentFilter = "自定义" && btn.Text = "自定义...")) {
+            btn.Enabled := false
+        } else {
+            btn.Enabled := true
+        }
+    }
+}
+
+ShowCustomDateDialog() {
+    global SummaryGui, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
+
+    dialog := Gui("+Owner" SummaryGui.Hwnd " +ToolWindow", "自定义时间范围")
+    dialog.SetFont("s9", "Microsoft YaHei UI")
+    dialog.MarginX := 12
+    dialog.MarginY := 10
+
+    dialog.Add("Text", "xm ym", "开始日期：")
+    startCtrl := dialog.Add("DateTime", "xm y+4 w140 vStartDate", "yyyy-MM-dd")
+
+    dialog.Add("Text", "xm y+8", "结束日期：")
+    endCtrl := dialog.Add("DateTime", "xm y+4 w140 vEndDate", "yyyy-MM-dd")
+    nowCtrl := dialog.Add("CheckBox", "x+8 yp w60 vEndIsNow", "至今")
+
+    ; 恢复上次选择
+    try {
+        if (SummaryCustomStartDate != "") {
+            startCtrl.Value := SummaryCustomStartDate
+        }
+    }
+    try {
+        if (SummaryCustomEndDate != "") {
+            endCtrl.Value := SummaryCustomEndDate
+        }
+    }
+    nowCtrl.Value := SummaryCustomEndIsNow ? 1 : 0
+    endCtrl.Enabled := !SummaryCustomEndIsNow
+
+    nowCtrl.OnEvent("Click", (*) => endCtrl.Enabled := nowCtrl.Value != 1)
+
+    okButton := dialog.Add("Button", "xm y+12 w70 h24 Default", "确定")
+    okButton.OnEvent("Click", (*) => ApplyCustomDate(dialog, startCtrl, endCtrl, nowCtrl))
+
+    cancelButton := dialog.Add("Button", "x+8 yp w70 h24", "取消")
+    cancelButton.OnEvent("Click", (*) => dialog.Destroy())
+
+    dialog.Show()
+}
+
+ApplyCustomDate(dialog, startCtrl, endCtrl, nowCtrl) {
+    global SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
+    SummaryCurrentFilter := "自定义"
+    SummaryCustomStartDate := startCtrl.Value
+    SummaryCustomEndIsNow := nowCtrl.Value = 1
+    if (!SummaryCustomEndIsNow) {
+        SummaryCustomEndDate := endCtrl.Value
+    }
+    dialog.Destroy()
+    UpdateFilterButtonState()
+    RefreshSummaryWindow()
+}
+
+; ============================================================
+; 数据加载与渲染
+; ============================================================
+
+RefreshSummaryWindow() {
+    RenderThemeList()
+    RefreshAgentStatusUI()
+}
+
+RenderThemeList() {
+    global SummaryListView, SummaryStatusBar, SummaryCurrentFilter
+    global SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
+    global SummaryRowPathMap, SummarySelectedThemePath
+
+    SummaryListView.Delete()
+    SummaryRowPathMap.Clear()
+
+    dateRange := GetFilterDateRange(SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
+    themes := LoadThemes(dateRange)
+
+    notExistCount := 0
+    for theme in themes {
+        rowIndex := SummaryListView.Add(, theme.name, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
+        SummaryRowPathMap[rowIndex] := theme.path
+        if (theme.dirStatus = "不存在") {
+            notExistCount += 1
+        }
+    }
+
+    totalCount := themes.Length
+    if (notExistCount > 0) {
+        SummaryStatusBar.Text := "状态：共 " totalCount " 个主题（目录不存在 " notExistCount " 个）"
+    } else {
+        SummaryStatusBar.Text := "状态：共 " totalCount " 个主题"
+    }
+
+    SummarySelectedThemePath := ""
+}
+
+LoadThemes(dateRange) {
+    global AppRoot
+
+    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+    if (projectRoot = "") {
+        projectRoot := AppRoot
+    }
+
+    indexDir := projectRoot "\history\index"
+    if (!DirExist(indexDir)) {
+        return []
+    }
+
+    themeMap := Map()
+
+    ; 获取需要读取的文件列表
+    files := []
+    Loop Files, indexDir "\*.jsonl", "F" {
+        fileDate := SubStr(A_LoopFileName, 1, 10)
+        if (IsDateInRange(fileDate, dateRange)) {
+            files.Push(A_LoopFileFullPath)
+        }
+    }
+
+    ; 读取每个文件
+    for filePath in files {
+        try {
+            content := FileRead(filePath, "UTF-8")
+            Loop Parse, content, "`n", "`r" {
+                line := Trim(A_LoopField)
+                if (line = "") {
+                    continue
+                }
+                try {
+                    record := JSON.Load(line)
+                    path := record["path"]
+                    time := record["time"]
+                    themeDir := FindThemeDir(path)
+                    if (themeDir = "") {
+                        continue
+                    }
+
+                    if (!themeMap.Has(themeDir)) {
+                        themeMap[themeDir] := time
+                    } else if (time > themeMap[themeDir]) {
+                        themeMap[themeDir] := time
+                    }
+                }
+            }
+        }
+    }
+
+    ; 转换为数组并排序
+    themes := []
+    for themeDir, lastTime in themeMap {
+        SplitPath(themeDir, &themeName)
+        summaryFile := themeDir "\.aiprocess\总结.md"
+        summaryStatus := FileExist(summaryFile) ? "已总结" : "未总结"
+        dirStatus := DirExist(themeDir) ? "存在" : "不存在"
+
+        themes.Push({
+            path: themeDir,
+            name: themeName,
+            lastAccessTime: lastTime,
+            summaryStatus: summaryStatus,
+            dirStatus: dirStatus
+        })
+    }
+
+    ; 按最后访问时间倒序
+    SortThemesByTime(themes)
+
+    return themes
+}
+
+FindThemeDir(path) {
+    if (path = "" || !InStr(path, "\")) {
+        return path
+    }
+
+    currentPath := path
+    Loop 20 {
+        if (DirExist(currentPath "\.aiprocess")) {
+            return currentPath
+        }
+        parentPath := ""
+        SplitPath(currentPath,, &parentPath)
+        if (parentPath = "" || parentPath = currentPath) {
+            break
+        }
+        currentPath := parentPath
+    }
+
+    return path
+}
+
+SortThemesByTime(themes) {
+    ; 简单冒泡排序，把时间字符串转为纯数字后比较
+    n := themes.Length
+    Loop n - 1 {
+        i := 1
+        Loop n - A_Index {
+            time1 := RegExReplace(themes[i].lastAccessTime, "[^\d]")
+            time2 := RegExReplace(themes[i + 1].lastAccessTime, "[^\d]")
+            if (time1 < time2) {
+                tmp := themes[i]
+                themes[i] := themes[i + 1]
+                themes[i + 1] := tmp
+            }
+            i += 1
+        }
+    }
+}
+
+IsDateInRange(fileDate, dateRange) {
+    if (dateRange["startDate"] = "" || dateRange["endDate"] = "") {
+        return true
+    }
+    ; 统一转换为 yyyyMMdd 数字字符串后比较，避免 AHK 字符串比较报错
+    fileDateNum := StrReplace(fileDate, "-")
+    startNum := StrReplace(dateRange["startDate"], "-")
+    endNum := StrReplace(dateRange["endDate"], "-")
+    return fileDateNum >= startNum && fileDateNum <= endNum
+}
+
+GetFilterDateRange(filterName, customStart, customEnd, endIsNow) {
+    now := A_Now
+    today := FormatTime(now, "yyyy-MM-dd")
+
+    startDate := ""
+    endDate := ""
+
+    switch filterName {
+        case "今天":
+            startDate := today
+            endDate := today
+        case "本周":
+            startDate := GetWeekStart(now)
+            endDate := today
+        case "上周":
+            weekStartTime := DateAdd(DateToTimestamp(GetWeekStart(now)), -7, "Days")
+            lastWeekEnd := DateAdd(weekStartTime, 6, "Days")
+            startDate := FormatTime(weekStartTime, "yyyy-MM-dd")
+            endDate := FormatTime(lastWeekEnd, "yyyy-MM-dd")
+        case "本月":
+            startDate := SubStr(today, 1, 8) "01"
+            endDate := today
+        case "上月":
+            thisMonthStart := SubStr(today, 1, 8) "01"
+            lastMonthEndTime := DateAdd(DateToTimestamp(thisMonthStart), -1, "Days")
+            lastMonthDay := Integer(FormatTime(lastMonthEndTime, "dd"))
+            lastMonthStartTime := DateAdd(lastMonthEndTime, 1 - lastMonthDay, "Days")
+            startDate := FormatTime(lastMonthStartTime, "yyyy-MM-dd")
+            endDate := FormatTime(lastMonthEndTime, "yyyy-MM-dd")
+        case "本年":
+            startDate := SubStr(today, 1, 5) "01-01"
+            endDate := today
+        case "自定义":
+            if (customStart != "") {
+                startDate := FormatTime(customStart, "yyyy-MM-dd")
+            }
+            if (endIsNow) {
+                endDate := today
+            } else if (customEnd != "") {
+                endDate := FormatTime(customEnd, "yyyy-MM-dd")
+            }
+    }
+
+    return Map("startDate", startDate, "endDate", endDate)
+}
+
+DateToTimestamp(dateStr) {
+    ; 将 yyyy-MM-dd 转换为 yyyyMMdd000000 时间戳
+    return StrReplace(dateStr, "-") "000000"
+}
+
+GetWeekStart(nowTime) {
+    ; 获取本周一，返回 yyyy-MM-dd
+    formatted := FormatTime(nowTime, "yyyyMMdd")
+    baseDate := "20000103"  ; 2000-01-03 是周一
+    diff := DateDiff(formatted, baseDate, "Days")
+    weekDayOffset := Mod(diff, 7)
+    if (weekDayOffset < 0) {
+        weekDayOffset += 7
+    }
+    monday := DateAdd(formatted, -weekDayOffset, "Days")
+    return FormatTime(monday, "yyyy-MM-dd")
+}
+
+; ============================================================
+; 列表选择事件与操作按钮
+; ============================================================
+
+SummaryListViewSelect(ctrl, item, selected) {
+    global SummarySelectedThemePath
+    if (selected && item > 0) {
+        SummarySelectedThemePath := GetThemePathByRow(item)
+    } else if (!selected) {
+        SummarySelectedThemePath := ""
+    }
+}
+
+SummaryListViewClick(ctrl, item) {
+    global SummarySelectedThemePath
+    if (item > 0) {
+        SummarySelectedThemePath := GetThemePathByRow(item)
+        themePath := GetThemePathByRow(item)
+        ShowThemeDetailDialog(themePath)
+    }
+}
+
+SummaryListViewDoubleClick(ctrl, item) {
+    if (item > 0) {
+        path := GetThemePathByRow(item)
+        ShowThemeDetailDialog(path)
+    }
+}
+
+GetThemePathByRow(rowIndex) {
+    global SummaryRowPathMap
+    if (SummaryRowPathMap.Has(rowIndex)) {
+        return SummaryRowPathMap[rowIndex]
+    }
+    return ""
+}
+
+; ============================================================
+; 主题详情弹窗
+; ============================================================
+
+ShowThemeDetailDialog(path) {
+    global SummaryGui
+
+    if (path = "") {
+        return
+    }
+
+    SplitPath(path, &themeName)
+    summaryFile := path "\.aiprocess\总结.md"
+    dirExists := DirExist(path)
+    summaryExists := FileExist(summaryFile)
+
+    dialog := Gui("+Owner" SummaryGui.Hwnd " +ToolWindow", "主题详情")
+    dialog.SetFont("s9", "Microsoft YaHei UI")
+    dialog.MarginX := 12
+    dialog.MarginY := 10
+
+    dialog.Add("Text", "xm ym w80 h18", "名称：")
+    dialog.Add("Text", "x+4 yp w400 h18", themeName)
+
+    dialog.Add("Text", "xm y+8 w80 h18", "路径：")
+    dialog.Add("Edit", "x+4 yp w400 h22 ReadOnly", path)
+
+    dialog.Add("Text", "xm y+8 w80 h18", "总结状态：")
+    dialog.Add("Text", "x+4 yp w100 h18", summaryExists ? "已总结" : "未总结")
+
+    dialog.Add("Text", "xm y+8 w80 h18", "目录状态：")
+    dialog.Add("Text", "x+4 yp w100 h18", dirExists ? "存在" : "不存在")
+
+    ; 操作按钮
+    copyButton := dialog.Add("Button", "xm y+16 w80 h24", "复制路径")
+    copyButton.OnEvent("Click", (*) => A_Clipboard := path)
+
+    openDirButton := dialog.Add("Button", "x+8 yp w80 h24", "打开目录")
+    openDirButton.OnEvent("Click", (*) => OpenThemeDir(path))
+    openDirButton.Enabled := dirExists
+
+    viewSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "查看总结")
+    viewSummaryButton.OnEvent("Click", (*) => ViewThemeSummary(path))
+    viewSummaryButton.Enabled := dirExists && summaryExists
+
+    generateSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "生成总结")
+    generateSummaryButton.OnEvent("Click", (*) => GenerateThemeSummary(path))
+    generateSummaryButton.Enabled := dirExists
+
+    closeButton := dialog.Add("Button", "xm y+16 w80 h24 Default", "关闭")
+    closeButton.OnEvent("Click", (*) => dialog.Destroy())
+
+    dialog.Show()
+}
+
+; ============================================================
+; Agent 绑定区
+; ============================================================
+
+RefreshAgentStatusUI() {
+    global SummaryAgentStatusText
+    global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
+
+    status := AgentDispatcherGetStatus("SummaryAgent")
+
+    if (!status["IsBound"]) {
+        SummaryAgentStatusText.Text := "未绑定"
+        SummaryBindButton.Visible := true
+        SummaryActivateButton.Visible := false
+        SummaryRebindButton.Visible := false
+        SummaryUnbindButton.Visible := false
+    } else {
+        displayText := "已绑定"
+        if (status["TitleContains"] != "") {
+            displayText .= " " status["TitleContains"]
+        }
+        if (status["ProcessName"] != "") {
+            displayText .= " (" status["ProcessName"] ")"
+        }
+        if (status["Hwnd"] != "") {
+            displayText .= " HWND: " status["Hwnd"]
+        }
+        if (!status["IsOnline"]) {
+            displayText .= " [未找到]"
+        }
+        SummaryAgentStatusText.Text := displayText
+
+        SummaryBindButton.Visible := false
+        SummaryActivateButton.Visible := true
+        SummaryRebindButton.Visible := true
+        SummaryUnbindButton.Visible := true
+    }
+}
+
+SummaryBindAgentClick(*) {
+    global SummaryGui
+    if (SummaryGui) {
+        SummaryGui.Hide()
+    }
+    SetTimer(DoSummaryBindAgent, -500)
+}
+
+DoSummaryBindAgent() {
+    global SummaryGui
+    result := AgentDispatcherBind("SummaryAgent")
+    if (SummaryGui) {
+        SummaryGui.Show()
+        WinActivate("经验总结")
+    }
+    if (result["Success"]) {
+        RefreshAgentStatusUI()
+        MsgBox("绑定成功：" result["Title"], "AIProcess", "Iconi")
+    } else {
+        MsgBox("绑定失败：" result["Message"], "AIProcess", "Iconx")
+    }
+}
+
+SummaryActivateAgentClick(*) {
+    if (AgentDispatcherActivate("SummaryAgent")) {
+        ; 激活成功，不提示
+    } else {
+        MsgBox("未找到绑定的 Agent 窗口", "AIProcess", "Iconx")
+    }
+}
+
+SummaryRebindAgentClick(*) {
+    SummaryBindAgentClick()
+}
+
+SummaryUnbindAgentClick(*) {
+    AgentDispatcherUnbind("SummaryAgent")
+    RefreshAgentStatusUI()
+}
+
+OpenThemeDir(themePath) {
+    if (themePath = "" || !DirExist(themePath)) {
+        return
+    }
+    Run('explorer.exe "' themePath '"')
+}
+
+ViewThemeSummary(themePath) {
+    if (themePath = "") {
+        return
+    }
+    summaryFile := themePath "\.aiprocess\总结.md"
+    if (!FileExist(summaryFile)) {
+        MsgBox("总结文件不存在", "AIProcess", "Iconx")
+        return
+    }
+    OpenFileInIdea(summaryFile)
+}
+
+GenerateThemeSummary(themePath) {
+    if (themePath = "" || !DirExist(themePath)) {
+        return
+    }
+    status := AgentDispatcherGetStatus("SummaryAgent")
+    if (!status["IsBound"]) {
+        MsgBox("未绑定 Agent，请先绑定经验总结 Agent。", "AIProcess", "Iconx")
+        return
+    }
+    MsgBox("后续将实现提示词发送逻辑（当前未实现）。", "AIProcess", "Iconi")
+}

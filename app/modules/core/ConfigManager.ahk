@@ -208,6 +208,15 @@ EnsureDefaultFiles() {
         IniWrite("0", SettingsFile, "Window3", "ShowExecuteNotification")
     }
 
+    ; [SummaryAgent] 段：经验总结窗口专用 Agent 绑定配置
+    if (IniRead(SettingsFile, "SummaryAgent", "AgentTitleContains", "__NOT_FOUND__") = "__NOT_FOUND__") {
+        IniWrite("", SettingsFile, "SummaryAgent", "AgentTitleContains")
+        IniWrite("", SettingsFile, "SummaryAgent", "AgentProcessName")
+        IniWrite("", SettingsFile, "SummaryAgent", "AgentClassName")
+        IniWrite("", SettingsFile, "SummaryAgent", "AgentHwnd")
+        IniWrite("4", SettingsFile, "SummaryAgent", "AgentAfterCopyAction")
+    }
+
     requirementTemplate := TemplateDir "\requirement_prompt.txt"
     if !FileExist(requirementTemplate) {
         FileAppend(
