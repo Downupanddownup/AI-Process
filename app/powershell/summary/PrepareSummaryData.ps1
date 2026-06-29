@@ -389,7 +389,7 @@ function Get-TweakBreakdown {
         }
     }
 
-    return $result
+    return ,$result
 }
 
 function Get-ThemeMetrics {
@@ -485,11 +485,11 @@ function Get-ThemeMetrics {
         discussionTime   = Format-Duration -Duration $discussionTime
         executeTime      = Format-Duration -Duration $executeTime
         tweakTime        = Format-Duration -Duration $tweakTime
-        tweakBreakdown   = $tweakBreakdown
+        tweakBreakdown   = @($tweakBreakdown)
         fileTree         = ($treeLines -join "`n")
         coreFiles        = ($coreFilePaths -join "`n")
         logEntries       = ($logEntries | ConvertTo-Json -Compress)
-        subThemes        = $subThemesList
+        subThemes        = @($subThemesList)
     }
 }
 

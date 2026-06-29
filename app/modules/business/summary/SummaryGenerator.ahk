@@ -94,8 +94,19 @@ BuildSummaryPrompt(data) {
 
 BuildCoreFilesText(coreFiles) {
     if (!IsObject(coreFiles)) {
-        return ""
+        if (coreFiles = "") {
+            return ""
+        }
+        lines := ""
+        Loop Parse, coreFiles, "`n", "`r" {
+            line := Trim(A_LoopField)
+            if (line != "") {
+                lines .= "- " line "`n"
+            }
+        }
+        return RTrim(lines, "`n")
     }
+
     lines := ""
     for path in coreFiles {
         lines .= "- " path "`n"
@@ -104,29 +115,51 @@ BuildCoreFilesText(coreFiles) {
 }
 
 BuildSubThemesText(subThemes) {
-    if (!IsObject(subThemes) || subThemes.Length = 0) {
+    if (!IsObject(subThemes)) {
+        return "无"
+    }
+    count := subThemes.HasProp("Length") ? subThemes.Length : subThemes.Count
+    if (count = 0) {
         return "无"
     }
 
     text := ""
-    for sub in subThemes {
-        text .= "- " sub["path"] "`n"
-        text .= "  - 总耗时：" sub["totalTime"] "`n"
-        text .= "  - 讨论耗时：" sub["discussionTime"] "`n"
-        text .= "  - 执行耗时：" sub["executeTime"] "`n"
-        text .= "  - 结果微调耗时：" sub["tweakTime"] "`n"
+    if (subThemes.HasProp("Count")) {
+        text .= BuildSubThemeItemText(subThemes)
+    } else {
+        for sub in subThemes {
+            text .= BuildSubThemeItemText(sub)
+        }
     }
     return RTrim(text, "`n")
 }
 
+BuildSubThemeItemText(sub) {
+    return "- " sub["path"] "`n"
+        . "  - 总耗时：" sub["totalTime"] "`n"
+        . "  - 讨论耗时：" sub["discussionTime"] "`n"
+        . "  - 执行耗时：" sub["executeTime"] "`n"
+        . "  - 结果微调耗时：" sub["tweakTime"] "`n"
+}
+
 BuildTweakBreakdownText(tweakBreakdown) {
-    if (!IsObject(tweakBreakdown) || tweakBreakdown.Length = 0) {
+    if (!IsObject(tweakBreakdown)) {
+        return ""
+    }
+    count := tweakBreakdown.HasProp("Length") ? tweakBreakdown.Length : tweakBreakdown.Count
+    if (count = 0) {
         return ""
     }
 
     text := ""
-    for item in tweakBreakdown {
-        text .= "  - " item["name"] "：" item["duration"] "`n"
+    if (tweakBreakdown.HasProp("Count")) {
+        if (tweakBreakdown.Has("name") && tweakBreakdown.Has("duration")) {
+            text .= "  - " tweakBreakdown["name"] "：" tweakBreakdown["duration"] "`n"
+        }
+    } else {
+        for item in tweakBreakdown {
+            text .= "  - " item["name"] "：" item["duration"] "`n"
+        }
     }
     return RTrim(text, "`n")
 }
