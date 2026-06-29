@@ -84,7 +84,6 @@ BuildSummaryPrompt(data) {
     prompt := StrReplace(prompt, "{{tweakTime}}", data["tweakTime"])
     prompt := StrReplace(prompt, "{{fileTree}}", data["fileTree"])
     prompt := StrReplace(prompt, "{{coreFiles}}", BuildCoreFilesText(data["coreFiles"]))
-    prompt := StrReplace(prompt, "{{logEntries}}", data["logEntries"])
     prompt := StrReplace(prompt, "{{subThemes}}", BuildSubThemesText(data["subThemes"]))
     prompt := StrReplace(prompt, "{{summaryTemplatePath}}", AppRoot "\templates\summary\summary_template.md")
     prompt := StrReplace(prompt, "{{notifyScriptPath}}", AppRoot "\powershell\summary\NotifySummaryComplete.ps1")

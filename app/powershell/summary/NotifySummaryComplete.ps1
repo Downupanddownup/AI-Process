@@ -71,3 +71,24 @@ $hwnd = [WindowHelper]::FindWindow($null, "经验总结")
 if ($hwnd -ne [IntPtr]::Zero) {
     [void][WindowHelper]::PostMessage($hwnd, 0x8000, [IntPtr]::Zero, [IntPtr]::Zero)
 }
+
+# 4. 安全清空主题临时目录（仅删除 {ThemePath}\.aiprocess\_tmp 下的内容，不越界）
+$tmpDir = Join-Path $ThemePath '.aiprocess\_tmp'
+if (Test-Path -Path $tmpDir -PathType Container) {
+    $expectedParent = Join-Path $ThemePath '.aiprocess'
+    try {
+        $resolvedTmpDir = (Resolve-Path -Path $tmpDir).Path
+        $resolvedExpectedParent = (Resolve-Path -Path $expectedParent).Path
+        $expectedTmpDir = Join-Path $resolvedExpectedParent '_tmp'
+
+        if ($resolvedTmpDir -eq $expectedTmpDir) {
+            $items = Get-ChildItem -LiteralPath $resolvedTmpDir -Force -ErrorAction SilentlyContinue
+            foreach ($item in $items) {
+                Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    catch {
+        # 路径解析或删除异常时静默忽略，不影响主流程
+    }
+}
