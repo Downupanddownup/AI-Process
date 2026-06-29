@@ -608,7 +608,7 @@ ShowThemeDetailDialog(path) {
 
     viewSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "查看总结")
     viewSummaryButton.OnEvent("Click", (*) => ViewThemeSummary(path))
-    viewSummaryButton.Enabled := dirExists && summaryExists
+    viewSummaryButton.Enabled := true
 
     generateSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "生成总结")
     generateSummaryButton.OnEvent("Click", (ctrl, *) => GenerateThemeSummary(path, ctrl))
@@ -708,13 +708,21 @@ OpenThemeDir(themePath) {
 
 ViewThemeSummary(themePath) {
     if (themePath = "") {
+        MsgBox("当前主题路径为空", "AIProcess", "Iconx")
         return
     }
+
+    if (!DirExist(themePath)) {
+        MsgBox("当前主题目录不存在：" themePath, "AIProcess", "Iconx")
+        return
+    }
+
     summaryFile := themePath "\.aiprocess\Summary.md"
     if (!FileExist(summaryFile)) {
-        MsgBox("总结文件不存在", "AIProcess", "Iconx")
+        MsgBox("当前主题尚未生成 Summary.md。", "AIProcess", "Iconi")
         return
     }
+
     OpenFileInIdea(summaryFile)
 }
 

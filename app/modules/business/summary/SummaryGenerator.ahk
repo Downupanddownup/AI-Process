@@ -22,6 +22,10 @@ GenerateSummary(themePath) {
     }
 
     data := CollectSummaryData(themePath)
+    if (IsObject(data) && data.Has("Error")) {
+        MsgBox("收集主题数据失败：`n" data["Error"], "AIProcess", "Iconx")
+        return false
+    }
     if (!IsObject(data) || data.Count = 0) {
         MsgBox("收集主题数据失败", "AIProcess", "Iconx")
         return false

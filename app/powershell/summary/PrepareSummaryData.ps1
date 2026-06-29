@@ -15,7 +15,8 @@
 
 param(
     [Parameter(Mandatory = $true)][string]$ThemePath,
-    [Parameter(Mandatory = $false)][string]$OutputFile = ""
+    [Parameter(Mandatory = $false)][string]$OutputFile = "",
+    [Parameter(Mandatory = $false)][string]$ErrorFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -463,10 +464,10 @@ function Get-ThemeMetrics {
             $subMetrics = Get-ThemeMetrics -Dir $std.FullName
             $subThemesList += [PSCustomObject]@{
                 path           = $std.FullName.Substring($Dir.Length + 1)
-                totalTime      = Format-Duration -Duration $subMetrics.totalTime
-                discussionTime = Format-Duration -Duration $subMetrics.discussionTime
-                executeTime    = Format-Duration -Duration $subMetrics.executeTime
-                tweakTime      = Format-Duration -Duration $subMetrics.tweakTime
+                totalTime      = $subMetrics.totalTime
+                discussionTime = $subMetrics.discussionTime
+                executeTime    = $subMetrics.executeTime
+                tweakTime      = $subMetrics.tweakTime
             }
         }
     }
@@ -495,24 +496,35 @@ function Get-ThemeMetrics {
 
 # ============ 主流程 ============
 
-$themePath = Resolve-ThemePath
-$metrics = Get-ThemeMetrics -Dir $themePath
+try {
+    $themePath = Resolve-ThemePath
+    $metrics = Get-ThemeMetrics -Dir $themePath
 
-if ([string]::IsNullOrWhiteSpace($OutputFile)) {
-    $tmpDir = Join-Path (Join-Path $themePath '.aiprocess') '_tmp'
-    if (-not (Test-Path $tmpDir)) {
-        New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+    if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+        $tmpDir = Join-Path (Join-Path $themePath '.aiprocess') '_tmp'
+        if (-not (Test-Path $tmpDir)) {
+            New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+        }
+        $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
+        $OutputFile = Join-Path $tmpDir "summary_data_$timestamp.json"
     }
-    $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
-    $OutputFile = Join-Path $tmpDir "summary_data_$timestamp.json"
+
+    $outputDir = Split-Path -Parent $OutputFile
+    if (-not (Test-Path $outputDir)) {
+        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+    }
+
+    $json = $metrics | ConvertTo-Json -Depth 5 -Compress
+    [System.IO.File]::WriteAllText($OutputFile, $json, [System.Text.Encoding]::UTF8)
+
+    Write-Output $OutputFile
+} catch {
+    if (-not [string]::IsNullOrWhiteSpace($ErrorFile)) {
+        $errMsg = $_.Exception.Message
+        if ($_.InvocationInfo -and $_.InvocationInfo.PositionMessage) {
+            $errMsg += "`n" + $_.InvocationInfo.PositionMessage
+        }
+        [System.IO.File]::WriteAllText($ErrorFile, $errMsg, [System.Text.Encoding]::UTF8)
+    }
+    throw
 }
-
-$outputDir = Split-Path -Parent $OutputFile
-if (-not (Test-Path $outputDir)) {
-    New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-}
-
-$json = $metrics | ConvertTo-Json -Depth 5 -Compress
-[System.IO.File]::WriteAllText($OutputFile, $json, [System.Text.Encoding]::UTF8)
-
-Write-Output $OutputFile
