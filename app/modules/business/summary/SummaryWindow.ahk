@@ -12,6 +12,7 @@ global SummaryActivateButton := ""
 global SummaryRebindButton := ""
 global SummaryUnbindButton := ""
 global SummaryRefreshButton := ""
+global SummaryImportHistoryButton := ""
 global SummaryFilterButtons := ""
 global SummaryDateRangeText := ""
 global SummaryReportFilter := ""
@@ -44,9 +45,9 @@ ShowSummaryWindow(*) {
 CreateSummaryGui() {
     global SummaryGui, SummaryListView, SummaryAgentStatusText, SummaryTotalCountText
     global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
-    global SummaryRefreshButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
+    global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
 
-    SummaryGui := Gui("+Resize +MinSize750x600", "经验总结")
+    SummaryGui := Gui("+Resize +MinSize860x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
     SummaryGui.OnEvent("Close", SummaryGuiClose)
     SummaryGui.OnEvent("Size", SummaryGuiSize)
@@ -73,6 +74,10 @@ CreateSummaryGui() {
     SummaryDateRangeText := SummaryGui.Add("Text", "x" xPos " ym w180 h22", "")
     xPos += 184
 
+    SummaryImportHistoryButton := SummaryGui.Add("Button", "x" xPos " ym w80 h22", "导入历史主题")
+    SummaryImportHistoryButton.OnEvent("Click", SummaryImportHistoryClick)
+    xPos += 84
+
     SummaryRefreshButton := SummaryGui.Add("Button", "x" xPos " ym w50 h22", "刷新")
     SummaryRefreshButton.OnEvent("Click", SummaryRefreshClick)
 
@@ -95,7 +100,7 @@ CreateSummaryGui() {
     SummaryTotalCountText := SummaryGui.Add("Text", "x+10 yp w80 h18", "")
 
     ; ListView
-    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w710 h380 Grid -Multi", ["序号", "主题名称", "最后访问时间", "总结状态", "目录状态"])
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "最后访问时间", "总结状态", "目录状态"])
     SummaryListView.ModifyCol(1, 40)   ; 序号
     SummaryListView.ModifyCol(2, 200)  ; 主题名称
     SummaryListView.ModifyCol(3, 140)  ; 最后访问时间
@@ -105,8 +110,8 @@ CreateSummaryGui() {
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
 
-    ; 计算窗口尺寸：固定 750×650，主屏幕居中
-    width := 750
+    ; 计算窗口尺寸：固定 860×650，主屏幕居中
+    width := 860
     height := 650
     x := Integer((A_ScreenWidth - width) / 2)
     y := Integer((A_ScreenHeight - height) / 2)
@@ -163,6 +168,35 @@ SummaryCustomFilterClick(*) {
 }
 
 SummaryRefreshClick(*) {
+    RefreshSummaryWindow()
+}
+
+SummaryImportHistoryClick(*) {
+    global AppRoot
+
+    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+    if (projectRoot = "") {
+        projectRoot := AppRoot
+    }
+
+    defaultDir := projectRoot "\需求"
+    if (!DirExist(defaultDir)) {
+        defaultDir := projectRoot
+    }
+
+    ib := InputBox("选择要导入历史主题目录的根目录：", "导入历史主题", "w450 h130", defaultDir)
+    if (ib.Result != "OK") {
+        return
+    }
+
+    selectedDir := Trim(ib.Value)
+    if (selectedDir = "" || !DirExist(selectedDir)) {
+        MsgBox("目录无效", "AIProcess", "Iconx")
+        return
+    }
+
+    count := ImportHistoricalThemes(selectedDir)
+    MsgBox("已导入 " count " 个历史主题", "AIProcess", "Iconi")
     RefreshSummaryWindow()
 }
 

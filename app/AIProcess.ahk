@@ -28,6 +28,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\AgentDispatcher.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryDataCollector.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryGenerator.ahk
+#Include %A_ScriptDir%\modules\business\summary\HistoricalThemeImporter.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryWindow.ahk
 #Include %A_ScriptDir%\modules\ui\StyleManager.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk

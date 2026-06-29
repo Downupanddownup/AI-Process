@@ -45,3 +45,38 @@ LogThemeIndex(themePath, source) {
         ; 写入失败静默忽略，不影响主流程
     }
 }
+
+AppendThemeIndexRecord(path, source, recordTime) {
+    global AppRoot
+
+    try {
+        SplitPath(path, &themeName)
+
+        data := Map(
+            "time", FormatTime(recordTime, "yyyy-MM-dd HH:mm:ss"),
+            "window", "W" GetActiveWindowId(),
+            "theme", themeName,
+            "source", source,
+            "path", path
+        )
+
+        JSON.EscapeUnicode := false
+        jsonLine := JSON.Dump(data) . "`n"
+
+        projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+        if (projectRoot = "") {
+            projectRoot := AppRoot
+        }
+
+        indexDir := projectRoot "\history\index"
+        DirCreate(indexDir)
+
+        dateStr := FormatTime(recordTime, "yyyy-MM-dd")
+        indexFile := indexDir "\" dateStr ".jsonl"
+        FileAppend(jsonLine, indexFile, "UTF-8")
+
+        return true
+    } catch {
+        return false
+    }
+}
