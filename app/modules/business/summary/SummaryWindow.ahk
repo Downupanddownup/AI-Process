@@ -282,7 +282,7 @@ RenderThemeList() {
     ; 应用报告状态过滤
     filteredThemes := []
     for theme in themes {
-        summaryExists := FileExist(theme.path "\Summary.md")
+        summaryExists := FileExist(theme.path "\.aiprocess\Summary.md")
         if (SummaryReportFilterValue = "已生成" && !summaryExists) {
             continue
         }
@@ -361,7 +361,7 @@ LoadThemes(dateRange) {
     themes := []
     for themeDir, lastTime in themeMap {
         SplitPath(themeDir, &themeName)
-        summaryFile := themeDir "\Summary.md"
+        summaryFile := themeDir "\.aiprocess\Summary.md"
         summaryStatus := FileExist(summaryFile) ? "已总结" : "未总结"
         dirStatus := DirExist(themeDir) ? "存在" : "不存在"
 
@@ -543,7 +543,7 @@ ShowThemeDetailDialog(path) {
     }
 
     SplitPath(path, &themeName)
-    summaryFile := path "\Summary.md"
+    summaryFile := path "\.aiprocess\Summary.md"
     dirExists := DirExist(path)
     summaryExists := FileExist(summaryFile)
 
@@ -577,7 +577,7 @@ ShowThemeDetailDialog(path) {
     viewSummaryButton.Enabled := dirExists && summaryExists
 
     generateSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "生成总结")
-    generateSummaryButton.OnEvent("Click", (*) => GenerateThemeSummary(path))
+    generateSummaryButton.OnEvent("Click", (ctrl, *) => GenerateThemeSummary(path, ctrl))
     generateSummaryButton.Enabled := dirExists
 
     closeButton := dialog.Add("Button", "xm y+16 w80 h24 Default", "关闭")
@@ -676,7 +676,7 @@ ViewThemeSummary(themePath) {
     if (themePath = "") {
         return
     }
-    summaryFile := themePath "\Summary.md"
+    summaryFile := themePath "\.aiprocess\Summary.md"
     if (!FileExist(summaryFile)) {
         MsgBox("总结文件不存在", "AIProcess", "Iconx")
         return
@@ -684,15 +684,27 @@ ViewThemeSummary(themePath) {
     OpenFileInIdea(summaryFile)
 }
 
-GenerateThemeSummary(themePath) {
+SummaryRefreshMessageHandler(wParam, lParam, msg, hwnd) {
+    RefreshSummaryWindow()
+    return true
+}
+
+; 注册自定义窗口消息，供结束脚本刷新列表
+OnMessage(0x8000, SummaryRefreshMessageHandler)
+
+GenerateThemeSummary(themePath, buttonCtrl := "") {
     if (themePath = "" || !DirExist(themePath)) {
         return
     }
-    status := AgentDispatcherGetStatus("SummaryAgent")
-    if (!status["IsBound"]) {
-        MsgBox("未绑定 Agent，请先绑定经验总结 Agent。", "AIProcess", "Iconx")
-        return
+
+    if (IsObject(buttonCtrl)) {
+        buttonCtrl.Enabled := false
     }
-    MsgBox("后续将实现提示词发送逻辑，生成结果将写入：" themePath "\Summary.md", "AIProcess", "Iconi")
+
+    if (!GenerateSummary(themePath)) {
+        if (IsObject(buttonCtrl)) {
+            buttonCtrl.Enabled := true
+        }
+    }
 }
 

@@ -1,0 +1,69 @@
+你是 AI Process 的「经验总结」助手。
+
+## 本次任务的目的
+
+基于一个已完成的人-AI 协作主题，生成一份经验总结文档，回答：
+1. 这个主题做了什么事？
+2. 需求复杂度和协作顺畅度如何？
+3. 能提炼出什么有价值的经验？
+
+## 主题基础信息
+
+- 主题路径：{{themePath}}
+- 主题名称：{{themeName}}
+- 文件总数：{{fileCount}}
+- 字符总量：{{charCount}}
+- 最后修改文件：{{lastModifiedFile}}
+- 最后修改时间：{{lastModifiedTime}}
+- 总耗时：{{totalTime}}
+
+### 阶段耗时
+
+- 讨论阶段：{{discussionTime}}
+- 执行阶段：{{executeTime}}
+- 结果微调阶段：{{tweakTime}}
+
+### 嵌套子主题
+
+{{subThemes}}
+
+### 目录结构
+
+```text
+{{fileTree}}
+```
+
+## 核心文件路径
+
+请按以下顺序阅读：
+
+{{coreFiles}}
+
+## 操作日志
+
+```json
+{{logEntries}}
+```
+
+## 总结文件模板
+
+请严格参考以下模板文件生成 Summary.md：
+
+{{summaryTemplatePath}}
+
+## 输出要求
+
+1. 保存到：{{themePath}}\.aiprocess\Summary.md
+2. 严格参考上面的总结模板，保留所有标题。
+3. 复杂程度从「低/中/高」中选择，基于需求内容判断，并给出一句理由。
+4. 顺畅程度从「顺利/波折/失控」中选择，基于沟通内容判断，并给出一句理由。
+5. 「预期之外的问题」每项必须包含：问题内容、为何是预期之外、实际如何解决、经验教训。
+6. 不要输出与模板无关的内容。
+
+## 完成后操作
+
+保存 Summary.md 后，请执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "{{notifyScriptPath}}" -ThemePath "{{themePath}}" -Status "done"
+```
