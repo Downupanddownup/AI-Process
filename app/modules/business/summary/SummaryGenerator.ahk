@@ -82,6 +82,7 @@ BuildSummaryPrompt(data) {
     prompt := StrReplace(prompt, "{{discussionTime}}", data["discussionTime"])
     prompt := StrReplace(prompt, "{{executeTime}}", data["executeTime"])
     prompt := StrReplace(prompt, "{{tweakTime}}", data["tweakTime"])
+    prompt := StrReplace(prompt, "{{tweakBreakdown}}", BuildTweakBreakdownText(data["tweakBreakdown"]))
     prompt := StrReplace(prompt, "{{fileTree}}", data["fileTree"])
     prompt := StrReplace(prompt, "{{coreFiles}}", BuildCoreFilesText(data["coreFiles"]))
     prompt := StrReplace(prompt, "{{subThemes}}", BuildSubThemesText(data["subThemes"]))
@@ -114,6 +115,18 @@ BuildSubThemesText(subThemes) {
         text .= "  - 讨论耗时：" sub["discussionTime"] "`n"
         text .= "  - 执行耗时：" sub["executeTime"] "`n"
         text .= "  - 结果微调耗时：" sub["tweakTime"] "`n"
+    }
+    return RTrim(text, "`n")
+}
+
+BuildTweakBreakdownText(tweakBreakdown) {
+    if (!IsObject(tweakBreakdown) || tweakBreakdown.Length = 0) {
+        return ""
+    }
+
+    text := ""
+    for item in tweakBreakdown {
+        text .= "  - " item["name"] "：" item["duration"] "`n"
     }
     return RTrim(text, "`n")
 }

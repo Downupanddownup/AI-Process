@@ -329,6 +329,69 @@ function Get-TweakTime {
     return $duration
 }
 
+function Get-TweakBreakdown {
+    param(
+        [string]$Dir,
+        [array]$LogEntries,
+        [datetime]$LastModifiedTime
+    )
+    $tweakRoot = Join-Path $Dir '结果微调'
+    if (-not (Test-Path -Path $tweakRoot -PathType Container)) {
+        return @()
+    }
+
+    $tweakDirs = Get-ChildItem -LiteralPath $tweakRoot -Directory -Force | Sort-Object CreationTime
+    if (-not $tweakDirs) {
+        return @()
+    }
+
+    $result = @()
+    for ($i = 0; $i -lt $tweakDirs.Count; $i++) {
+        $td = $tweakDirs[$i]
+        $start = $td.CreationTime
+
+        $nextBoundary = if ($i + 1 -lt $tweakDirs.Count) { $tweakDirs[$i + 1].CreationTime } else { $LastModifiedTime }
+
+        $endCandidates = @()
+
+        $tweakFiles = Get-ChildItem -LiteralPath $td.FullName -Recurse -File -Force
+        if ($tweakFiles) {
+            $endCandidates += ($tweakFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
+        }
+
+        $notifyCandidates = $LogEntries | Where-Object {
+            $_.action -eq '完成通知' -and
+            ([datetime]::ParseExact($_.time, 'yyyy-MM-dd HH:mm:ss', $null) -gt $start) -and
+            ([datetime]::ParseExact($_.time, 'yyyy-MM-dd HH:mm:ss', $null) -lt $nextBoundary)
+        }
+        if ($notifyCandidates) {
+            $latestNotify = $notifyCandidates | Sort-Object time -Descending | Select-Object -First 1
+            $endCandidates += [datetime]::ParseExact($latestNotify.time, 'yyyy-MM-dd HH:mm:ss', $null)
+        }
+
+        if ($endCandidates.Count -eq 0) {
+            $result += [PSCustomObject]@{
+                name     = $td.Name
+                duration = Format-Duration -Duration ([TimeSpan]::Zero)
+            }
+            continue
+        }
+
+        $end = $endCandidates | Sort-Object -Descending | Select-Object -First 1
+        if ($end -gt $nextBoundary) { $end = $nextBoundary }
+
+        $duration = $end - $start
+        if ($duration -lt [TimeSpan]::Zero) { $duration = [TimeSpan]::Zero }
+
+        $result += [PSCustomObject]@{
+            name     = $td.Name
+            duration = Format-Duration -Duration $duration
+        }
+    }
+
+    return $result
+}
+
 function Get-ThemeMetrics {
     param([string]$Dir)
     $allFiles = Get-CoreFilesRecursive -Dir $Dir -BaseDir $Dir
@@ -385,6 +448,7 @@ function Get-ThemeMetrics {
     if ($executeTime -lt [TimeSpan]::Zero) { $executeTime = [TimeSpan]::Zero }
 
     $tweakTime = Get-TweakTime -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime
+    $tweakBreakdown = Get-TweakBreakdown -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime
 
     # 独立子主题
     $subThemesList = @()
@@ -421,6 +485,7 @@ function Get-ThemeMetrics {
         discussionTime   = Format-Duration -Duration $discussionTime
         executeTime      = Format-Duration -Duration $executeTime
         tweakTime        = Format-Duration -Duration $tweakTime
+        tweakBreakdown   = $tweakBreakdown
         fileTree         = ($treeLines -join "`n")
         coreFiles        = ($coreFilePaths -join "`n")
         logEntries       = ($logEntries | ConvertTo-Json -Compress)
