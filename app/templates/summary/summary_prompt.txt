@@ -91,7 +91,13 @@
 
 ## 完成后操作
 
-保存 Summary.md 后，请执行：
+请将生成的 Summary.md 保存到以下路径：
+
+```text
+{{themePath}}\.aiprocess\Summary.md
+```
+
+保存后，请执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "{{notifyScriptPath}}" -ThemePath "{{themePath}}" -Status "done"
