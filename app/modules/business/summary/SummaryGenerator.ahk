@@ -33,7 +33,23 @@ GenerateSummary(themePath) {
         return false
     }
 
-    result := AgentDispatcherSend("SummaryAgent", prompt)
+    ; 将完整 Prompt 写入临时文件，避免剪贴板内容过长被拦截
+    tmpDir := themePath "\.aiprocess\_tmp"
+    if (!DirExist(tmpDir)) {
+        DirCreate(tmpDir)
+    }
+    promptFile := tmpDir "\summary_prompt_" A_Now A_MSec ".txt"
+    try {
+        FileAppend(prompt, promptFile, "UTF-8")
+    } catch Error as err {
+        MsgBox("保存提示词失败：" err.Message, "AIProcess", "Iconx")
+        return false
+    }
+
+    ; 剪贴板中只放文件路径和简单说明
+    shortMessage := "请查看这个文件：" promptFile "`n这是本次「经验总结」任务的完整提示词，请按其中的要求和模板生成 Summary.md。"
+
+    result := AgentDispatcherSend("SummaryAgent", shortMessage)
     if (!result["Success"]) {
         MsgBox("发送失败：" result["Message"], "AIProcess", "Iconx")
         return false

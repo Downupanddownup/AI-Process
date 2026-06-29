@@ -128,12 +128,17 @@ function Get-TreeLines {
     $dirs = $items | Where-Object { $_.PSIsContainer -and ($excludedDirs -notcontains $_.Name) }
     $files = $items | Where-Object { -not $_.PSIsContainer }
 
-    foreach ($d in (Sort-SubdirsByConvention $dirs)) {
-        $lines += (Format-TreeLine -Indent $Indent -Name "$($d.Name)/" -CreationTime $d.CreationTime)
-        $lines += (Get-TreeLines -Dir $d.FullName -BaseDir $BaseDir -Indent "$Indent  ")
-    }
-    foreach ($f in (Sort-FilesByConvention $files)) {
-        $lines += (Format-TreeLine -Indent $Indent -Name $f.Name -CreationTime $f.CreationTime)
+    # 将文件和目录合并后按创建时间升序排列
+    $allItems = @($dirs) + @($files) | Sort-Object CreationTime
+
+    foreach ($item in $allItems) {
+        if ($item.PSIsContainer) {
+            $lines += (Format-TreeLine -Indent $Indent -Name "$($item.Name)/" -CreationTime $item.CreationTime)
+            $lines += (Get-TreeLines -Dir $item.FullName -BaseDir $BaseDir -Indent "$Indent  ")
+        }
+        else {
+            $lines += (Format-TreeLine -Indent $Indent -Name $item.Name -CreationTime $item.CreationTime)
+        }
     }
     return $lines
 }
