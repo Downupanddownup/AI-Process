@@ -4,6 +4,11 @@
 ; 记录每次进入主题目录的动作，写入 history/index/YYYY-MM-DD.jsonl
 
 LogThemeIndex(themePath, source) {
+    ; 结果微调子目录（如 主题/结果微调/01）不是独立主题，不写入索引
+    if (IsResultIssueDir(themePath)) {
+        return
+    }
+
     global AppRoot
     try {
         ; 提取主题名
