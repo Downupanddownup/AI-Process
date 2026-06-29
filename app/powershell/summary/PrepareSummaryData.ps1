@@ -99,6 +99,24 @@ function Sort-SubdirsByConvention {
     return $result
 }
 
+function Format-TreeLine {
+    param(
+        [string]$Indent,
+        [string]$Name,
+        [datetime]$CreationTime
+    )
+    $timeStr = $CreationTime.ToString('yyyy-MM-dd HH:mm:ss')
+    $full = "$Indent$Name"
+    $padLength = 50
+    if ($full.Length -lt $padLength) {
+        $padded = $full.PadRight($padLength)
+    }
+    else {
+        $padded = "$full "
+    }
+    return "$padded$timeStr"
+}
+
 function Get-TreeLines {
     param(
         [string]$Dir,
@@ -111,11 +129,11 @@ function Get-TreeLines {
     $files = $items | Where-Object { -not $_.PSIsContainer }
 
     foreach ($d in (Sort-SubdirsByConvention $dirs)) {
-        $lines += "$Indent$($d.Name)/"
+        $lines += (Format-TreeLine -Indent $Indent -Name "$($d.Name)/" -CreationTime $d.CreationTime)
         $lines += (Get-TreeLines -Dir $d.FullName -BaseDir $BaseDir -Indent "$Indent  ")
     }
     foreach ($f in (Sort-FilesByConvention $files)) {
-        $lines += "$Indent$($f.Name)"
+        $lines += (Format-TreeLine -Indent $Indent -Name $f.Name -CreationTime $f.CreationTime)
     }
     return $lines
 }
