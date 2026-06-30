@@ -26,9 +26,19 @@ global SummaryFilterAreaHeight := 0
 global SummaryRowPathMap := Map()
 global SummaryPathFilterEdit := ""
 global SummaryPathFilterValue := ""
+global SummaryGenerateReportBtn := ""
+global SummaryOpenReportBtn := ""
 
 ; 筛选选项
-FILTER_OPTIONS := ["今天", "本周", "上周", "本月", "上月", "本年"]
+FILTER_DEFINITIONS := [
+    {name: "今天", reportType: "日报"},
+    {name: "本周", reportType: "周报"},
+    {name: "上周", reportType: "周报"},
+    {name: "本月", reportType: "月报"},
+    {name: "上月", reportType: "月报"},
+    {name: "本季", reportType: "季报"},
+    {name: "本年", reportType: "年报"}
+]
 
 ShowSummaryWindow(*) {
     global SummaryGui
@@ -49,7 +59,7 @@ CreateSummaryGui() {
     global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
     global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
 
-    SummaryGui := Gui("+Resize +MinSize860x600", "经验总结")
+    SummaryGui := Gui("+Resize +MinSize920x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
     SummaryGui.OnEvent("Close", SummaryGuiClose)
     SummaryGui.OnEvent("Size", SummaryGuiSize)
@@ -58,12 +68,14 @@ CreateSummaryGui() {
     SummaryGui.Add("Text", "xm ym w80 h18", "筛选条件：")
     SummaryFilterButtons := []
     xPos := 80
-    for filterName in FILTER_OPTIONS {
-        btn := SummaryGui.Add("Button", "x" xPos " ym w50 h22", filterName)
+    for filterDef in FILTER_DEFINITIONS {
+        btn := SummaryGui.Add("Button", "x" xPos " ym w50 h22", filterDef.name)
         btn.OnEvent("Click", SummaryFilterButtonClick)
         SummaryFilterButtons.Push(btn)
         xPos += 54
     }
+
+    xPos += 25 ; 固定按钮与自定义之间视觉分隔
 
     customBtn := SummaryGui.Add("Button", "x" xPos " ym w80 h22", "自定义")
     customBtn.OnEvent("Click", SummaryCustomFilterClick)
@@ -106,6 +118,12 @@ CreateSummaryGui() {
     SummaryPathFilterEdit := SummaryGui.Add("Edit", "x+4 yp w180 h22")
     SummaryPathFilterEdit.OnEvent("Change", OnPathFilterChange)
 
+    SummaryGenerateReportBtn := SummaryGui.Add("Button", "x+8 yp w80 h22", "生成报告")
+    SummaryGenerateReportBtn.OnEvent("Click", OnGenerateReportClick)
+
+    SummaryOpenReportBtn := SummaryGui.Add("Button", "x+8 yp w80 h22", "报告窗口")
+    SummaryOpenReportBtn.OnEvent("Click", OnOpenReportWindowClick)
+
     ; ListView
     SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "总结状态", "目录状态"])
     SummaryListView.ModifyCol(1, 40)   ; 序号
@@ -118,8 +136,8 @@ CreateSummaryGui() {
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
 
-    ; 计算窗口尺寸：固定 860×680，主屏幕居中
-    width := 860
+    ; 计算窗口尺寸：固定 920×680，主屏幕居中
+    width := 920
     height := 680
     x := Integer((A_ScreenWidth - width) / 2)
     y := Integer((A_ScreenHeight - height) / 2)
@@ -512,6 +530,13 @@ GetFilterDateRange(filterName, customStart, customEnd, endIsNow) {
         case "本月":
             startDate := SubStr(today, 1, 8) "01"
             endDate := today
+        case "本季":
+            todayNum := FormatTime(now, "yyyyMMdd")
+            month := Integer(SubStr(todayNum, 5, 2))
+            quarter := Ceil(month / 3)
+            startMonth := (quarter - 1) * 3 + 1
+            startDate := SubStr(todayNum, 1, 4) Format("{:02d}", startMonth) "01"
+            endDate := today
         case "上月":
             thisMonthStart := SubStr(today, 1, 8) "01"
             lastMonthEndTime := DateAdd(DateToTimestamp(thisMonthStart), -1, "Days")
@@ -774,5 +799,94 @@ GenerateThemeSummary(themePath, buttonCtrl := "") {
             buttonCtrl.Enabled := true
         }
     }
+}
+
+; ============================================================
+; 报告类型映射
+; ============================================================
+
+GetReportType(filterName) {
+    global FILTER_DEFINITIONS
+    if (filterName = "自定义") {
+        return "自定义"
+    }
+    for def in FILTER_DEFINITIONS {
+        if (def.name = filterName) {
+            return def.reportType
+        }
+    }
+    return ""
+}
+
+GetReportFileName(filterName, dateRange) {
+    reportType := GetReportType(filterName)
+    startDate := dateRange["startDate"]
+    endDate := dateRange["endDate"]
+
+    if (reportType = "日报") {
+        return "日报_" startDate
+    }
+    if (reportType = "周报") {
+        return "周报_" startDate "_" endDate
+    }
+    if (reportType = "月报") {
+        return "月报_" SubStr(startDate, 1, 7)
+    }
+    if (reportType = "季报") {
+        m := Integer(SubStr(startDate, 6, 2))
+        q := Ceil(m / 3)
+        return "季报_" SubStr(startDate, 1, 4) "_Q" q
+    }
+    if (reportType = "年报") {
+        return "年报_" SubStr(startDate, 1, 4)
+    }
+    ; 自定义
+    return "自定义_" startDate "_" endDate
+}
+
+; ============================================================
+; 报告生成
+; ============================================================
+
+OnGenerateReportClick(ctrl, *) {
+    global SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow, AppRoot
+
+    ctrl.Enabled := false
+
+    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+    filterName := SummaryCurrentFilter
+    dateRange := GetFilterDateRange(filterName, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
+    fileName := GetReportFileName(filterName, dateRange)
+    reportPath := projectRoot "\reports\" fileName ".md"
+
+    DirCreate(projectRoot "\reports")
+
+    promptPath := BuildReportPrompt(filterName, dateRange, reportPath)
+    if (promptPath = "") {
+        MsgBox("当前时间范围内没有匹配的主题", "AIProcess", "Iconi")
+        ctrl.Enabled := true
+        return
+    }
+
+    shortMsg := "请根据临时文件 " promptPath " 生成报告"
+    result := AgentDispatcherSend("SummaryAgent", shortMsg)
+    if (!result["Success"]) {
+        MsgBox("Agent 发送失败：" result["Message"], "AIProcess", "Iconx")
+        FileDelete(promptPath)
+        ctrl.Enabled := true
+        return
+    }
+
+    SetTimer(() => WatchdogRecoverButton(ctrl), -120000)
+}
+
+WatchdogRecoverButton(ctrl) {
+    if (ctrl.Enabled = false) {
+        ctrl.Enabled := true
+    }
+}
+
+OnOpenReportWindowClick(*) {
+    ShowReportWindow()
 }
 
