@@ -119,6 +119,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window1", "AppendImplementationTail", "") = "") {
         IniWrite("1", SettingsFile, "Window1", "AppendImplementationTail")
     }
+    if (IniRead(SettingsFile, "Window1", "AppendQuestionRules", "") = "") {
+        IniWrite("1", SettingsFile, "Window1", "AppendQuestionRules")
+    }
     if (IniRead(SettingsFile, "Window1", "ExecuteStrategy", "") = "") {
         IniWrite("ai_judge", SettingsFile, "Window1", "ExecuteStrategy")
     }
@@ -160,6 +163,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window2", "AppendImplementationTail", "") = "") {
         IniWrite("1", SettingsFile, "Window2", "AppendImplementationTail")
     }
+    if (IniRead(SettingsFile, "Window2", "AppendQuestionRules", "") = "") {
+        IniWrite("1", SettingsFile, "Window2", "AppendQuestionRules")
+    }
     if (IniRead(SettingsFile, "Window2", "ExecuteStrategy", "") = "") {
         IniWrite("ai_judge", SettingsFile, "Window2", "ExecuteStrategy")
     }
@@ -200,6 +206,9 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Window3", "AppendImplementationTail", "") = "") {
         IniWrite("1", SettingsFile, "Window3", "AppendImplementationTail")
+    }
+    if (IniRead(SettingsFile, "Window3", "AppendQuestionRules", "") = "") {
+        IniWrite("1", SettingsFile, "Window3", "AppendQuestionRules")
     }
     if (IniRead(SettingsFile, "Window3", "ExecuteStrategy", "") = "") {
         IniWrite("ai_judge", SettingsFile, "Window3", "ExecuteStrategy")
@@ -345,6 +354,7 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AppendNoModifyPrompt"] := IniRead(SettingsFile, section, "AppendNoModifyPrompt", "1") = "1"
         WindowSessions[windowId]["AutoHideAfterCreate"] := IniRead(SettingsFile, section, "AutoHideAfterCreate", "0") = "1"
         WindowSessions[windowId]["AppendImplementationTail"] := IniRead(SettingsFile, section, "AppendImplementationTail", "1") = "1"
+        WindowSessions[windowId]["AppendQuestionRules"] := IniRead(SettingsFile, section, "AppendQuestionRules", "1") = "1"
         WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "ai_judge")
         WindowSessions[windowId]["ShowExecuteNotification"] := IniRead(SettingsFile, section, "ShowExecuteNotification", "0") = "1"
     }
@@ -365,6 +375,7 @@ SaveWindowSession(windowId) {
     IniWrite(WindowSessions[windowId]["AppendNoModifyPrompt"] ? "1" : "0", SettingsFile, section, "AppendNoModifyPrompt")
     IniWrite(WindowSessions[windowId]["AutoHideAfterCreate"] ? "1" : "0", SettingsFile, section, "AutoHideAfterCreate")
     IniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
+    IniWrite(WindowSessions[windowId]["AppendQuestionRules"] ? "1" : "0", SettingsFile, section, "AppendQuestionRules")
     IniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
     IniWrite(WindowSessions[windowId]["ShowExecuteNotification"] ? "1" : "0", SettingsFile, section, "ShowExecuteNotification")
 }
