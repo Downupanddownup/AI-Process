@@ -24,6 +24,8 @@ global SummaryCustomEndIsNow := true
 global SummarySelectedThemePath := ""
 global SummaryFilterAreaHeight := 0
 global SummaryRowPathMap := Map()
+global SummaryPathFilterEdit := ""
+global SummaryPathFilterValue := ""
 
 ; 筛选选项
 FILTER_OPTIONS := ["今天", "本周", "上周", "本月", "上月", "本年"]
@@ -99,20 +101,26 @@ CreateSummaryGui() {
 
     SummaryTotalCountText := SummaryGui.Add("Text", "x+10 yp w80 h18", "")
 
+    ; 路径筛选
+    SummaryGui.Add("Text", "xm y+8 w60 h18", "路径筛选：")
+    SummaryPathFilterEdit := SummaryGui.Add("Edit", "x+4 yp w180 h22")
+    SummaryPathFilterEdit.OnEvent("Change", OnPathFilterChange)
+
     ; ListView
-    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "最后访问时间", "总结状态", "目录状态"])
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "总结状态", "目录状态"])
     SummaryListView.ModifyCol(1, 40)   ; 序号
-    SummaryListView.ModifyCol(2, 200)  ; 主题名称
-    SummaryListView.ModifyCol(3, 140)  ; 最后访问时间
-    SummaryListView.ModifyCol(4, 70)   ; 总结状态
-    SummaryListView.ModifyCol(5, 70)   ; 目录状态
+    SummaryListView.ModifyCol(2, 180)  ; 主题名称
+    SummaryListView.ModifyCol(3, 140)  ; 归属项目
+    SummaryListView.ModifyCol(4, 140)  ; 最后访问时间
+    SummaryListView.ModifyCol(5, 70)   ; 总结状态
+    SummaryListView.ModifyCol(6, 70)   ; 目录状态
     SummaryListView.OnEvent("Click", SummaryListViewClick)
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
 
-    ; 计算窗口尺寸：固定 860×650，主屏幕居中
+    ; 计算窗口尺寸：固定 860×680，主屏幕居中
     width := 860
-    height := 650
+    height := 680
     x := Integer((A_ScreenWidth - width) / 2)
     y := Integer((A_ScreenHeight - height) / 2)
     SummaryGui.Show(Format("w{} h{} x{} y{}", width, height, x, y))
@@ -139,7 +147,7 @@ SummaryGuiSize(gui, minMax, width, height) {
         return
     }
 
-    topReserved := 70      ; 筛选条件区高度 + 边距（两行）
+    topReserved := 100     ; 筛选条件区高度 + 边距（三行）
     bottomReserved := 20   ; 底部边距
     minListHeight := 200
 
@@ -168,6 +176,12 @@ SummaryCustomFilterClick(*) {
 }
 
 SummaryRefreshClick(*) {
+    RefreshSummaryWindow()
+}
+
+OnPathFilterChange(ctrl, *) {
+    global SummaryPathFilterValue
+    SummaryPathFilterValue := ctrl.Value
     RefreshSummaryWindow()
 }
 
@@ -326,8 +340,20 @@ RenderThemeList() {
         filteredThemes.Push(theme)
     }
 
+    ; 应用路径筛选
+    if (SummaryPathFilterValue != "") {
+        pathFiltered := []
+        for theme in filteredThemes {
+            if (InStr(theme.path, SummaryPathFilterValue)) {
+                pathFiltered.Push(theme)
+            }
+        }
+        filteredThemes := pathFiltered
+    }
+
     for index, theme in filteredThemes {
-        rowIndex := SummaryListView.Add(, index, theme.name, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
+        projectName := ExtractProjectName(theme.path)
+        rowIndex := SummaryListView.Add(, index, theme.name, projectName, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
         SummaryRowPathMap[rowIndex] := theme.path
     }
 
