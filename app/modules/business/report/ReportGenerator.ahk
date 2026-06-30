@@ -50,13 +50,14 @@ BuildReportPrompt(filterName, dateRange, reportPath) {
     for project in sortedProjects {
         themeList .= "### " project.name "`n"
         for theme in project.themes {
+            duration := CalculateThemeDuration(theme.path)
             summaryPath := theme.path "\.aiprocess\Summary.md"
             implDocPath := theme.path "\实施文档.md"
 
             if (FileExist(summaryPath)) {
-                themeList .= Format("{}. {} → Summary: {}`n", themeIndex, theme.path, summaryPath)
+                themeList .= Format("{}. {} → 执行时长：{} → Summary: {}`n", themeIndex, theme.path, duration, summaryPath)
             } else {
-                entry := Format("{}. {} → Summary: 无", themeIndex, theme.path)
+                entry := Format("{}. {} → 执行时长：{} → Summary: 无", themeIndex, theme.path, duration)
                 if (FileExist(implDocPath)) {
                     entry .= "，有 实施文档.md"
                 }
