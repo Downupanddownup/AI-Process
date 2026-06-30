@@ -6,6 +6,7 @@ global CurrentPathText := ""
 global CurrentPathHwnd := 0
 global CurrentDirStateMark := ""
 global ReplyImplementationTailCheckbox := ""
+global QuestionRulesCheckbox := ""
 global SetDirectoryButton := ""
 global ReturnParentButton := ""
 global CreateIssueButton := ""
@@ -28,6 +29,7 @@ CreateMainGui() {
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies, MdActivationModeDropdown
+    global QuestionRulesCheckbox
     actionButtonWidth := 60
     actionButtonHeight := 24
     actionGap := 6
@@ -93,6 +95,9 @@ CreateMainGui() {
     CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
     CopyRequirementPromptButton.OnEvent("Click", CopyRequirementPrompt)
     ApplyButtonStyle(CopyRequirementPromptButton)
+
+    QuestionRulesCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "问")
+    QuestionRulesCheckbox.OnEvent("Click", OnQuestionRulesToggle)
 
     CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
     CreateReplyButton.OnEvent("Click", CreateReplyFile)
@@ -239,6 +244,11 @@ RefreshMainWindow() {
         ReplyImplementationTailCheckbox.Value := GetSession(windowId, "AppendImplementationTail") ? 1 : 0
     }
 
+    ; 同步"问" checkbox
+    if (QuestionRulesCheckbox) {
+        QuestionRulesCheckbox.Value := GetSession(windowId, "AppendQuestionRules") ? 1 : 0
+    }
+
     ; 同步执行策略下拉框
     if (ExecuteStrategyDropdown) {
         strategyKey := GetSession(windowId, "ExecuteStrategy")
@@ -292,13 +302,14 @@ HandleClose(*) {
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, QuestionRulesCheckbox, CreateIssueButton, ReturnParentButton
     global NewThemeButton, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
     ReplyImplementationTailCheckbox.Enabled := enabled
+    QuestionRulesCheckbox.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
     CopyExecuteButton.Enabled := enabled
     ExecuteStrategyDropdown.Enabled := enabled
@@ -348,6 +359,11 @@ MaybeAutoHide() {
 
 OnImplementationTailToggle(ctrl, *) {
     SetSession(GetActiveWindowId(), "AppendImplementationTail", ctrl.Value = 1)
+    SaveWindowSession(GetActiveWindowId())
+}
+
+OnQuestionRulesToggle(ctrl, *) {
+    SetSession(GetActiveWindowId(), "AppendQuestionRules", ctrl.Value = 1)
     SaveWindowSession(GetActiveWindowId())
 }
 

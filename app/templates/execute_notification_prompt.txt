@@ -1,3 +1,3 @@
-补充指令：当你完成本次执行后，请立即调用以下命令显示一个完成通知。
+结束指令：当你完成本次执行后，请立即调用以下命令显示一个完成通知。
 
 powershell -ExecutionPolicy Bypass -File "{{scriptPath}}" -WindowId "{{windowId}}"

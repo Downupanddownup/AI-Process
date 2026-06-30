@@ -102,6 +102,20 @@ AppendReplyImplementationTailIfNeeded(content) {
     return baseContent "`r`n" tailContent
 }
 
+AppendQuestionRulesIfNeeded(content) {
+    if !GetSession(GetActiveWindowId(), "AppendQuestionRules") {
+        return content
+    }
+
+    rulesContent := Trim(LoadTemplate("question_rules.txt"), "`r`n `t")
+    if (rulesContent = "") {
+        return content
+    }
+
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n`r`n" rulesContent
+}
+
 
 
 AppendExecuteNotificationIfNeeded(content) {
@@ -156,6 +170,7 @@ CopyRequirementPrompt(*) {
     content := LoadTemplate("requirement_prompt.txt")
     content := StrReplace(content, "{{filePath}}", currentDir "\需求.txt")
     content := AppendNoModifyPromptIfNeeded(content)
+    content := AppendQuestionRulesIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
     LogActivity("复需求", content)
@@ -255,4 +270,3 @@ CopyExecutePrompt(*) {
 
     MaybeAutoHide()
 }
-
