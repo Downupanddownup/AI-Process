@@ -47,6 +47,9 @@ if (!EnsureSingleInstance()) {
 
 EnsureDefaultFiles()
 LoadConfig()
+if (!IsWindowPositionValid(AppConfig["WindowPosX"], AppConfig["WindowPosY"])) {
+    ClearSavedWindowPosition()
+}
 CreateTray()
 CreateMainGui()
 UpdateBindButtonState()

@@ -49,3 +49,29 @@ GetSavedWindowPosition() {
     }
     return []
 }
+
+; 校验窗口坐标是否落在当前任一显示器工作区内
+; 空坐标视为无效，由调用方走默认居中逻辑
+IsWindowPositionValid(x, y) {
+    if (x = "" || y = "") {
+        return false
+    }
+    try {
+        monitorCount := MonitorGetCount()
+        Loop monitorCount {
+            MonitorGetWorkArea(A_Index, &left, &top, &right, &bottom)
+            if (x >= left && x < right && y >= top && y < bottom) {
+                return true
+            }
+        }
+    } catch {
+        ; 获取显示器信息失败时，保守视为无效，走兜底居中
+        return false
+    }
+    return false
+}
+
+; 清空保存的窗口位置，让下次启动使用默认居中
+ClearSavedWindowPosition() {
+    SaveWindowPositionToConfig("", "")
+}
