@@ -851,8 +851,6 @@ GetReportFileName(filterName, dateRange) {
 OnGenerateReportClick(ctrl, *) {
     global SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow, AppRoot
 
-    ctrl.Enabled := false
-
     projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
     filterName := SummaryCurrentFilter
     dateRange := GetFilterDateRange(filterName, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
@@ -864,7 +862,6 @@ OnGenerateReportClick(ctrl, *) {
     promptPath := BuildReportPrompt(filterName, dateRange, reportPath)
     if (promptPath = "") {
         MsgBox("当前时间范围内没有匹配的主题", "AIProcess", "Iconi")
-        ctrl.Enabled := true
         return
     }
 
@@ -873,16 +870,7 @@ OnGenerateReportClick(ctrl, *) {
     if (!result["Success"]) {
         MsgBox("Agent 发送失败：" result["Message"], "AIProcess", "Iconx")
         FileDelete(promptPath)
-        ctrl.Enabled := true
         return
-    }
-
-    SetTimer(() => WatchdogRecoverButton(ctrl), -120000)
-}
-
-WatchdogRecoverButton(ctrl) {
-    if (ctrl.Enabled = false) {
-        ctrl.Enabled := true
     }
 }
 
