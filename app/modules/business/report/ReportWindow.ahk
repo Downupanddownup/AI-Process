@@ -6,9 +6,12 @@
 global ReportGui := ""
 global ReportListView := ""
 global ReportTotalText := ""
+global btnOpen := ""
+global btnDir := ""
+global btnDel := ""
 
 ShowReportWindow() {
-    global ReportGui, ReportListView, ReportTotalText
+    global ReportGui, ReportListView, ReportTotalText, btnOpen, btnDir, btnDel
 
     if (ReportGui) {
         ReportGui.Show()
@@ -26,7 +29,7 @@ ShowReportWindow() {
     refreshBtn := ReportGui.Add("Button", "x+8 yp w50 h22", "刷新")
     refreshBtn.OnEvent("Click", (*) => RefreshReportList())
 
-    ReportListView := ReportGui.Add("ListView", "xm y+8 w440 h280 Grid -Multi", ["序号", "报告类型", "时间范围", "生成时间"])
+    ReportListView := ReportGui.Add("ListView", "xm y+8 w440 h280 Grid -Multi +LV0x4000", ["序号", "报告类型", "时间范围", "生成时间"])
     ReportListView.ModifyCol(1, 40)
     ReportListView.ModifyCol(2, 70)
     ReportListView.ModifyCol(3, 180)
@@ -50,10 +53,14 @@ ShowReportWindow() {
 }
 
 ReportGuiSize(gui, minMax, width, height) {
-    global ReportListView
+    global ReportListView, btnOpen, btnDir, btnDel
     if (minMax = -1 || !ReportListView)
         return
     ReportListView.Move(10, 40, width - 20, height - 85)
+    btnY := height - 35
+    btnOpen.Move(10, btnY, 70, 24)
+    btnDir.Move(84, btnY, 80, 24)
+    btnDel.Move(168, btnY, 60, 24)
 }
 
 RefreshReportList() {
@@ -118,28 +125,33 @@ OnReportDoubleClick(ctrl, item) {
 
 OnReportOpenClick(*) {
     row := GetSelectedReportRow()
-    if (row > 0) {
-        OpenReportByRow(row)
+    if (row <= 0) {
+        MsgBox("请先选择一份报告。", "提示", "Iconi")
+        return
     }
+    OpenReportByRow(row)
 }
 
 OnReportDeleteClick(*) {
+    global ReportListView
     row := GetSelectedReportRow()
-    if (row > 0) {
-        path := GetReportPathByRow(row)
-        FileDelete(path)
-        RefreshReportList()
+    if (row <= 0) {
+        MsgBox("请先选择一份报告。", "提示", "Iconi")
+        return
     }
+    path := GetReportPathByRow(row)
+    SplitPath(path, &fileName)
+    msg := "确认删除 '" fileName "' ？`n此操作不可恢复。"
+    result := MsgBox(msg, "确认删除", "YesNo Icon!")
+    if (result != "Yes")
+        return
+    FileDelete(path)
+    RefreshReportList()
 }
 
 GetSelectedReportRow() {
     global ReportListView
-    Loop ReportListView.GetCount() {
-        if (ReportListView.GetNext(A_Index - 1, "Focused")) {
-            return A_Index
-        }
-    }
-    return 0
+    return ReportListView.GetNext(0, "F")
 }
 
 OpenReportByRow(row) {
