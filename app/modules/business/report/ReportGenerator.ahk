@@ -34,23 +34,37 @@ BuildReportPrompt(filterName, dateRange, reportPath) {
     sortedProjects := []
     for projectName, group in projectGroups {
         latestTime := group[group.Length].lastAccessTime
-        sortedProjects.Push({name: projectName, themes: group, latestTime: latestTime})
+        sortedProjects.Push({name: projectName, themes: group, latestTime: latestTime, hours: 0.0})
     }
     SortProjectsByTimeDesc(sortedProjects)
 
-    ; 统计主题数
+    ; 统计主题数并计算每个主题时长
     totalCount := 0
     for project in sortedProjects {
         totalCount += project.themes.Length
+        for theme in project.themes {
+            theme.hours := CalculateThemeActiveHours(theme.path)
+        }
+    }
+
+    ; 计算项目合计与总合计
+    totalHours := 0.0
+    for project in sortedProjects {
+        projectHours := 0.0
+        for theme in project.themes {
+            projectHours += theme.hours
+        }
+        project.hours := projectHours
+        totalHours += projectHours
     }
 
     ; 拼主题列表文本（精简格式）
     themeList := ""
     themeIndex := 1
     for project in sortedProjects {
-        themeList .= "### " project.name "`n"
+        themeList .= "### " project.name "（" FormatDuration(project.hours) "）`n"
         for theme in project.themes {
-            duration := CalculateThemeDuration(theme.path)
+            duration := FormatDuration(theme.hours)
             summaryPath := theme.path "\.aiprocess\Summary.md"
             implDocPath := theme.path "\实施文档.md"
 
@@ -86,6 +100,7 @@ BuildReportPrompt(filterName, dateRange, reportPath) {
     prompt := StrReplace(prompt, "{{dateRange}}", dateRangeText)
     prompt := StrReplace(prompt, "{{reportPath}}", reportPath)
     prompt := StrReplace(prompt, "{{themeList}}", themeList)
+    prompt := StrReplace(prompt, "{{totalDuration}}", FormatDuration(totalHours))
     prompt := StrReplace(prompt, "{{reportTemplatePath}}", AppRoot "\templates\report\report_template.md")
     prompt := StrReplace(prompt, "{{reportCompletePs1}}", projectRoot "\app\powershell\report\ReportComplete.ps1")
 

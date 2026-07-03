@@ -2,10 +2,11 @@
 
 - 时间范围：{{dateRange}}
 - 统计：{{totalCount}} 个主题，分布在 {{projectCount}} 个项目
+- 总时长：{{totalDuration}}
 
 ---
 
-## 1. {{projectName1}}
+## 1. {{projectName1}}（{{projectDuration1}}）
 
 ### 1.1 {{themeName1}}（{{duration1}}）
 
@@ -19,7 +20,7 @@
 
 ---
 
-## 2. {{projectName2}}
+## 2. {{projectName2}}（{{projectDuration2}}）
 
 ### 2.1 {{themeName3}}（{{duration3}}）
 

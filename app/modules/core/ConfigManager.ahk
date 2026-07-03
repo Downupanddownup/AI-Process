@@ -68,6 +68,11 @@ EnsureDefaultFiles() {
         IniWrite("idea64.exe", SettingsFile, "Editor", "IdeaCommand")
     }
 
+    ; [Report] 段：报告生成相关配置
+    if (IniRead(SettingsFile, "Report", "IdleThresholdMinutes", "") = "") {
+        IniWrite("60", SettingsFile, "Report", "IdleThresholdMinutes")
+    }
+
     ; [Hotkey] 段
     if (IniRead(SettingsFile, "Hotkey", "Window1Hotkey", "") = "") {
         IniWrite("F2", SettingsFile, "Hotkey", "Window1Hotkey")
@@ -326,6 +331,7 @@ LoadConfig() {
     AppConfig["NotificationScriptPath"] := AppRoot "\powershell\notification\ShowCenterNotification.ps1"
     AppConfig["MdActivationMode"] := IniRead(SettingsFile, "Behavior", "MdActivationMode", "activate")
     AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
+    AppConfig["IdleThresholdMinutes"] := IniRead(SettingsFile, "Report", "IdleThresholdMinutes", "60") + 0
 }
 
 ; 加载热键配置
