@@ -21,12 +21,48 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 引入活跃时长计算工具
+. "$PSScriptRoot\ActiveDurationCalculator.ps1"
+
 # ============ 配置 ============
 
 $excludedDirs = @('.aiprocess', '.git', '.idea')
 $binaryExtensions = @('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.exe', '.dll', '.zip', '.rar', '.7z', '.pdf', '.docx', '.xlsx', '.pptx', '.mp3', '.mp4', '.avi', '.mkv')
 
 # ============ 工具函数 ============
+
+function Get-IdleThresholdMinutes {
+    $settingsFile = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'config\settings.ini'
+    $defaultValue = 60
+    if (-not (Test-Path -Path $settingsFile)) {
+        return $defaultValue
+    }
+    try {
+        $lines = [System.IO.File]::ReadAllLines($settingsFile, [System.Text.Encoding]::Unicode)
+        $inReportSection = $false
+        foreach ($line in $lines) {
+            $trimmed = $line.Trim()
+            if ($trimmed -eq '[Report]') {
+                $inReportSection = $true
+                continue
+            }
+            if ($trimmed -match '^\[.*\]$') {
+                $inReportSection = $false
+                continue
+            }
+            if ($inReportSection -and $trimmed -match '^IdleThresholdMinutes\s*=\s*(\d+)') {
+                $value = [int]$matches[1]
+                if ($value -gt 0) {
+                    return $value
+                }
+            }
+        }
+    }
+    catch {
+        # 读取失败时使用默认值
+    }
+    return $defaultValue
+}
 
 function Resolve-ThemePath {
     if (-not (Test-Path -Path $ThemePath -PathType Container)) {
@@ -280,7 +316,10 @@ function Get-TweakTime {
     param(
         [string]$Dir,
         [array]$LogEntries,
-        [datetime]$LastModifiedTime
+        [datetime]$LastModifiedTime,
+        [array]$FileCreationTimes,
+        [array]$LogTimes,
+        [int]$ThresholdMinutes
     )
     $tweakRoot = Join-Path $Dir '结果微调'
     if (-not (Test-Path -Path $tweakRoot -PathType Container)) {
@@ -325,16 +364,18 @@ function Get-TweakTime {
     }
     $end = $endCandidates | Sort-Object -Descending | Select-Object -First 1
 
-    $duration = $end - $start
-    if ($duration -lt [TimeSpan]::Zero) { $duration = [TimeSpan]::Zero }
-    return $duration
+    return Get-ActiveDuration -Start $start -End $end `
+        -FileCreationTimes $FileCreationTimes -LogTimes $LogTimes -ThresholdMinutes $ThresholdMinutes
 }
 
 function Get-TweakBreakdown {
     param(
         [string]$Dir,
         [array]$LogEntries,
-        [datetime]$LastModifiedTime
+        [datetime]$LastModifiedTime,
+        [array]$FileCreationTimes,
+        [array]$LogTimes,
+        [int]$ThresholdMinutes
     )
     $tweakRoot = Join-Path $Dir '结果微调'
     if (-not (Test-Path -Path $tweakRoot -PathType Container)) {
@@ -381,8 +422,8 @@ function Get-TweakBreakdown {
         $end = $endCandidates | Sort-Object -Descending | Select-Object -First 1
         if ($end -gt $nextBoundary) { $end = $nextBoundary }
 
-        $duration = $end - $start
-        if ($duration -lt [TimeSpan]::Zero) { $duration = [TimeSpan]::Zero }
+        $duration = Get-ActiveDuration -Start $start -End $end `
+            -FileCreationTimes $FileCreationTimes -LogTimes $LogTimes -ThresholdMinutes $ThresholdMinutes
 
         $result += [PSCustomObject]@{
             name     = $td.Name
@@ -394,7 +435,10 @@ function Get-TweakBreakdown {
 }
 
 function Get-ThemeMetrics {
-    param([string]$Dir)
+    param(
+        [string]$Dir,
+        [int]$ThresholdMinutes = (Get-IdleThresholdMinutes)
+    )
     $allFiles = Get-CoreFilesRecursive -Dir $Dir -BaseDir $Dir
     $textFiles = $allFiles | Where-Object { Test-TextFile -Path $_.FullName }
 
@@ -430,14 +474,18 @@ function Get-ThemeMetrics {
         $startCandidates += [datetime]::ParseExact($firstLog.time, 'yyyy-MM-dd HH:mm:ss', $null)
     }
 
+    # 收集用于活跃时长计算的活跃点
+    $creationTimes = @($allFiles | Select-Object -ExpandProperty CreationTime)
+    $logDateTimes = @($logEntries | ForEach-Object { [datetime]::ParseExact($_.time, 'yyyy-MM-dd HH:mm:ss', $null) })
+
     $startTime = if ($startCandidates.Count -gt 0) { $startCandidates | Sort-Object | Select-Object -First 1 } else { [datetime]::MinValue }
 
-    $totalTime = $lastModifiedDateTime - $startTime
-    if ($totalTime -lt [TimeSpan]::Zero) { $totalTime = [TimeSpan]::Zero }
+    $totalTime = Get-ActiveDuration -Start $startTime -End $lastModifiedDateTime `
+        -FileCreationTimes $creationTimes -LogTimes $logDateTimes -ThresholdMinutes $ThresholdMinutes
 
     $discussionEnd = Get-DiscussionEnd -Dir $Dir -LogEntries $logEntries -FallbackEnd $lastModifiedDateTime
-    $discussionTime = $discussionEnd - $startTime
-    if ($discussionTime -lt [TimeSpan]::Zero) { $discussionTime = [TimeSpan]::Zero }
+    $discussionTime = Get-ActiveDuration -Start $startTime -End $discussionEnd `
+        -FileCreationTimes $creationTimes -LogTimes $logDateTimes -ThresholdMinutes $ThresholdMinutes
 
     $executeStart = Get-FirstLogTime -Entries $logEntries -Action '复执行'
     if (-not $executeStart) {
@@ -445,11 +493,13 @@ function Get-ThemeMetrics {
     }
     $executeEnd = Get-ExecuteEnd -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime
     if ($executeEnd -lt $executeStart) { $executeEnd = $executeStart }
-    $executeTime = $executeEnd - $executeStart
-    if ($executeTime -lt [TimeSpan]::Zero) { $executeTime = [TimeSpan]::Zero }
+    $executeTime = Get-ActiveDuration -Start $executeStart -End $executeEnd `
+        -FileCreationTimes $creationTimes -LogTimes $logDateTimes -ThresholdMinutes $ThresholdMinutes
 
-    $tweakTime = Get-TweakTime -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime
-    $tweakBreakdown = Get-TweakBreakdown -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime
+    $tweakTime = Get-TweakTime -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime `
+        -FileCreationTimes $creationTimes -LogTimes $logDateTimes -ThresholdMinutes $ThresholdMinutes
+    $tweakBreakdown = Get-TweakBreakdown -Dir $Dir -LogEntries $logEntries -LastModifiedTime $lastModifiedDateTime `
+        -FileCreationTimes $creationTimes -LogTimes $logDateTimes -ThresholdMinutes $ThresholdMinutes
 
     # 独立子主题
     $subThemesList = @()
@@ -461,7 +511,7 @@ function Get-ThemeMetrics {
             (Test-Path (Join-Path $_.FullName '实施文档.md'))
         }
         foreach ($std in $subThemeDirs) {
-            $subMetrics = Get-ThemeMetrics -Dir $std.FullName
+            $subMetrics = Get-ThemeMetrics -Dir $std.FullName -ThresholdMinutes $ThresholdMinutes
             $subThemesList += [PSCustomObject]@{
                 path           = $std.FullName.Substring($Dir.Length + 1)
                 totalTime      = $subMetrics.totalTime
