@@ -6,6 +6,17 @@ global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
 
 SetCurrentDirAndOpenRequirement(dirPath) {
+    ; 自动仓库关联：标准路径且在仓库列表中不存在 → 自动添加
+    if (IsStandardRepoPath(dirPath)) {
+        repo := FindRepoByThemePath(dirPath)
+        if (repo = "") {
+            repoPath := ExtractRepoPath(dirPath)
+            if (repoPath != "") {
+                AddRepository(repoPath)
+            }
+        }
+    }
+
     SetCurrentDir(NormalizePath(dirPath))
     SaveWindowSession(GetActiveWindowId())
     LogThemeIndex(GetCurrentDir(), "右键")

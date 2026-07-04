@@ -22,6 +22,8 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\PromptManager.ahk
 #Include %A_ScriptDir%\modules\business\DirectoryManager.ahk
 #Include %A_ScriptDir%\modules\business\ThemeManager.ahk
+#Include %A_ScriptDir%\modules\business\RepositoryManager.ahk
+#Include %A_ScriptDir%\modules\business\RepositoryDialog.ahk
 #Include %A_ScriptDir%\modules\business\HistoryIndexManager.ahk
 #Include %A_ScriptDir%\modules\business\ActivityLogger.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
@@ -54,6 +56,7 @@ LoadConfig()
 if (!IsWindowPositionValid(AppConfig["WindowPosX"], AppConfig["WindowPosY"])) {
     ClearSavedWindowPosition()
 }
+InitRepositoryManager()
 CreateTray()
 CreateMainGui()
 UpdateBindButtonState()

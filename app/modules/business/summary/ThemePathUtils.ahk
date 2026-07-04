@@ -3,6 +3,13 @@
 ; 从主题路径中提取归属项目名
 ; 规则：找 \需求\ 或 \need\，取上一级；兜底取父级目录名
 ExtractProjectName(path) {
+    ; 优先通过仓库管理器查找
+    repo := FindRepoByThemePath(path)
+    if (repo != "") {
+        return repo["name"]
+    }
+
+    ; 以下为原有 fallback 逻辑
     pathNoDrive := RegExReplace(path, "^[A-Z]:\\", "")
 
     pos := InStr(pathNoDrive, "\需求\")
