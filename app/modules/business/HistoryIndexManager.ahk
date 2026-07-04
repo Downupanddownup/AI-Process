@@ -80,3 +80,78 @@ AppendThemeIndexRecord(path, source, recordTime) {
         return false
     }
 }
+
+UpdateThemePathInIndex(oldPath, newPath) {
+    global AppRoot
+
+    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+    if (projectRoot = "") {
+        projectRoot := AppRoot
+    }
+
+    indexDir := projectRoot "\history\index"
+    if (!DirExist(indexDir)) {
+        return 0
+    }
+
+    LogDebug("UpdateThemePathInIndex: scanning " indexDir " for oldPath=" oldPath " newPath=" newPath)
+
+    updatedCount := 0
+    fileCount := 0
+    lineChecked := 0
+
+    Loop Files, indexDir "\*.jsonl", "F" {
+        filePath := A_LoopFileFullPath
+        fileCount += 1
+        try {
+            content := FileRead(filePath, "UTF-8")
+        } catch {
+            LogDebug("UpdateThemePathInIndex: FAILED to read " filePath)
+            continue
+        }
+
+        newContent := ""
+        fileChanged := false
+        Loop Parse, content, "`n", "`r" {
+            line := Trim(A_LoopField)
+            if (line = "") {
+                continue
+            }
+
+            record := ""
+            try {
+                record := JSON.Load(line)
+            } catch {
+                LogDebug("UpdateThemePathInIndex: JSON parse FAILED for: " SubStr(line, 1, 80))
+                newContent .= line "`n"
+                continue
+            }
+
+            lineChecked += 1
+            recordPath := record.Has("path") ? record["path"] : ""
+
+            if (lineChecked = 1 || InStr(recordPath, "测试V3") || InStr(line, "测试V3")) {
+                LogDebug("UpdateThemePathInIndex: line=" lineChecked " recordPath=[" recordPath "]")
+            }
+
+            if (recordPath != "" && IsPathPrefix(oldPath, recordPath)) {
+                record["path"] := StrReplace(recordPath, oldPath, newPath)
+                JSON.EscapeUnicode := false
+                line := JSON.Dump(record)
+                updatedCount += 1
+                fileChanged := true
+                LogDebug("UpdateThemePathInIndex: UPDATED to " record["path"])
+            }
+
+            newContent .= line "`n"
+        }
+
+        if (fileChanged) {
+            FileDelete(filePath)
+            FileAppend(newContent, filePath, "UTF-8")
+        }
+    }
+
+    LogDebug("UpdateThemePathInIndex: scanned " fileCount " files, " lineChecked " lines, updated " updatedCount)
+    return updatedCount
+}

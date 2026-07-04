@@ -43,9 +43,13 @@ LoadRepositories() {
             }
             try {
                 item := JSON.Load(line)
+                itemPath := item.Has("path") ? item["path"] : ""
+                if (itemPath = "") {
+                    continue
+                }
                 repo := Map(
-                    "name", item.Has("name") ? item["name"] : "",
-                    "path", item.Has("path") ? item["path"] : "",
+                    "name", ExtractRepoName(itemPath),
+                    "path", itemPath,
                     "addedTime", item.Has("addedTime") ? item["addedTime"] : ""
                 )
                 exists := false
@@ -116,20 +120,10 @@ AddRepository(inputPath) {
 }
 
 ExtractRepoName(repoPath) {
-    normalized := NormalizePath(repoPath)
+    normalized := NormalizePath(repoPath) "\"
 
     posNeed := InStr(normalized, "\need\", 0)
     posDemand := InStr(normalized, "\需求\", 0)
-
-    if (!posNeed && !posDemand) {
-        posNeed := 0
-        if (SubStr(normalized, -5) = "\need") {
-            posNeed := StrLen(normalized) - 5
-        }
-        if (SubStr(normalized, -3) = "\需求") {
-            posDemand := StrLen(normalized) - 3
-        }
-    }
 
     pos := Max(posNeed, posDemand)
     if (pos > 0) {
@@ -138,7 +132,7 @@ ExtractRepoName(repoPath) {
         return name
     }
 
-    SplitPath(normalized, &fallbackName)
+    SplitPath(NormalizePath(repoPath), &fallbackName)
     return fallbackName
 }
 

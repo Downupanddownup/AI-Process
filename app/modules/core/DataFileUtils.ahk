@@ -10,6 +10,16 @@ NormalizePath(path) {
     return path
 }
 
+PathsEqual(path1, path2) {
+    return StrCompare(NormalizePath(path1), NormalizePath(path2), 0) = 0
+}
+
+IsPathPrefix(prefix, fullPath) {
+    normalizedPrefix := NormalizePath(prefix) "\"
+    normalizedFull := NormalizePath(fullPath) "\"
+    return InStr(normalizedFull, normalizedPrefix, 0) = 1
+}
+
 TruncateMiddle(text, maxLength) {
     if StrLen(text) <= maxLength {
         return text
