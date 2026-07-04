@@ -441,7 +441,17 @@ LoadThemes(dateRange) {
         SplitPath(themeDir, &themeName)
         summaryFile := themeDir "\.aiprocess\Summary.md"
         summaryStatus := FileExist(summaryFile) ? "已总结" : "未总结"
-        dirStatus := DirExist(themeDir) ? "存在" : "不存在"
+        exists := DirExist(themeDir)
+        isArchived := IsArchivedTheme(themeDir)
+        if (exists && isArchived) {
+            dirStatus := "已归档"
+        } else if (isArchived) {
+            dirStatus := "已归档（目录缺失）"
+        } else if (exists) {
+            dirStatus := "存在"
+        } else {
+            dirStatus := "不存在"
+        }
 
         themes.Push({
             path: themeDir,
