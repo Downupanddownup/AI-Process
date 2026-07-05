@@ -9,7 +9,7 @@ GenerateSummary(themePath) {
         return false
     }
 
-    summaryFile := themePath "\.aiprocess\Summary.md"
+    summaryFile := themePath "\.aiprocess\Summary.json"
     if (FileExist(summaryFile)) {
         MsgBox("总结已存在，如需重新生成请删除后重试。", "AIProcess", "Iconi")
         return false
@@ -51,7 +51,7 @@ GenerateSummary(themePath) {
     }
 
     ; 剪贴板中只放文件路径和简单说明
-    shortMessage := "请查看这个文件：" promptFile "`n这是本次「经验总结」任务的完整提示词，请按其中的要求和模板生成 Summary.md。"
+    shortMessage := "请查看这个文件：" promptFile "`n这是本次「经验总结」任务的完整提示词，请按其中的要求和模板生成 Summary.json。"
 
     result := AgentDispatcherSend("SummaryAgent", shortMessage)
     if (!result["Success"]) {
@@ -65,33 +65,49 @@ GenerateSummary(themePath) {
 BuildSummaryPrompt(data) {
     global AppRoot
 
-    templatePath := AppRoot "\templates\summary\summary_prompt.txt"
-    if (!FileExist(templatePath)) {
+    themePath := data["themePath"]
+    themeName := data["themeName"]
+    tmpDir := themePath "\.aiprocess\_tmp"
+
+    ; 复制稳定规则文件到主题临时目录，方便 Agent 一次性读取
+    guideSrc := AppRoot "\templates\summary\summary_input_guide.md"
+    templateSrc := AppRoot "\templates\summary\summary_template.json"
+    rulesSrc := AppRoot "\templates\summary\summary_rules.md"
+
+    guideDst := tmpDir "\summary_input_guide.md"
+    templateDst := tmpDir "\summary_template.json"
+    rulesDst := tmpDir "\summary_rules.md"
+
+    if (!FileExist(guideSrc) || !FileExist(templateSrc) || !FileExist(rulesSrc)) {
+        MsgBox("缺少经验总结规则模板文件，请检查 app/templates/summary/ 目录。", "AIProcess", "Iconx")
         return ""
     }
 
     try {
-        prompt := FileRead(templatePath, "UTF-8")
+        FileCopy(guideSrc, guideDst, true)
+        FileCopy(templateSrc, templateDst, true)
+        FileCopy(rulesSrc, rulesDst, true)
     } catch Error as err {
+        MsgBox("复制规则模板文件失败：" err.Message, "AIProcess", "Iconx")
         return ""
     }
 
-    prompt := StrReplace(prompt, "{{themePath}}", data["themePath"])
-    prompt := StrReplace(prompt, "{{themeName}}", data["themeName"])
-    prompt := StrReplace(prompt, "{{fileCount}}", String(data["fileCount"]))
-    prompt := StrReplace(prompt, "{{charCount}}", String(data["charCount"]))
-    prompt := StrReplace(prompt, "{{lastModifiedFile}}", data["lastModifiedFile"])
-    prompt := StrReplace(prompt, "{{lastModifiedTime}}", data["lastModifiedTime"])
-    prompt := StrReplace(prompt, "{{totalTime}}", data["totalTime"])
-    prompt := StrReplace(prompt, "{{discussionTime}}", data["discussionTime"])
-    prompt := StrReplace(prompt, "{{executeTime}}", data["executeTime"])
-    prompt := StrReplace(prompt, "{{tweakTime}}", data["tweakTime"])
-    prompt := StrReplace(prompt, "{{tweakBreakdown}}", BuildTweakBreakdownText(data["tweakBreakdown"]))
-    prompt := StrReplace(prompt, "{{fileTree}}", data["fileTree"])
-    prompt := StrReplace(prompt, "{{coreFiles}}", BuildCoreFilesText(data["coreFiles"]))
-    prompt := StrReplace(prompt, "{{subThemes}}", BuildSubThemesText(data["subThemes"]))
-    prompt := StrReplace(prompt, "{{summaryTemplatePath}}", AppRoot "\templates\summary\summary_template.md")
-    prompt := StrReplace(prompt, "{{notifyScriptPath}}", AppRoot "\powershell\summary\NotifySummaryComplete.ps1")
+    inputFile := tmpDir "\summary_input.json"
+    notifyScript := AppRoot "\powershell\summary\NotifySummaryComplete.ps1"
+
+    prompt := "你是 AI Process 的「经验总结」助手。本次任务是基于主题素材生成结构化总结 JSON。`n`n"
+    prompt .= "请按以下顺序读取文件，然后生成 Summary.json：`n"
+    prompt .= "1. 素材说明：" guideDst "`n"
+    prompt .= "2. 输出模板：" templateDst "`n"
+    prompt .= "3. 生成规则：" rulesDst "`n"
+    prompt .= "4. 主题素材：" inputFile "`n`n"
+    prompt .= "要求：`n"
+    prompt .= "- 严格按输出模板生成 JSON，不要增删字段。`n"
+    prompt .= "- 严格按生成规则进行分类、摘要、分析和自检。`n"
+    prompt .= "- 生成完成后，将 Summary.json 保存到：" themePath "\.aiprocess\Summary.json`n"
+    prompt .= Format("- 保存后执行：powershell -ExecutionPolicy Bypass -File `"{1:s}`" -ThemePath `"{2:s}`" -Status `"done`"`n`n", notifyScript, themePath)
+    prompt .= "主题名称：" themeName "`n"
+    prompt .= "主题路径：" themePath "`n"
 
     return prompt
 }

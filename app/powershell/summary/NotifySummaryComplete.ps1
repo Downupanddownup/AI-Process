@@ -3,7 +3,7 @@
     经验总结完成通知脚本。
 
 .DESCRIPTION
-    AI Agent 生成 Summary.md 后调用此脚本。
+    AI Agent 生成 Summary.json 后调用此脚本。
     负责写入独立日志、显示通知、刷新 AI Process 的「经验总结」窗口。
 
 .PARAMETER ThemePath
@@ -20,9 +20,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 校验产物
+$summaryJson = Join-Path $ThemePath '.aiprocess\Summary.json'
+if ($Status -eq "done" -and -not (Test-Path $summaryJson)) {
+    throw "Summary.json 不存在：$summaryJson"
+}
+
 # 定位项目根目录
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = Resolve-Path (Join-Path $scriptDir "..\..\..")
+$projectRoot = Resolve-Path (Join-Path $scriptDir "..\..")
 
 # 1. 写入独立日志
 $historyDir = Join-Path $projectRoot "history"

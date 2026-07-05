@@ -348,7 +348,7 @@ RenderThemeList() {
     ; 应用报告状态过滤
     filteredThemes := []
     for theme in themes {
-        summaryExists := FileExist(theme.path "\.aiprocess\Summary.md")
+        summaryExists := FileExist(theme.path "\.aiprocess\Summary.md") || FileExist(theme.path "\.aiprocess\Summary.json")
         if (SummaryReportFilterValue = "已生成" && !summaryExists) {
             continue
         }
@@ -638,9 +638,10 @@ ShowThemeDetailDialog(path) {
     }
 
     SplitPath(path, &themeName)
-    summaryFile := path "\.aiprocess\Summary.md"
+    summaryMd := path "\.aiprocess\Summary.md"
+    summaryJson := path "\.aiprocess\Summary.json"
     dirExists := DirExist(path)
-    summaryExists := FileExist(summaryFile)
+    summaryExists := FileExist(summaryMd) || FileExist(summaryJson)
 
     dialog := Gui("+Owner" SummaryGui.Hwnd " +ToolWindow", "主题详情")
     dialog.SetFont("s9", "Microsoft YaHei UI")
@@ -778,13 +779,33 @@ ViewThemeSummary(themePath) {
         return
     }
 
-    summaryFile := themePath "\.aiprocess\Summary.md"
-    if (!FileExist(summaryFile)) {
-        MsgBox("当前主题尚未生成 Summary.md。", "AIProcess", "Iconi")
+    summaryMd := themePath "\.aiprocess\Summary.md"
+    summaryJson := themePath "\.aiprocess\Summary.json"
+
+    if (FileExist(summaryMd)) {
+        OpenFileInTool(summaryMd)
         return
     }
 
-    OpenFileInTool(summaryFile)
+    if (FileExist(summaryJson)) {
+        global AppRoot
+        psScript := AppRoot "\powershell\summary\ConvertSummaryToMarkdown.ps1"
+        cmd := 'powershell -ExecutionPolicy Bypass -File "' psScript '" -JsonPath "' summaryJson '"'
+        try {
+            RunWait(cmd, , "Hide")
+        } catch Error as err {
+            MsgBox("生成 Markdown 失败：" err.Message, "AIProcess", "Iconx")
+            return
+        }
+        if (FileExist(summaryMd)) {
+            OpenFileInTool(summaryMd)
+        } else {
+            MsgBox("Markdown 生成失败", "AIProcess", "Iconx")
+        }
+        return
+    }
+
+    MsgBox("当前主题尚未生成总结。", "AIProcess", "Iconi")
 }
 
 SummaryRefreshMessageHandler(wParam, lParam, msg, hwnd) {
