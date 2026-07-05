@@ -34,7 +34,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
     }
 
     if (GetSession(GetActiveWindowId(), "OpenWithIdea")) {
-        OpenFileInIdea(filePath)
+        OpenFileInTool(filePath)
     }
 }
 

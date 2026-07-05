@@ -157,7 +157,7 @@ GetSelectedReportRow() {
 OpenReportByRow(row) {
     path := GetReportPathByRow(row)
     if (path != "") {
-        OpenFileInIdea(path)
+        OpenFileInTool(path)
     }
 }
 

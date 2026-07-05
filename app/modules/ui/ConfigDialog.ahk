@@ -28,7 +28,17 @@ ShowConfigDialog(*) {
     ConfigDialog.OnEvent("Close", CloseConfigDialog)
     ConfigDialog.OnEvent("Escape", CloseConfigDialog)
 
-    ConfigDialog.AddText("xm ym w240 h18", "窗口列表")
+    ; 文件处理工具区域（顶部，即时生效，无需重启）
+    ConfigDialog.AddText("xm ym w240 h18", "文件处理工具")
+    global ConfigDialogFileToolLabel := ConfigDialog.AddText("xm y+2 w240 h14 cGray", "当前：" GetDefaultToolName())
+    manageBtn := ConfigDialog.AddButton("xm y+6 w100 h24", "管理...")
+    manageBtn.OnEvent("Click", (*) => (ShowFileToolDialog(ConfigDialog.Hwnd), RefreshConfigFileToolLabel()))
+
+    ; 分隔线
+    ConfigDialog.AddText("xm y+12 w240 h2 +0x7")
+
+    ; 窗口列表区域（底部，修改后需重启）
+    ConfigDialog.AddText("xm y+6 w240 h18", "窗口列表")
 
     ConfigDialogListView := ConfigDialog.AddListView("xm y+6 w240 h110 Checked", ["窗口", "热键"])
     ConfigDialogListView.Add("Check", "1 号窗", AppConfig["Window1Hotkey"])
@@ -79,10 +89,24 @@ OnConfigDialogExit(*) {
 }
 
 CloseConfigDialog(*) {
-    global ConfigDialog, ConfigDialogListView
+    global ConfigDialog, ConfigDialogListView, ConfigDialogFileToolLabel
+    global g_FileToolDialog, g_FileToolListView
+    if (g_FileToolDialog) {
+        g_FileToolDialog.Destroy()
+        g_FileToolDialog := ""
+        g_FileToolListView := ""
+    }
     if (ConfigDialog) {
         ConfigDialog.Destroy()
         ConfigDialog := ""
         ConfigDialogListView := ""
+        ConfigDialogFileToolLabel := ""
+    }
+}
+
+RefreshConfigFileToolLabel() {
+    global ConfigDialogFileToolLabel
+    if (ConfigDialogFileToolLabel) {
+        ConfigDialogFileToolLabel.Text := "当前：" GetDefaultToolName()
     }
 }

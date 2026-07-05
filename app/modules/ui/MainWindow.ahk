@@ -221,7 +221,7 @@ OpenPendingMarkdownIfAny(windowId) {
         IniWrite("", SettingsFile, "PendingMd", key)
         return
     }
-    OpenFileInIdea(pendingPath)
+    OpenFileInTool(pendingPath)
     IniWrite("", SettingsFile, "PendingMd", key)
 }
 

@@ -43,3 +43,4 @@ Desktop.ini
 /app/_tmp/
 /app/reports/
 /reports/
+/app/config/filetools.json

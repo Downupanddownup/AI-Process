@@ -73,6 +73,12 @@ EnsureDefaultFiles() {
         IniWrite("60", SettingsFile, "Report", "IdleThresholdMinutes")
     }
 
+    ; [FileTool] 首次迁移：旧 IdeaCommand → filetools.json
+    toolsFile := ConfigDir "\filetools.json"
+    if (!FileExist(toolsFile) && IniRead(SettingsFile, "Editor", "IdeaCommand", "") != "") {
+        MigrateFromIdeaCommand()
+    }
+
     ; [Hotkey] 段
     if (IniRead(SettingsFile, "Hotkey", "Window1Hotkey", "") = "") {
         IniWrite("F2", SettingsFile, "Hotkey", "Window1Hotkey")
@@ -330,7 +336,7 @@ LoadConfig() {
     AppConfig["OpenMdScriptPath"] := AppRoot "\powershell\markdown\OpenMarkdown.ps1"
     AppConfig["NotificationScriptPath"] := AppRoot "\powershell\notification\ShowCenterNotification.ps1"
     AppConfig["MdActivationMode"] := IniRead(SettingsFile, "Behavior", "MdActivationMode", "activate")
-    AppConfig["IdeaCommand"] := IniRead(SettingsFile, "Editor", "IdeaCommand", "idea64.exe")
+    AppConfig["FileToolPath"] := IniRead(SettingsFile, "FileTool", "FileToolPath", "")
     AppConfig["IdleThresholdMinutes"] := IniRead(SettingsFile, "Report", "IdleThresholdMinutes", "60") + 0
 }
 

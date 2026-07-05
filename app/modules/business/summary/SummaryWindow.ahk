@@ -784,7 +784,7 @@ ViewThemeSummary(themePath) {
         return
     }
 
-    OpenFileInIdea(summaryFile)
+    OpenFileInTool(summaryFile)
 }
 
 SummaryRefreshMessageHandler(wParam, lParam, msg, hwnd) {

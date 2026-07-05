@@ -3,12 +3,16 @@
 ; 文件创建与管理
 
 
-OpenFileInIdea(filePath) {
-    global AppConfig
+OpenFileInTool(filePath) {
+    toolPath := GetCurrentToolPath()
+    if (toolPath = "") {
+        ShowFeedback("未配置文件处理工具，请在托盘→配置中添加", true)
+        return
+    }
     try {
-        Run('"' AppConfig["IdeaCommand"] '" "' filePath '"')
+        Run('"' toolPath '" "' filePath '"')
     } catch Error {
-        ShowFeedback("IDEA 打开失败，请检查 settings.ini 中的 IdeaCommand", true)
+        ShowFeedback("文件工具打开失败，请检查配置", true)
     }
 }
 
@@ -197,7 +201,7 @@ CreateRequirementFile(*) {
     LogActivity("建需求", "")
 
     if GetSession(GetActiveWindowId(), "OpenWithIdea") {
-        OpenFileInIdea(filePath)
+        OpenFileInTool(filePath)
     }
 
     MaybeAutoHide()
@@ -229,7 +233,7 @@ CreateReplyFile(*) {
     LogActivity("建回复", "")
 
     if GetSession(GetActiveWindowId(), "OpenWithIdea") {
-        OpenFileInIdea(replyPath)
+        OpenFileInTool(replyPath)
     }
 
     MaybeAutoHide()

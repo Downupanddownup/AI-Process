@@ -3,8 +3,8 @@
     MD 激活模式：用 IDEA 打开 Markdown 文件并激活窗口。
 
 .DESCRIPTION
-    读取 settings.ini 中的 IdeaCommand，使用 Start-Process 打开 Markdown 文件。
-    IDEA 窗口会被激活并置到最前台。
+    读取 settings.ini 中的 FileToolPath，使用 Start-Process 打开 Markdown 文件。
+    文件处理工具窗口会被激活并置到最前台。
 
 .PARAMETER FilePath
     要打开的 Markdown 文件绝对路径。
@@ -64,15 +64,15 @@ function Assert-PathExists {
 
 Assert-PathExists -Path $settingsPath -Description "settings.ini"
 
-$ideaCommand = Read-IniValue -Path $settingsPath -Section "Editor" -Key "IdeaCommand"
-if ([string]::IsNullOrWhiteSpace($ideaCommand)) {
-    Write-Error "IdeaCommand is not configured in settings.ini [Editor] section."
+$fileToolPath = Read-IniValue -Path $settingsPath -Section "FileTool" -Key "FileToolPath"
+if ([string]::IsNullOrWhiteSpace($fileToolPath)) {
+    Write-Error "FileToolPath is not configured in settings.ini [FileTool] section."
     exit 1
 }
 
-Assert-PathExists -Path $ideaCommand -Description "IDEA executable"
+Assert-PathExists -Path $fileToolPath -Description "File tool executable"
 Assert-PathExists -Path $FilePath -Description "Markdown file"
 
-Start-Process -FilePath $ideaCommand -ArgumentList "`"$FilePath`"" -NoNewWindow
+Start-Process -FilePath $fileToolPath -ArgumentList "`"$FilePath`"" -NoNewWindow
 
-Write-Host "Activated IDEA and opened '$FilePath'."
+Write-Host "Opened '$FilePath' with file tool."
