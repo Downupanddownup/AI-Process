@@ -27,10 +27,10 @@ CreateOptionsDialog() {
     OptionsDialog.OnEvent("Close", CloseOptionsDialog)
     OptionsDialog.OnEvent("Escape", CloseOptionsDialog)
 
-    OptionsIdeaCheckbox := OptionsDialog.AddCheckbox("xm ym w220 h20", "IDEA 打开需求文件")
+    OptionsIdeaCheckbox := OptionsDialog.AddCheckbox("xm ym w220 h20", "创建后用工具打开需求文件")
     OptionsIdeaCheckbox.OnEvent("Click", OnOptionsIdeaToggle)
 
-    OptionsMdCheckbox := OptionsDialog.AddCheckbox("xm y+4 w220 h20", "MD 文件用 IDEA 打开")
+    OptionsMdCheckbox := OptionsDialog.AddCheckbox("xm y+4 w220 h20", "MD 文件用工具打开")
     OptionsMdCheckbox.OnEvent("Click", OnOptionsMdToggle)
 
     OptionsNoModifyCheckbox := OptionsDialog.AddCheckbox("xm y+4 w220 h20", "提示词追加禁止修改正式文件")
