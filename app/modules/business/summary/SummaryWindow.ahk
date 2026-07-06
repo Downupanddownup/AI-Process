@@ -1023,9 +1023,10 @@ StartHttpServer(port) {
                   psScript, port, projectRoot, logFile)
     LogInfo("HTTP: starting server command: " cmd)
 
-    pid := Run(cmd, , "Hide")
-    if (!pid) {
-        LogError("HTTP: Run returned empty PID")
+    pid := 0
+    Run(cmd, , "Hide", &pid)
+    if (pid = 0) {
+        LogError("HTTP: Run failed, pid=" pid)
         MsgBox("HTTP 服务启动失败", "AIProcess", "Iconx")
         return
     }
