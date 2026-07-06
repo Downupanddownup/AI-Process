@@ -32,88 +32,6 @@
     ]
   },
 
-  "overview": {
-    "abstract": "",
-    "complexity": "",
-    "complexityReason": "",
-    "collaboration": "",
-    "collaborationReason": "",
-    "totalTime": { "minutes": 0, "display": "" },
-    "tags": []
-  },
-
-  "metrics": {
-    "totalRounds": 0,
-    "totalTimeMinutes": 0,
-    "totalHumanChars": 0,
-    "totalAiChars": 0,
-    "byRound": {
-      "normal": 0,
-      "refinement": 0,
-      "exploration": 0,
-      "correction": 0,
-      "extreme": 0,
-      "idle": 0,
-      "intentMatchRate": 0,
-      "correctionRate": 0,
-      "extremeRate": 0
-    },
-    "byTime": {
-      "smoothMinutes": 0,
-      "correctionMinutes": 0,
-      "extremeMinutes": 0,
-      "intentMatchRate": 0,
-      "correctionRate": 0,
-      "extremeRate": 0
-    },
-    "byChars": {
-      "smoothHumanChars": 0,
-      "correctionHumanChars": 0,
-      "extremeHumanChars": 0,
-      "intentMatchRate": 0,
-      "correctionRate": 0,
-      "extremeRate": 0
-    }
-  },
-
-  "analysis": {
-    "correctionAnalysis": {
-      "perRound": [
-        {
-          "roundIndex": 0,
-          "category": "",
-          "summary": "",
-          "rootCause": "",
-          "impact": "",
-          "lesson": ""
-        }
-      ],
-      "summary": {
-        "totalCorrectionRounds": 0,
-        "totalExtremeRounds": 0,
-        "mainPattern": "",
-        "keyLesson": ""
-      }
-    },
-    "extremeAnalysis": {
-      "perRound": [
-        {
-          "roundIndex": 0,
-          "summary": "",
-          "trigger": "",
-          "escalation": "",
-          "resolution": "",
-          "lesson": ""
-        }
-      ],
-      "summary": {
-        "totalExtremeRounds": 0,
-        "mainPattern": "",
-        "keyLesson": ""
-      }
-    }
-  },
-
   "resultFineTunings": [
     {
       "name": "",
@@ -194,5 +112,87 @@
     "main": { "rounds": 0, "timeMinutes": 0, "humanChars": 0, "aiChars": 0 },
     "resultFineTunings": { "rounds": 0, "timeMinutes": 0, "humanChars": 0, "aiChars": 0 },
     "subThemes": { "rounds": 0, "timeMinutes": 0, "humanChars": 0, "aiChars": 0 }
+  },
+
+  "overview": {
+    "abstract": "",
+    "complexity": "",
+    "complexityReason": "",
+    "collaboration": "",
+    "collaborationReason": "",
+    "totalTime": { "minutes": 0, "display": "" },
+    "tags": []
+  },
+
+  "metrics": {
+    "totalRounds": 0,
+    "totalTimeMinutes": 0,
+    "totalHumanChars": 0,
+    "totalAiChars": 0,
+    "byRound": {
+      "normal": 0,
+      "refinement": 0,
+      "exploration": 0,
+      "correction": 0,
+      "extreme": 0,
+      "idle": 0,
+      "intentMatchRate": 0,
+      "correctionRate": 0,
+      "extremeRate": 0
+    },
+    "byTime": {
+      "smoothMinutes": 0,
+      "correctionMinutes": 0,
+      "extremeMinutes": 0,
+      "intentMatchRate": 0,
+      "correctionRate": 0,
+      "extremeRate": 0
+    },
+    "byChars": {
+      "smoothHumanChars": 0,
+      "correctionHumanChars": 0,
+      "extremeHumanChars": 0,
+      "intentMatchRate": 0,
+      "correctionRate": 0,
+      "extremeRate": 0
+    }
+  },
+
+  "analysis": {
+    "correctionAnalysis": {
+      "perRound": [
+        {
+          "roundIndex": 0,
+          "category": "",
+          "summary": "",
+          "rootCause": "",
+          "impact": "",
+          "lesson": ""
+        }
+      ],
+      "summary": {
+        "totalCorrectionRounds": 0,
+        "totalExtremeRounds": 0,
+        "mainPattern": "",
+        "keyLesson": ""
+      }
+    },
+    "extremeAnalysis": {
+      "perRound": [
+        {
+          "roundIndex": 0,
+          "summary": "",
+          "trigger": "",
+          "escalation": "",
+          "resolution": "",
+          "lesson": ""
+        }
+      ],
+      "summary": {
+        "totalExtremeRounds": 0,
+        "mainPattern": "",
+        "keyLesson": ""
+      }
+    }
   }
 }
