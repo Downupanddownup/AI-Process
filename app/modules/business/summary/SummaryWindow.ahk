@@ -790,17 +790,23 @@ ViewThemeSummary(themePath) {
     if (FileExist(summaryJson)) {
         global AppRoot
         psScript := AppRoot "\powershell\summary\ConvertSummaryToMarkdown.ps1"
-        cmd := 'powershell -ExecutionPolicy Bypass -File "' psScript '" -JsonPath "' summaryJson '"'
-        try {
-            RunWait(cmd, , "Hide")
-        } catch Error as err {
-            MsgBox("生成 Markdown 失败：" err.Message, "AIProcess", "Iconx")
-            return
-        }
+        errFile := themePath "\.aiprocess\_tmp\convert_error.txt"
+        DirCreate(themePath "\.aiprocess\_tmp")
+        cmd := Format('powershell -ExecutionPolicy Bypass -File "{}" -JsonPath "{}" > "{}" 2>&1', psScript, summaryJson, errFile)
+        RunWait(cmd, , "Hide")
         if (FileExist(summaryMd)) {
+            FileDelete(errFile)
             OpenFileInTool(summaryMd)
         } else {
-            MsgBox("Markdown 生成失败", "AIProcess", "Iconx")
+            errMsg := ""
+            if (FileExist(errFile)) {
+                errMsg := FileRead(errFile, "UTF-8")
+                FileDelete(errFile)
+            }
+            if (errMsg = "") {
+                errMsg := "未知错误"
+            }
+            MsgBox("Markdown 生成失败：" errMsg, "AIProcess", "Iconx")
         }
         return
     }
