@@ -31,6 +31,7 @@ global SummaryOpenReportBtn := ""
 global SummaryViewerStatusText := ""
 global SummaryViewerToggleButton := ""
 global SummaryViewerHtmlButton := ""
+global SummaryViewerRefreshButton := ""
 global SummaryViewerHttpServerPid := 0
 global SummaryViewerStatusPending := false
 global SummaryViewerLastRunning := false
@@ -67,7 +68,7 @@ CreateSummaryGui() {
     global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
     global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
     global SummaryGenerateReportBtn, SummaryOpenReportBtn
-    global SummaryViewerStatusText, SummaryViewerToggleButton, SummaryViewerHtmlButton
+    global SummaryViewerStatusText, SummaryViewerToggleButton, SummaryViewerHtmlButton, SummaryViewerRefreshButton
 
     SummaryGui := Gui("+Resize +MinSize920x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
@@ -141,6 +142,9 @@ CreateSummaryGui() {
     SummaryViewerStatusText.SetFont("c808080")
     SummaryViewerToggleButton := SummaryGui.Add("Button", "x+4 yp w70 h22", "启动服务")
     SummaryViewerToggleButton.OnEvent("Click", SummaryViewerToggleClick)
+
+    SummaryViewerRefreshButton := SummaryGui.Add("Button", "x+4 yp w80 h22", "刷新状态")
+    SummaryViewerRefreshButton.OnEvent("Click", SummaryViewerRefreshClick)
 
     ; ListView
     SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "总结状态", "目录状态"])
@@ -941,14 +945,19 @@ OnOpenReportWindowClick(*) {
 ; HTML 可视化总结
 ; ============================================================
 
-SummaryViewerToggleClick(*) {
-    global SummaryViewerHttpServerPid
+SummaryViewerRefreshClick(*) {
+    SummaryViewerRefreshButton.Text := "检测中…"
+    UpdateSummaryViewerStatus()
+}
 
-    port := GetSummaryViewerPort()
-    if (IsHttpServerRunning(port)) {
+SummaryViewerToggleClick(*) {
+    btnText := SummaryViewerToggleButton.Text
+    if (btnText = "关闭服务") {
+        SummaryViewerToggleButton.Text := "正在关闭…"
         StopHttpServer()
-    } else {
-        StartHttpServer(port)
+    } else if (btnText = "启动服务") {
+        SummaryViewerToggleButton.Text := "正在启动…"
+        StartHttpServer(GetSummaryViewerPort())
     }
 }
 
@@ -960,7 +969,19 @@ SummaryViewerHtmlClick(*) {
         return
     }
 
-    ViewThemeHtmlSummary(SummarySelectedThemePath)
+    SummaryViewerHtmlButton.Text := "正在打开…"
+    SetTimer(() => OpenHtmlSummary(SummarySelectedThemePath), -50)
+}
+
+OpenHtmlSummary(themePath) {
+    port := GetSummaryViewerPort()
+    if (!IsHttpServerRunning(port)) {
+        SummaryViewerHtmlButton.Text := "可视化总结"
+        MsgBox("请先点击「启动服务」启动 HTTP 服务。", "AIProcess", "Iconi")
+        return
+    }
+    ViewThemeHtmlSummary(themePath)
+    SummaryViewerHtmlButton.Text := "可视化总结"
 }
 
 GetSummaryViewerPort() {
@@ -969,15 +990,27 @@ GetSummaryViewerPort() {
 }
 
 IsHttpServerRunning(port) {
-    global AppRoot
+    global AppRoot, SummaryViewerHttpServerPid
+
+    LogInfo("HTTP: IsHttpServerRunning called, port=" port ", pid=" SummaryViewerHttpServerPid)
+
+    if (SummaryViewerHttpServerPid != 0 && ProcessExist(SummaryViewerHttpServerPid)) {
+        LogInfo("HTTP: cached PID still exists, returning true")
+        return true
+    }
+
     psScript := AppRoot "\powershell\summary\Test-HttpServerPort.ps1"
-    cmd := Format('powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -Port {}', psScript, port)
+    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -Port {}', psScript, port)
+    LogInfo("HTTP: running port test command: " cmd)
     exitCode := RunWait(cmd, , "Hide")
+    LogInfo("HTTP: Test-HttpServerPort exitCode=" exitCode)
     return (exitCode = 0)
 }
 
 StartHttpServer(port) {
     global AppRoot, SummaryViewerHttpServerPid
+
+    LogInfo("HTTP: StartHttpServer called, port=" port)
 
     projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
     if (projectRoot = "") {
@@ -985,35 +1018,57 @@ StartHttpServer(port) {
     }
 
     psScript := AppRoot "\powershell\summary\Start-HttpServer.ps1"
-    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{}" -Port {} -Root "{}"',
-                  psScript, port, projectRoot)
+    logFile := AppRoot "\logs\SummaryHttp_" FormatTime(, "yyyy-MM-dd") ".log"
+    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -Port {} -Root "{}" -LogFile "{}"',
+                  psScript, port, projectRoot, logFile)
+    LogInfo("HTTP: starting server command: " cmd)
 
     pid := Run(cmd, , "Hide")
     if (!pid) {
+        LogError("HTTP: Run returned empty PID")
         MsgBox("HTTP 服务启动失败", "AIProcess", "Iconx")
         return
     }
 
     SummaryViewerHttpServerPid := pid
+    LogInfo("HTTP: server process PID=" pid)
 
     ; 等待服务就绪
     Loop 20 {
         Sleep(100)
         if (IsHttpServerRunning(port)) {
+            LogInfo("HTTP: server is running, updating UI")
             UpdateSummaryViewerStatus()
             return
         }
     }
 
+    LogError("HTTP: server start timed out")
     MsgBox("HTTP 服务启动超时，请检查端口是否被占用。", "AIProcess", "Iconx")
 }
 
 StopHttpServer() {
-    global SummaryViewerHttpServerPid
+    global AppRoot, SummaryViewerHttpServerPid
 
-    if (SummaryViewerHttpServerPid != 0) {
-        ProcessClose(SummaryViewerHttpServerPid)
-        SummaryViewerHttpServerPid := 0
+    port := GetSummaryViewerPort()
+    LogInfo("HTTP: StopHttpServer called, port=" port ", pid=" SummaryViewerHttpServerPid)
+
+    psScript := AppRoot "\powershell\summary\Stop-HttpServer.ps1"
+    logFile := AppRoot "\logs\SummaryHttp_" FormatTime(, "yyyy-MM-dd") ".log"
+    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+    if (projectRoot = "") {
+        projectRoot := AppRoot
+    }
+    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -Port {} -Root "{}" -LogFile "{}"',
+                  psScript, port, projectRoot, logFile)
+    LogInfo("HTTP: running stop command: " cmd)
+    exitCode := RunWait(cmd, , "Hide")
+    LogInfo("HTTP: Stop-HttpServer exitCode=" exitCode)
+    SummaryViewerHttpServerPid := 0
+
+    if (exitCode != 0) {
+        LogError("HTTP: Stop-HttpServer failed")
+        MsgBox("关闭 HTTP 服务失败。", "AIProcess", "Iconx")
     }
 
     SetTimer(WaitForServerStopped, -100)
@@ -1021,13 +1076,16 @@ StopHttpServer() {
 
 WaitForServerStopped() {
     port := GetSummaryViewerPort()
+    LogInfo("HTTP: WaitForServerStopped started")
     Loop 30 {
         if (!IsHttpServerRunning(port)) {
+            LogInfo("HTTP: server confirmed stopped")
             UpdateSummaryViewerStatusUI(false, port)
             return
         }
         Sleep(100)
     }
+    LogWarn("HTTP: WaitForServerStopped timed out, forcing UI to stopped")
     UpdateSummaryViewerStatusUI(false, port)
 }
 
@@ -1049,9 +1107,10 @@ CheckHttpServerStatus() {
 }
 
 UpdateSummaryViewerStatusUI(running, port, force := false) {
-    global SummaryViewerStatusText, SummaryViewerToggleButton, SummaryViewerLastRunning
+    global SummaryViewerStatusText, SummaryViewerToggleButton, SummaryViewerRefreshButton, SummaryViewerLastRunning
 
     if (!force && running == SummaryViewerLastRunning) {
+        SummaryViewerRefreshButton.Text := "刷新状态"
         return
     }
     SummaryViewerLastRunning := running
@@ -1065,10 +1124,13 @@ UpdateSummaryViewerStatusUI(running, port, force := false) {
         SummaryViewerStatusText.SetFont("c808080")
         SummaryViewerToggleButton.Text := "启动服务"
     }
+    SummaryViewerRefreshButton.Text := "刷新状态"
 }
 
 ViewThemeHtmlSummary(themePath) {
     global AppRoot
+
+    LogInfo("HTTP: ViewThemeHtmlSummary called, themePath=" themePath)
 
     if (themePath = "") {
         MsgBox("当前主题路径为空", "AIProcess", "Iconx")
@@ -1097,23 +1159,33 @@ ViewThemeHtmlSummary(themePath) {
         projectRoot := AppRoot
     }
 
-    jsonRelativePath := StrReplace(summaryJson, projectRoot, "")
-    jsonRelativePath := StrReplace(jsonRelativePath, "\", "/")
-    if (SubStr(jsonRelativePath, 1, 1) != "/") {
-        jsonRelativePath := "/" jsonRelativePath
+    psScript := AppRoot "\powershell\summary\Get-SummaryViewerUrl.ps1"
+    tempFile := A_Temp "\aiprocess_url_" A_TickCount ".txt"
+    logFile := AppRoot "\logs\SummaryHttp_" FormatTime(, "yyyy-MM-dd") ".log"
+    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -ThemePath "{}" -ProjectRoot "{}" -Port {} -OutputFile "{}" -LogFile "{}"',
+                  psScript, themePath, projectRoot, port, tempFile, logFile)
+    LogInfo("HTTP: running URL build command: " cmd)
+
+    url := ""
+    try {
+        exitCode := RunWait(cmd, , "Hide")
+        if (FileExist(tempFile)) {
+            url := Trim(FileRead(tempFile, "UTF-8"), "`r`n")
+        }
+        LogInfo("HTTP: Get-SummaryViewerUrl exitCode=" exitCode ", url=" url)
+        if (exitCode != 0 || url = "") {
+            LogError("HTTP: Get-SummaryViewerUrl failed or returned empty")
+            MsgBox("构造可视化总结 URL 失败。", "AIProcess", "Iconx")
+            return
+        }
+        Run(url)
+    } catch as err {
+        LogError("HTTP: ViewThemeHtmlSummary exception: " err.Message)
+        MsgBox("构造可视化总结 URL 时出错。", "AIProcess", "Iconx")
+    } finally {
+        if (FileExist(tempFile)) {
+            FileDelete(tempFile)
+        }
     }
-
-    encodedPath := UrlEncode(jsonRelativePath)
-    url := Format("http://127.0.0.1:{}/summary-viewer/index.html?json={}", port, encodedPath)
-    Run(url)
-}
-
-UrlEncode(str) {
-    global AppRoot
-    psScript := AppRoot "\powershell\summary\ConvertTo-UrlEncoded.ps1"
-    shell := ComObject("WScript.Shell")
-    cmd := Format('powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{}" -Text "{}"', psScript, str)
-    exec := shell.Exec(cmd)
-    return Trim(exec.StdOut.ReadAll(), "`r`n")
 }
 

@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 
 <#
 .SYNOPSIS
@@ -10,8 +10,17 @@ param(
     [int]$Port,
 
     [Parameter(Mandatory = $true)]
-    [string]$Root
+    [string]$Root,
+
+    [string]$LogFile = ""
 )
+
+function Write-Log($msg) {
+    if ($LogFile) {
+        $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [START] $msg"
+        Add-Content -Path $LogFile -Value $line -ErrorAction SilentlyContinue
+    }
+}
 
 $ErrorActionPreference = "Stop"
 
@@ -43,47 +52,60 @@ function Get-MimeType {
     return 'application/octet-stream'
 }
 
-$Root = Resolve-Path $Root | Select-Object -ExpandProperty Path
-$listener = New-Object System.Net.HttpListener
-$prefix = "http://127.0.0.1:$Port/"
-$listener.Prefixes.Add($prefix)
-$listener.Start()
-
-# 向标准输出写入一行，便于 AHK 判断启动成功
-Write-Host "HTTP server started at $prefix"
-
 try {
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $request = $context.Request
-        $response = $context.Response
+    $Root = Resolve-Path $Root | Select-Object -ExpandProperty Path
+    $listener = New-Object System.Net.HttpListener
+    $prefix = "http://127.0.0.1:$Port/"
+    $listener.Prefixes.Add($prefix)
+    $listener.Start()
 
-        $localPath = [System.Web.HttpUtility]::UrlDecode($request.Url.LocalPath)
-        # 去掉前导斜杠
-        $relativePath = $localPath.TrimStart('/').Replace('/', '\')
-        $fullPath = Join-Path $Root $relativePath
+    # 写入 PID 文件，便于后续关闭
+    $pidFile = Join-Path $Root 'app\logs\SummaryHttpServer.pid'
+    $pid | Out-File -FilePath $pidFile -Encoding utf8 -Force
+    Write-Log "HTTP server started at $prefix, PID=$pid, pidFile=$pidFile"
 
-        try {
-            if (Test-Path $fullPath -PathType Leaf) {
-                $bytes = [System.IO.File]::ReadAllBytes($fullPath)
-                $response.ContentType = Get-MimeType -Path $fullPath
-                $response.ContentLength64 = $bytes.Length
-                $response.OutputStream.Write($bytes, 0, $bytes.Length)
-            } else {
-                $response.StatusCode = 404
-                $msg = [System.Text.Encoding]::UTF8.GetBytes("Not Found: $localPath")
+    # 向标准输出写入一行，便于 AHK 判断启动成功
+    Write-Host "HTTP server started at $prefix"
+
+    try {
+        while ($listener.IsListening) {
+            $context = $listener.GetContext()
+            $request = $context.Request
+            $response = $context.Response
+
+            $localPath = [System.Web.HttpUtility]::UrlDecode($request.Url.LocalPath)
+            # 去掉前导斜杠
+            $relativePath = $localPath.TrimStart('/').Replace('/', '\')
+            $fullPath = Join-Path $Root $relativePath
+
+            try {
+                if (Test-Path $fullPath -PathType Leaf) {
+                    $bytes = [System.IO.File]::ReadAllBytes($fullPath)
+                    $response.ContentType = Get-MimeType -Path $fullPath
+                    $response.ContentLength64 = $bytes.Length
+                    $response.OutputStream.Write($bytes, 0, $bytes.Length)
+                } else {
+                    $response.StatusCode = 404
+                    $msg = [System.Text.Encoding]::UTF8.GetBytes("Not Found: $localPath")
+                    $response.ContentLength64 = $msg.Length
+                    $response.OutputStream.Write($msg, 0, $msg.Length)
+                }
+            } catch {
+                $response.StatusCode = 500
+                $msg = [System.Text.Encoding]::UTF8.GetBytes("Internal Server Error: $_")
                 $response.ContentLength64 = $msg.Length
                 $response.OutputStream.Write($msg, 0, $msg.Length)
+            } finally {
+                $response.OutputStream.Close()
             }
-        } catch {
-            $response.StatusCode = 500
-            $msg = [System.Text.Encoding]::UTF8.GetBytes("Internal Server Error: $_")
-            $response.ContentLength64 = $msg.Length
-            $response.OutputStream.Write($msg, 0, $msg.Length)
-        } finally {
-            $response.OutputStream.Close()
+        }
+    } finally {
+        $listener.Stop()
+        if (Test-Path $pidFile) {
+            Remove-Item $pidFile -ErrorAction SilentlyContinue
         }
     }
-} finally {
-    $listener.Stop()
+} catch {
+    Write-Log "ERROR: $_"
+    throw
 }
