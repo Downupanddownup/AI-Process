@@ -1,0 +1,15 @@
+﻿实施确认
+
+实施确认的时间是可以计算的。你找到用户输入文件，然后再结合实施文档，不就能算出它的实施时间了吗？
+
+C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_input.json
+C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_input_guide.md
+C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_prompt_20260705224723749.txt
+C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_rules.md
+C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_template.json
+C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\Summary.json
+
+这是我刚才测试用的一个例子。我发现你提供的文件其实有很多遗漏，具体情况如下：
+
+1. 结果微调：这里有一个遗漏。
+2. 资助题：目前还没测，但我怀疑也是一个遗漏。

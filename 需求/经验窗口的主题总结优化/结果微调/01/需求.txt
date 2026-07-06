@@ -1,0 +1,9 @@
+﻿C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_prompt_20260705223528188.txt
+
+4. 主题素材：C:\NotSystem\ClaudeCodeTool\AIProcess\需求\周报时间\.aiprocess\_tmp\summary_input.json
+
+看一下这个目录。这是我刚才针对周报时间做的一次总结生成，然后我发现你生成的文件好像不完整。
+
+基础输入文件好像没有，我没看到那个文件，好像是不存在的，是不是生成脚本出问题了？
+
+这个 sum_input.json 文件我没看到。

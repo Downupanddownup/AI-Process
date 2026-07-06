@@ -16,11 +16,10 @@ CollectSummaryData(themePath) {
         DirCreate(tmpDir)
     }
 
-    timestamp := A_Now . A_MSec
-    outputFile := tmpDir "\summary_data_" timestamp ".json"
-    errFile := tmpDir "\summary_data_err_" timestamp ".txt"
+    outputFile := tmpDir "\summary_input.json"
+    errFile := tmpDir "\summary_input_err.txt"
 
-    psScript := AppRoot "\powershell\summary\PrepareSummaryData.ps1"
+    psScript := AppRoot "\powershell\summary\PrepareSummaryInput.ps1"
     cmd := 'powershell -ExecutionPolicy Bypass -File "' psScript '" -ThemePath "' themePath '" -OutputFile "' outputFile '" -ErrorFile "' errFile '"'
 
     try {
@@ -63,14 +62,8 @@ CollectSummaryData(themePath) {
             content := SubStr(content, 2)
         }
         data := JSON.Load(content)
-        FileDelete(outputFile)
         return data
     } catch Error as err {
-        try {
-            FileDelete(outputFile)
-        } catch {
-            ; 忽略删除失败
-        }
         return Map("Error", "解析数据失败：" err.Message)
     }
 }
