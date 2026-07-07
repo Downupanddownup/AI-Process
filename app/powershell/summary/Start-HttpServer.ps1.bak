@@ -76,24 +76,7 @@ try {
             $localPath = [System.Web.HttpUtility]::UrlDecode($request.Url.LocalPath)
             # 去掉前导斜杠
             $relativePath = $localPath.TrimStart('/').Replace('/', '\')
-
-            # 支持 Windows 绝对路径（如 /D:/...）
-            if ($relativePath -match '^[A-Za-z]:\\') {
-                $fullPath = $relativePath
-
-                # 本地服务安全白名单：绝对路径只允许访问 .aiprocess\Summary.json
-                $normalizedPath = [System.IO.Path]::GetFullPath($fullPath)
-                if (-not ($normalizedPath -like '*\.aiprocess\Summary.json')) {
-                    $response.StatusCode = 403
-                    $msg = [System.Text.Encoding]::UTF8.GetBytes("Forbidden: only .aiprocess\Summary.json allowed")
-                    $response.ContentLength64 = $msg.Length
-                    $response.OutputStream.Write($msg, 0, $msg.Length)
-                    $response.OutputStream.Close()
-                    continue
-                }
-            } else {
-                $fullPath = Join-Path $Root $relativePath
-            }
+            $fullPath = Join-Path $Root $relativePath
 
             try {
                 if (Test-Path $fullPath -PathType Leaf) {
