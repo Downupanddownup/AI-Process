@@ -267,3 +267,296 @@ body {
   font-size: 13px;
   padding: 12px 0;
 }
+
+/* 关键指标行 */
+.key-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.key-metric-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 12px;
+  text-align: center;
+  position: relative;
+}
+
+.key-metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  background: #1890ff;
+  border-radius: 0 0 4px 4px;
+}
+
+.key-metric-card .label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+.key-metric-card .value {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.key-metric-card .unit {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+/* 总时长卡片允许内容换行 */
+.key-metric-card:nth-child(2) .value {
+  font-size: 26px;
+  white-space: pre-line;
+}
+
+/* 时间线整体布局 */
+.timeline-layout {
+  display: flex;
+  gap: 20px;
+  padding: 0;
+}
+
+.timeline-layout > h2 {
+  display: none;
+}
+
+#timeline-nav {
+  width: 180px;
+  flex-shrink: 0;
+  background: #fafafa;
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+#timeline-content {
+  flex: 1;
+  padding: 20px;
+  min-height: 400px;
+  max-height: 700px;
+  overflow-y: auto;
+}
+
+/* 树形导航 */
+.timeline-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+.timeline-tree li {
+  margin: 4px 0;
+}
+
+.timeline-tree .node {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.timeline-tree .node:hover {
+  background: #e6f7ff;
+}
+
+.timeline-tree .node.active {
+  background: #1890ff;
+  color: #fff;
+}
+
+.timeline-tree .children {
+  list-style: none;
+  margin: 0;
+  padding-left: 20px;
+}
+
+/* 聊天式时间线 */
+.chat-timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.chat-timeline-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.chat-timeline-header .round-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.chat-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.chat-round {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-round-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
+  flex-wrap: wrap;
+}
+
+.chat-round-header .round-index {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chat-round-header .category-badge {
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.chat-message {
+  display: flex;
+  gap: 12px;
+  max-width: 85%;
+}
+
+.chat-message.human {
+  align-self: flex-start;
+}
+
+.chat-message.ai {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  background: #f0f0f0;
+  color: var(--text-secondary);
+}
+
+.chat-message.human .chat-avatar {
+  background: #1890ff;
+  color: #fff;
+}
+
+.chat-bubble {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  background: #f5f5f5;
+  word-break: break-word;
+}
+
+.chat-message.human .chat-bubble {
+  background: #e6f7ff;
+}
+
+.chat-bubble.collapsed {
+  max-height: 72px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.chat-bubble.collapsed::after {
+  content: '...展开';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(to right, transparent, #e6f7ff 30%);
+  padding-left: 20px;
+  color: #1890ff;
+  font-size: 12px;
+}
+
+.chat-message.ai .chat-bubble.collapsed::after {
+  background: linear-gradient(to right, transparent, #f5f5f5 30%);
+}
+
+/* 成本拆分图表布局 */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.breakdown-chart {
+  height: 260px;
+}
+
+/* 饼图整行 */
+#chart-rounds {
+  height: 320px;
+}
+
+/* 响应式：小屏幕堆叠 */
+@media (max-width: 900px) {
+  .key-metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .breakdown-grid,
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+  .timeline-layout {
+    flex-direction: column;
+  }
+  #timeline-nav {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+/* 纠偏失控分析分组 */
+.analysis-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analysis-group-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-left: 4px solid #1890ff;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}

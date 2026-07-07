@@ -13,101 +13,87 @@
 
   window.renderTimeline = function (data) {
     const container = document.getElementById('timeline');
-    if (!container) return;
+    const nav = document.getElementById('timeline-nav');
+    const content = document.getElementById('timeline-content');
+    if (!container || !nav || !content) return;
 
-    const rounds = collectRounds(data);
-    const phases = data.rounds?.phases || [];
+    const units = collectUnits(data);
 
-    container.innerHTML = `
-      <h2>阶段与轮次</h2>
-      ${renderPhasesBar(phases, data.rounds?.items || [])}
-      ${renderRoundsTable(rounds)}
-    `;
+    renderTree(nav, units, (selected) => {
+      if (typeof window.renderChatTimeline === 'function') {
+        window.renderChatTimeline(content, selected.rounds, { colorMap, title: selected.name });
+      } else {
+        content.innerHTML = '<div class="error">时间线渲染模块未加载</div>';
+      }
+    });
+
+    // 默认选中主讨论
+    const defaultUnit = units.find(u => u.id === 'main') || units[0];
+    if (defaultUnit && typeof window.renderChatTimeline === 'function') {
+      window.renderChatTimeline(content, defaultUnit.rounds, { colorMap, title: defaultUnit.name });
+    }
   };
 
-  function collectRounds(data) {
-    const list = [];
-
-    (data.rounds?.items || []).forEach(r => {
-      list.push({ ...r, source: '根目录' });
-    });
-
-    (data.resultFineTunings || []).forEach(unit => {
-      const source = '结果微调/' + unit.name;
-      (unit.rounds?.items || []).forEach(r => {
-        list.push({ ...r, source: source });
-      });
-    });
-
-    (data.subThemes || []).forEach(unit => {
-      const source = '子主题/' + unit.name;
-      (unit.rounds?.items || []).forEach(r => {
-        list.push({ ...r, source: source });
-      });
-    });
-
-    return list;
-  }
-
-  function getPhaseColor(phase, rootRounds) {
-    const indexes = phase.roundIndexes || [];
-    for (const idx of indexes) {
-      const round = rootRounds.find(r => r.roundIndex === idx);
-      if (round && round.category && colorMap[round.category]) {
-        return colorMap[round.category];
-      }
+  function collectUnits(data) {
+    const units = [];
+    if (data.rounds?.items?.length) {
+      units.push({ id: 'main', name: '主讨论', rounds: data.rounds.items });
     }
-    return '#999';
+    (data.resultFineTunings || []).forEach((unit, idx) => {
+      if (unit.rounds?.items?.length) {
+        units.push({ id: 'rf-' + idx, name: '结果微调/' + unit.name, rounds: unit.rounds.items, parent: 'resultFineTunings' });
+      }
+    });
+    (data.subThemes || []).forEach((unit, idx) => {
+      if (unit.rounds?.items?.length) {
+        units.push({ id: 'st-' + idx, name: '子主题/' + unit.name, rounds: unit.rounds.items, parent: 'subThemes' });
+      }
+    });
+    return units;
   }
 
-  function renderPhasesBar(phases, rootRounds) {
-    if (!phases.length) return '';
+  function renderTree(nav, units, onSelect) {
+    const groups = {
+      main: { name: '主讨论', children: [] },
+      resultFineTunings: { name: '结果微调', children: [] },
+      subThemes: { name: '子主题', children: [] }
+    };
 
-    const items = phases.map(p => {
-      const indexes = p.roundIndexes || [];
-      const firstRound = indexes[0];
-      const label = indexes.length > 1 ? `R${firstRound}~R${indexes[indexes.length - 1]}` : `R${firstRound}`;
-      const color = getPhaseColor(p, rootRounds);
-      return `<div class="phase-item" style="background:${color}" data-summary="${escapeHtml(p.summary || '')}" title="${escapeHtml(p.summary || '')}">${escapeHtml(p.name)} (${label})</div>`;
-    }).join('');
+    units.forEach(u => {
+      if (u.id === 'main') {
+        groups.main.children.push(u);
+      } else if (u.parent === 'resultFineTunings') {
+        groups.resultFineTunings.children.push(u);
+      } else {
+        groups.subThemes.children.push(u);
+      }
+    });
 
-    return `<div class="phases-bar">${items}</div>`;
-  }
+    let html = '<ul class="timeline-tree">';
+    Object.values(groups).forEach(group => {
+      if (!group.children.length) return;
+      html += `<li><div class="node group-node">${escapeHtml(group.name)}</div><ul class="children">`;
+      group.children.forEach(u => {
+        html += `<li><div class="node leaf-node" data-id="${escapeHtml(u.id)}">${escapeHtml(u.name)}</div></li>`;
+      });
+      html += '</ul></li>';
+    });
+    html += '</ul>';
 
-  function renderRoundsTable(rounds) {
-    if (!rounds.length) return '<p>无轮次数据</p>';
+    nav.innerHTML = html;
 
-    const rows = rounds.map(r => {
-      const category = r.category || '未知';
-      const color = colorMap[category] || '#999';
-      const duration = r.duration?.display || (r.durationMinutes ? r.durationMinutes + '分钟' : '-');
-      return `
-        <tr>
-          <td>R${r.roundIndex}</td>
-          <td><span class="category-badge" style="background:${color}">${escapeHtml(category)}</span></td>
-          <td>${escapeHtml(duration)}</td>
-          <td class="round-summary">${escapeHtml(r.humanSummary || '')}</td>
-          <td class="round-summary">${escapeHtml(r.aiSummary || '')}</td>
-          <td class="source-cell">${escapeHtml(r.source)}</td>
-        </tr>
-      `;
-    }).join('');
+    const leafNodes = nav.querySelectorAll('.leaf-node');
+    leafNodes.forEach(node => {
+      node.addEventListener('click', () => {
+        leafNodes.forEach(n => n.classList.remove('active'));
+        node.classList.add('active');
+        const id = node.getAttribute('data-id');
+        const unit = units.find(u => u.id === id);
+        if (unit) onSelect(unit);
+      });
+    });
 
-    return `
-      <table class="rounds-table">
-        <thead>
-          <tr>
-            <th>轮次</th>
-            <th>类型</th>
-            <th>耗时</th>
-            <th>用户输入摘要</th>
-            <th>AI 回复摘要</th>
-            <th>来源</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+    if (leafNodes.length) leafNodes[0].classList.add('active');
   }
 
   function escapeHtml(text) {

@@ -15,9 +15,14 @@
 
     <main id="content">
       <section id="overview" class="card"></section>
+      <section id="key-metrics" class="card"></section>
+      <section id="pie-chart" class="card"></section>
       <section id="metrics" class="card"></section>
       <section id="breakdown" class="card"></section>
-      <section id="timeline" class="card"></section>
+      <section id="timeline" class="card timeline-layout">
+        <aside id="timeline-nav"></aside>
+        <div id="timeline-content"></div>
+      </section>
       <section id="analysis" class="card"></section>
     </main>
   </div>
@@ -26,6 +31,7 @@
   <script src="lib/marked.min.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/timeline.js"></script>
+  <script src="js/timeline-chat.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
