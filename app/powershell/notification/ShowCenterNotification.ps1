@@ -7,8 +7,15 @@
     支持 -WindowId 参数显示窗口编号，无参数时显示默认"已完成"文本。
     不抢焦点、不中断输入、无声音，3 秒后自动淡出消失。
 
+    可靠性设计：
+    - 启动清场：杀掉同脚本旧实例，保证单实例（停旧播新），顺带清理卡死僵尸。
+    - 兜底超时：独立线程看门狗 10 秒强制结束进程，Dispatcher 卡死也能触发。
+    - 错误处理：Stop 模式 + try/catch/finally，任何异常都保证进程退出并留日志。
+    - 点击穿透：WS_EX_TRANSPARENT，极端情况下窗口卡住也不拦截鼠标。
+    - 预编译缓存：C# 编译为 DLL 缓存复用，源码变更自动重编译，失败降级现场编译。
+
 .PARAMETER WindowId
-    窗口编号，1 或 2。可选。
+    窗口编号，1 或 2 或 3。可选。
 #>
 
 param(
@@ -17,11 +24,62 @@ param(
     [string]$WindowId = ""
 )
 
+$ErrorActionPreference = "Stop"
+
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+$activityLogScript = Join-Path $scriptDirectory "..\activity\WriteActivityLog.ps1"
 
-Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+# 写操作日志（失败静默忽略，日志不能反过来影响通知）
+function Write-NotificationLog {
+    param(
+        [Parameter(Mandatory = $true)][string]$Action,
+        [Parameter(Mandatory = $false)][string]$Detail = ""
+    )
+    try {
+        if (-not (Test-Path $activityLogScript)) { return }
+        if ([string]::IsNullOrWhiteSpace($Detail)) {
+            & powershell -ExecutionPolicy Bypass -File "$activityLogScript" -WindowId $WindowId -Action $Action
+        } else {
+            $detailFile = Join-Path $env:TEMP ("aiprocess_notify_detail_" + [guid]::NewGuid().ToString("N") + ".txt")
+            [System.IO.File]::WriteAllText($detailFile, $Detail, [System.Text.Encoding]::UTF8)
+            & powershell -ExecutionPolicy Bypass -File "$activityLogScript" -WindowId $WindowId -Action $Action -ContentFile "$detailFile"
+        }
+    } catch {
+        # 静默忽略
+    }
+}
 
-$csharpCode = @"
+# 启动清场：结束同脚本的旧实例（含卡死僵尸），保证单实例
+function Clear-OldNotificationInstances {
+    $killed = 0
+    try {
+        $oldProcesses = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+            Where-Object { $_.ProcessId -ne $PID -and
+                           $_.CommandLine -and
+                           $_.CommandLine.Contains('ShowCenterNotification.ps1') }
+        foreach ($proc in $oldProcesses) {
+            try {
+                Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
+                $killed++
+            } catch {
+                # 单个进程结束失败不影响其他
+            }
+        }
+    } catch {
+        # 查询失败不阻塞本次通知
+    }
+    if ($killed -gt 0) {
+        Write-NotificationLog -Action "通知清场" -Detail "结束旧实例 $killed 个"
+    }
+}
+
+try {
+    Clear-OldNotificationInstances
+    Write-NotificationLog -Action "通知开始"
+
+    Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+
+    $csharpCode = @"
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -41,8 +99,11 @@ public class NotificationWindow : Window {
 
     const int GWL_EXSTYLE = -20;
     const int WS_EX_NOACTIVATE = 0x08000000;
+    const int WS_EX_TRANSPARENT = 0x00000020;
 
     private string windowNumber;
+    // 独立线程看门狗：Dispatcher 卡死时也能触发，强制结束进程
+    private System.Threading.Timer watchdog;
 
     public NotificationWindow(string windowNumber) {
         this.windowNumber = windowNumber;
@@ -65,11 +126,17 @@ public class NotificationWindow : Window {
         SourceInitialized += OnSourceInitialized;
         ContentRendered += (s, e) => StartAnimations();
         BuildUI();
+
+        // 兜底超时 10 秒（正常生命周期约 3.8 秒），到时进程必死
+        watchdog = new System.Threading.Timer(
+            _ => Environment.Exit(0),
+            null, 10000, System.Threading.Timeout.Infinite);
     }
 
     private void OnSourceInitialized(object sender, EventArgs e) {
         IntPtr hwnd = new WindowInteropHelper(this).Handle;
-        SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_NOACTIVATE);
+        // WS_EX_TRANSPARENT：点击穿透，窗口即使卡住也不拦截鼠标
+        SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT);
     }
 
     private void BuildUI() {
@@ -263,14 +330,51 @@ public class NotificationWindow : Window {
 }
 "@
 
-Add-Type -TypeDefinition $csharpCode -ReferencedAssemblies PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+    # 预编译缓存：按源码哈希缓存 DLL，命中则直接加载，失败降级现场编译
+    $cacheDir = Join-Path $scriptDirectory ".cache"
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $hashBytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($csharpCode))
+    $hashPrefix = ([BitConverter]::ToString($hashBytes)).Replace("-", "").Substring(0, 8)
+    $cachedDll = Join-Path $cacheDir "NotificationWindow_$hashPrefix.dll"
 
-$window = New-Object NotificationWindow $WindowId
-$window.Show()
-[System.Windows.Threading.Dispatcher]::Run()
+    $typeLoaded = $false
+    if (Test-Path $cachedDll) {
+        try {
+            Add-Type -Path $cachedDll
+            $typeLoaded = $true
+        } catch {
+            # 缓存加载失败，降级为重新编译
+            $typeLoaded = $false
+        }
+    }
+    if (-not $typeLoaded) {
+        $compiledToCache = $false
+        try {
+            if (-not (Test-Path $cacheDir)) {
+                New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+            }
+            # -OutputAssembly 只负责编译落盘，不加载进会话，需再加载一次
+            Add-Type -TypeDefinition $csharpCode -OutputAssembly $cachedDll `
+                -ReferencedAssemblies PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+            Add-Type -Path $cachedDll
+            $compiledToCache = $true
+        } catch {
+            # 写缓存失败，降级为纯内存现场编译
+            $compiledToCache = $false
+        }
+        if (-not $compiledToCache) {
+            Add-Type -TypeDefinition $csharpCode `
+                -ReferencedAssemblies PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+        }
+    }
 
-# 通知显示完成后，写入操作日志
-$activityLogScript = Join-Path $scriptDirectory "..\activity\WriteActivityLog.ps1"
-if (Test-Path $activityLogScript) {
-    & powershell -ExecutionPolicy Bypass -File "$activityLogScript" -WindowId $WindowId -Action "完成通知"
+    $window = New-Object NotificationWindow $WindowId
+    $window.Show()
+    [System.Windows.Threading.Dispatcher]::Run()
+
+    # 通知显示完成后，写入操作日志
+    Write-NotificationLog -Action "完成通知"
+} catch {
+    Write-NotificationLog -Action "通知异常" -Detail $_.Exception.Message
+    exit 1
 }
