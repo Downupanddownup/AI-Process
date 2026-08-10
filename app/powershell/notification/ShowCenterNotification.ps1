@@ -301,24 +301,27 @@ public class NotificationWindow : Window {
     }
 
     private void StartBreathing(UIElement element) {
-        var animation = new DoubleAnimation {
-            From = 0.5,
-            To = 1.0,
-            Duration = new Duration(TimeSpan.FromMilliseconds(800)),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever
+        // 脉冲式呼吸：快速转换（100ms）+ 到位停留（250ms），避免平滑往复的拖沓感
+        var animation = new DoubleAnimationUsingKeyFrames {
+            RepeatBehavior = RepeatBehavior.Forever,
+            Duration = new Duration(TimeSpan.FromMilliseconds(700))
         };
+        animation.KeyFrames.Add(new LinearDoubleKeyFrame(0.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(0))));
+        animation.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100))));
+        animation.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(350))));
+        animation.KeyFrames.Add(new LinearDoubleKeyFrame(0.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(450))));
+        animation.KeyFrames.Add(new LinearDoubleKeyFrame(0.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(700))));
         element.BeginAnimation(UIElement.OpacityProperty, animation);
     }
 
     private void StartAnimations() {
-        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300));
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150));
         BeginAnimation(UIElement.OpacityProperty, fadeIn);
 
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         timer.Tick += (s, ev) => {
             timer.Stop();
-            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(500));
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(250));
             fadeOut.Completed += (s2, ev2) => {
                 Close();
                 Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
