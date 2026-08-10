@@ -44,3 +44,5 @@ Desktop.ini
 /app/reports/
 /reports/
 /app/config/filetools.json
+/app/powershell/notification/.cache/
+/需求/
