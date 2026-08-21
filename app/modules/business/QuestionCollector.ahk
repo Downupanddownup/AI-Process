@@ -3,6 +3,7 @@
 ; 提问采集：从 vN.md 提取问题主干，供"建回复"使用
 
 QUESTION_AREA_MARKER := "待确认问题区"
+QUESTION_AREA_PATTERN := "^\s*#{0,4}\s*[0-9一二三四五六七八九十a-zA-Z]{0,4}\s*[、.．]?\s*" QUESTION_AREA_MARKER
 REPLY_SEPARATOR := "`r`n`r`n`r`n`r`n`r`n"
 
 
@@ -15,11 +16,11 @@ ExtractQuestionsFromMd(mdPath) {
     content := FileRead(mdPath, "UTF-8")
     lines := StrSplit(content, "`n", "`r")
 
-    ; 优先在"待确认问题区"块内提取
+    ; 优先在"待确认问题区"块内提取（行首锚定，避免正文误匹配）
     begin := 1
     end := lines.Length
     Loop lines.Length {
-        if InStr(lines[A_Index], QUESTION_AREA_MARKER) {
+        if RegExMatch(lines[A_Index], QUESTION_AREA_PATTERN) {
             begin := A_Index + 1
             ; 区块结束于下一个 md 标题行
             Loop lines.Length - begin + 1 {
