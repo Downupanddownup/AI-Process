@@ -16,29 +16,50 @@ ExtractQuestionsFromMd(mdPath) {
     content := FileRead(mdPath, "UTF-8")
     lines := StrSplit(content, "`n", "`r")
 
-    ; 优先在"待确认问题区"块内提取（行首锚定，避免正文误匹配）
-    begin := 1
-    end := lines.Length
+    ; 单遍扫描 + 围栏感知：``` / ~~~ 围栏内的行不参与任何解析
+    inFence := false
+    inArea := false
     Loop lines.Length {
-        if RegExMatch(lines[A_Index], QUESTION_AREA_PATTERN) {
-            begin := A_Index + 1
-            ; 区块结束于下一个 md 标题行
-            Loop lines.Length - begin + 1 {
-                idx := begin + A_Index - 1
-                if RegExMatch(lines[idx], "^#+\s") {
-                    end := idx - 1
-                    break
-                }
+        line := lines[A_Index]
+        if RegExMatch(line, "^[``~]{3,}") {
+            inFence := !inFence
+            continue
+        }
+        if inFence {
+            continue
+        }
+        if !inArea {
+            ; 行首锚定定位问题区起点
+            if RegExMatch(line, QUESTION_AREA_PATTERN) {
+                inArea := true
             }
+            continue
+        }
+        ; 问题区内：遇到标题行即结束
+        if RegExMatch(line, "^#+\s") {
             break
+        }
+        if RegExMatch(line, "^Q\d+(?:[（(][^）)]*[）)])?\s*[：:]", &m) {
+            questions.Push(Trim(line))
         }
     }
 
-    ; 未找到区块 → 退化全文扫描（兼容旧格式文档）
-    Loop end - begin + 1 {
-        line := lines[begin + A_Index - 1]
-        if RegExMatch(line, "^Q\d+(?:[（(][^）)]*[）)])?\s*[：:]", &m) {
-            questions.Push(Trim(line))
+    ; 未找到问题区 → 退化全文扫描（兼容旧格式文档）
+    if !inArea {
+        questions := []
+        inFence := false
+        Loop lines.Length {
+            line := lines[A_Index]
+            if RegExMatch(line, "^[``~]{3,}") {
+                inFence := !inFence
+                continue
+            }
+            if inFence {
+                continue
+            }
+            if RegExMatch(line, "^Q\d+(?:[（(][^）)]*[）)])?\s*[：:]", &m) {
+                questions.Push(Trim(line))
+            }
         }
     }
     return questions
