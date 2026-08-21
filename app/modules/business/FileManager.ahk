@@ -224,7 +224,15 @@ CreateReplyFile(*) {
     replyPath := currentDir "\对v" latestVersion "的回复.txt"
     existed := FileExist(replyPath)
     if !existed {
-        FileAppend("", replyPath, "UTF-8")
+        content := ""
+        if GetSession(GetActiveWindowId(), "AppendQuestionTemplate") {
+            mdPath := currentDir "\v" latestVersion ".md"
+            questions := ExtractQuestionsFromMd(mdPath)
+            if (questions.Length > 0) {
+                content := BuildReplyText(questions)
+            }
+        }
+        FileAppend(content, replyPath, "UTF-8")
         ShowFeedback("已创建：" ExtractFileName(replyPath))
     } else {
         ShowFeedback("文件已存在：" ExtractFileName(replyPath), true)

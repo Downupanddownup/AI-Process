@@ -118,6 +118,24 @@ AppendQuestionRulesIfNeeded(content) {
 
 
 
+AppendQuestionTemplateIfNeeded(content) {
+    global TemplateDir
+    if !GetSession(GetActiveWindowId(), "AppendQuestionTemplate") {
+        return content
+    }
+
+    templatePath := TemplateDir "\question_format.txt"
+    if !FileExist(templatePath) {
+        return content
+    }
+
+    hint := "如需提问，请参照提问模板：" templatePath
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n`r`n" hint
+}
+
+
+
 AppendExecuteNotificationIfNeeded(content) {
     global AppConfig, TemplateDir
     if (!GetSession(GetActiveWindowId(), "ShowExecuteNotification")) {
@@ -171,6 +189,7 @@ CopyRequirementPrompt(*) {
     content := StrReplace(content, "{{filePath}}", currentDir "\需求.txt")
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendQuestionRulesIfNeeded(content)
+    content := AppendQuestionTemplateIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
     LogActivity("复需求", content)
@@ -201,6 +220,7 @@ CopyReplyPrompt(*) {
     content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
     content := AppendReplyImplementationTailIfNeeded(content)
     content := AppendNoModifyPromptIfNeeded(content)
+    content := AppendQuestionTemplateIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
 
     properties := Map()

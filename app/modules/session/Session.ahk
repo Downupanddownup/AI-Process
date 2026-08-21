@@ -19,6 +19,7 @@ global WindowSessions := Map(
         "AppendNoModifyPrompt", true,
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
+        "AppendQuestionTemplate", true,
         "ExecuteStrategy", "ai_judge",
         "ShowExecuteNotification", false
     ),
@@ -34,6 +35,7 @@ global WindowSessions := Map(
         "AppendNoModifyPrompt", true,
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
+        "AppendQuestionTemplate", true,
         "ExecuteStrategy", "ai_judge",
         "ShowExecuteNotification", false
     ),
@@ -49,6 +51,7 @@ global WindowSessions := Map(
         "AppendNoModifyPrompt", true,
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
+        "AppendQuestionTemplate", true,
         "ExecuteStrategy", "ai_judge",
         "ShowExecuteNotification", false
     )
