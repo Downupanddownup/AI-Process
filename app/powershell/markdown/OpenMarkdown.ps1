@@ -71,6 +71,12 @@ if ([string]::IsNullOrWhiteSpace($mode)) {
 $activateScript = Join-Path $scriptDirectory "OpenMarkdownActivate.ps1"
 $backgroundScript = Join-Path $scriptDirectory "OpenMarkdownBackground.ps1"
 
+# 写入 AI-AGENT 标识（独立业务脚本，作为子进程调用，失败不影响打开流程）
+$tagScript = Join-Path $scriptDirectory "SetMarkdownAgentTag.ps1"
+if ((Test-Path $tagScript) -and $WindowId -ne "") {
+    & powershell -ExecutionPolicy Bypass -File "`"$tagScript`"" -FilePath "`"$FilePath`"" -WindowId "`"$WindowId`""
+}
+
 $arguments = @("-FilePath", "`"$FilePath`"")
 if ($WindowId -ne "") {
     $arguments += @("-WindowId", "`"$WindowId`"")

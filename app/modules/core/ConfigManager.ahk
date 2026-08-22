@@ -112,6 +112,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window1", "AgentHwnd", "") = "") {
         IniWrite("", SettingsFile, "Window1", "AgentHwnd")
     }
+    if (IniRead(SettingsFile, "Window1", "AgentName", "") = "") {
+        IniWrite("", SettingsFile, "Window1", "AgentName")
+    }
     if (IniRead(SettingsFile, "Window1", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window1", "AgentAfterCopyAction")
     }
@@ -159,6 +162,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window2", "AgentHwnd", "") = "") {
         IniWrite("", SettingsFile, "Window2", "AgentHwnd")
     }
+    if (IniRead(SettingsFile, "Window2", "AgentName", "") = "") {
+        IniWrite("", SettingsFile, "Window2", "AgentName")
+    }
     if (IniRead(SettingsFile, "Window2", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window2", "AgentAfterCopyAction")
     }
@@ -205,6 +211,9 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Window3", "AgentHwnd", "") = "") {
         IniWrite("", SettingsFile, "Window3", "AgentHwnd")
+    }
+    if (IniRead(SettingsFile, "Window3", "AgentName", "") = "") {
+        IniWrite("", SettingsFile, "Window3", "AgentName")
     }
     if (IniRead(SettingsFile, "Window3", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window3", "AgentAfterCopyAction")
@@ -369,6 +378,7 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AgentProcessName"] := IniRead(SettingsFile, section, "AgentProcessName", "")
         WindowSessions[windowId]["AgentClassName"] := IniRead(SettingsFile, section, "AgentClassName", "")
         WindowSessions[windowId]["AgentHwnd"] := IniRead(SettingsFile, section, "AgentHwnd", "")
+        WindowSessions[windowId]["AgentName"] := IniRead(SettingsFile, section, "AgentName", "")
         WindowSessions[windowId]["AgentAfterCopyAction"] := IniRead(SettingsFile, section, "AgentAfterCopyAction", "3") + 0
         WindowSessions[windowId]["OpenWithIdea"] := IniRead(SettingsFile, section, "OpenWithIdea", "1") = "1"
         WindowSessions[windowId]["OpenMdWithIdea"] := IniRead(SettingsFile, section, "OpenMdWithIdea", "1") = "1"
@@ -391,6 +401,7 @@ SaveWindowSession(windowId) {
     IniWrite(WindowSessions[windowId]["AgentProcessName"], SettingsFile, section, "AgentProcessName")
     IniWrite(WindowSessions[windowId]["AgentClassName"], SettingsFile, section, "AgentClassName")
     IniWrite(WindowSessions[windowId]["AgentHwnd"], SettingsFile, section, "AgentHwnd")
+    IniWrite(WindowSessions[windowId]["AgentName"], SettingsFile, section, "AgentName")
     IniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
     IniWrite(WindowSessions[windowId]["OpenWithIdea"] ? "1" : "0", SettingsFile, section, "OpenWithIdea")
     IniWrite(WindowSessions[windowId]["OpenMdWithIdea"] ? "1" : "0", SettingsFile, section, "OpenMdWithIdea")

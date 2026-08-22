@@ -7,6 +7,7 @@ global AgentWindowDialogTitleText := ""
 global AgentWindowDialogProcessText := ""
 global AgentWindowDialogClassText := ""
 global AgentWindowDialogStatusText := ""
+global AgentWindowDialogNameEdit := ""
 global AgentWindowDialogActionDropdown := ""
 
 OnBindAgentWindowButtonClick(*) {
@@ -71,6 +72,7 @@ BindAgentWindow(*) {
     SetSession(windowId, "AgentProcessName", proc)
     SetSession(windowId, "AgentClassName", class)
     SetSession(windowId, "AgentHwnd", hwnd)
+    SetSession(windowId, "AgentName", title)   ; 绑定即以窗口标题重置 AGENT 名称默认值
     SaveAgentWindowConfig()
     UpdateBindButtonState()
 }
@@ -120,7 +122,7 @@ SaveAgentWindowConfig() {
 
 ShowAgentWindowDialog() {
     global AgentWindowDialog, AppConfig
-    global AgentWindowDialogTitleText, AgentWindowDialogProcessText
+    global AgentWindowDialogNameEdit, AgentWindowDialogTitleText, AgentWindowDialogProcessText
     global AgentWindowDialogClassText, AgentWindowDialogStatusText
     global AgentWindowDialogActionDropdown
 
@@ -140,7 +142,10 @@ ShowAgentWindowDialog() {
     AgentWindowDialog.OnEvent("Escape", CloseAgentWindowDialog)
 
     AgentWindowDialog.AddText("xm ym w300 h18", "当前绑定")
-    AgentWindowDialogTitleText := AgentWindowDialog.AddText("xm y+4 w300 h18", "窗口标题：未绑定")
+    AgentWindowDialog.AddText("xm y+4 w70 h18", "AGENT名称：")
+    AgentWindowDialogNameEdit := AgentWindowDialog.AddEdit("x+4 yp-2 w226 h22")
+    AgentWindowDialogNameEdit.OnEvent("LoseFocus", AgentDialogNameChanged)
+    AgentWindowDialogTitleText := AgentWindowDialog.AddText("xm y+8 w300 h18", "窗口标题：未绑定")
     AgentWindowDialogProcessText := AgentWindowDialog.AddText("xm y+4 w300 h18", "进程：未绑定")
     AgentWindowDialogClassText := AgentWindowDialog.AddText("xm y+4 w300 h18", "类名：未绑定")
     AgentWindowDialogStatusText := AgentWindowDialog.AddText("xm y+4 w300 h18", "状态：未绑定")
@@ -161,13 +166,26 @@ ShowAgentWindowDialog() {
 
 
 
+AgentDialogNameChanged(*) {
+    global AgentWindowDialogNameEdit
+    if (!AgentWindowDialogNameEdit) {
+        return
+    }
+    windowId := GetActiveWindowId()
+    SetSession(windowId, "AgentName", Trim(AgentWindowDialogNameEdit.Text))
+    SaveAgentWindowConfig()
+}
+
+
+
 RefreshAgentWindowDialog() {
     global AppConfig
-    global AgentWindowDialogTitleText, AgentWindowDialogProcessText
+    global AgentWindowDialogNameEdit, AgentWindowDialogTitleText, AgentWindowDialogProcessText
     global AgentWindowDialogClassText, AgentWindowDialogStatusText
     global AgentWindowDialogActionDropdown
 
     if (!IsAgentWindowBound()) {
+        AgentWindowDialogNameEdit.Text := ""
         AgentWindowDialogTitleText.Text := "窗口标题：未绑定"
         AgentWindowDialogProcessText.Text := "进程：未绑定"
         AgentWindowDialogClassText.Text := "类名：未绑定"
@@ -181,6 +199,7 @@ RefreshAgentWindowDialog() {
     proc := GetSession(windowId, "AgentProcessName")
     class := GetSession(windowId, "AgentClassName")
 
+    AgentWindowDialogNameEdit.Text := GetSession(windowId, "AgentName")
     AgentWindowDialogTitleText.Text := "窗口标题：" TruncateMiddle(title, 40)
     AgentWindowDialogProcessText.Text := "进程：" proc
     AgentWindowDialogClassText.Text := "类名：" class
@@ -361,6 +380,7 @@ UnbindAgentWindow() {
     SetSession(windowId, "AgentProcessName", "")
     SetSession(windowId, "AgentClassName", "")
     SetSession(windowId, "AgentHwnd", "")
+    SetSession(windowId, "AgentName", "")
     SaveAgentWindowConfig()
     UpdateBindButtonState()
     if (AgentWindowDialog) {
