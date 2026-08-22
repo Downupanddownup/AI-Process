@@ -4,6 +4,8 @@
 
 QUESTION_AREA_MARKER := "待确认问题区"
 QUESTION_AREA_PATTERN := "^\s*#{0,4}\s*[0-9一二三四五六七八九十a-zA-Z]{0,4}\s*[、.．]?\s*" QUESTION_AREA_MARKER
+; Q 行：允许可选的 md 标题（# 1~6 个）/ 加粗（**）前缀，兼容旧纯文本格式
+QUESTION_LINE_PATTERN := "^(?:#{1,6}\s*)?(?:\*\*)?Q\d+(?:[（(][^）)]*[）)])?\s*[：:]"
 REPLY_SEPARATOR := "`r`n`r`n`r`n`r`n`r`n"
 
 
@@ -35,12 +37,12 @@ ExtractQuestionsFromMd(mdPath) {
             }
             continue
         }
-        ; 问题区内：遇到标题行即结束
-        if RegExMatch(line, "^#+\s") {
+        ; 问题区内：遇到非 Q 开头的标题行即结束（Q 标题行本身不误触发结束）
+        if RegExMatch(line, "^#+\s") && !RegExMatch(line, QUESTION_LINE_PATTERN) {
             break
         }
-        if RegExMatch(line, "^Q\d+(?:[（(][^）)]*[）)])?\s*[：:]", &m) {
-            questions.Push(Trim(line))
+        if RegExMatch(line, QUESTION_LINE_PATTERN) {
+            questions.Push(StripMdPrefix(line))
         }
     }
 
@@ -57,12 +59,20 @@ ExtractQuestionsFromMd(mdPath) {
             if inFence {
                 continue
             }
-            if RegExMatch(line, "^Q\d+(?:[（(][^）)]*[）)])?\s*[：:]", &m) {
-                questions.Push(Trim(line))
+            if RegExMatch(line, QUESTION_LINE_PATTERN) {
+                questions.Push(StripMdPrefix(line))
             }
         }
     }
     return questions
+}
+
+
+; 剥离 Q 行行首的 md 前缀（### / **）与行尾残留的 **，输出纯文本问题主干
+StripMdPrefix(line) {
+    q := RegExReplace(Trim(line), "^(?:#{1,6}\s*)?(?:\*\*)?", "")
+    q := RegExReplace(q, "\s*\*\*\s*$", "")
+    return q
 }
 
 
