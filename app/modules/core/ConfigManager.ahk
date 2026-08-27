@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 
 ; 全局配置
 
@@ -323,6 +323,13 @@ EnsureDefaultFiles() {
         , executeNotificationTemplate, "UTF-8")
     }
 
+    executeResultDocTemplate := executeTemplateDir "\result_doc.md"
+    if !FileExist(executeResultDocTemplate) {
+        FileAppend(
+        "# {{prevDocName}} 的执行结果`n`n对《{{prevDocName}}》的需求内容变更已完成。`n"
+        , executeResultDocTemplate, "UTF-8")
+    }
+
     noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
     if !FileExist(noModifyTemplate) {
         FileAppend(
@@ -353,6 +360,7 @@ LoadConfig() {
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
     AppConfig["OpenMdScriptPath"] := AppRoot "\powershell\markdown\OpenMarkdown.ps1"
     AppConfig["NotificationScriptPath"] := AppRoot "\powershell\notification\ShowCenterNotification.ps1"
+    AppConfig["ExecResultScriptPath"] := AppRoot "\powershell\execute\WriteExecResultDoc.ps1"
     AppConfig["MdActivationMode"] := IniRead(SettingsFile, "Behavior", "MdActivationMode", "activate")
     AppConfig["FileToolPath"] := IniRead(SettingsFile, "FileTool", "FileToolPath", "")
     AppConfig["IdleThresholdMinutes"] := IniRead(SettingsFile, "Report", "IdleThresholdMinutes", "60") + 0

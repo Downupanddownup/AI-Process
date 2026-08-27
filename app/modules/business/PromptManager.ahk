@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 
 ; 提示词模板与管理
 
@@ -138,18 +138,30 @@ AppendQuestionTemplateIfNeeded(content) {
 
 AppendExecuteNotificationIfNeeded(content) {
     global AppConfig, TemplateDir
-    if (!GetSession(GetActiveWindowId(), "ShowExecuteNotification")) {
-        return content
-    }
+    windowId := GetActiveWindowId()
 
     templatePath := TemplateDir "\execute_notification_prompt.txt"
     if (!FileExist(templatePath)) {
         return content
     }
 
+    ; 改吧：无条件追加，指向 WriteExecResultDoc（结果文档+打开由其处理；通知由脚本按开关控制）
+    if (GetSelectedExecuteStrategy() = "tweak") {
+        template := FileRead(templatePath, "UTF-8")
+        template := StrReplace(template, "{{scriptPath}}", AppConfig["ExecResultScriptPath"])
+        template := StrReplace(template, "{{windowId}}", windowId)
+        baseContent := RTrim(content, "`r`n")
+        return baseContent "`r`n`r`n" template
+    }
+
+    ; 其它策略：仅当"显示通知"开启才追加，指向 ShowCenterNotification
+    if (!GetSession(windowId, "ShowExecuteNotification")) {
+        return content
+    }
+
     template := FileRead(templatePath, "UTF-8")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
-    template := StrReplace(template, "{{windowId}}", GetActiveWindowId())
+    template := StrReplace(template, "{{windowId}}", windowId)
 
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n`r`n" template

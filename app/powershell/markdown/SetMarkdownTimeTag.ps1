@@ -130,6 +130,26 @@ function Get-LogBestTime {
     return $best
 }
 
+# ---------- 取指定动作的最近一次时间（无窗口约束，用于执行轮的复执行起点） ----------
+function Get-LatestActionTime {
+    param(
+        [array]$Entries,
+        [string]$Action
+    )
+    $latest = $null
+    $latestTime = [datetime]::MinValue
+    foreach ($e in $Entries) {
+        if ($e.action -ne $Action) { continue }
+        try {
+            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
+            if ($t -gt $latestTime) { $latestTime = $t; $latest = $t }
+        } catch {
+            # 忽略无效时间
+        }
+    }
+    return $latest
+}
+
 # ---------- 定位轮次并提取时间点；非轮次 md 返回 $null，无法定位时相应时间点取 $null ----------
 function Get-ThemeRoundInfo {
     param(
@@ -162,21 +182,32 @@ function Get-ThemeRoundInfo {
         }
         elseif ($n -ge 2) {
             $humanFile = Join-Path $ThemeDir ("对v" + ($n - 1) + "的回复.txt")
-            if (-not (Test-Path -LiteralPath $humanFile)) { return $null }
-            $humanItem = Get-Item -LiteralPath $humanFile
+            if (Test-Path -LiteralPath $humanFile) {
+                # 讨论轮
+                $humanItem = Get-Item -LiteralPath $humanFile
+                $humanStart = Get-LogBestTime -Entries $Entries -Action "建回复" -Reference $humanItem.CreationTime
+                $hsFallback = ($null -eq $humanStart)
+                if ($hsFallback) { $humanStart = $humanItem.CreationTime }
 
-            $humanStart = Get-LogBestTime -Entries $Entries -Action "建回复" -Reference $humanItem.CreationTime
-            $hsFallback = ($null -eq $humanStart)
-            if ($hsFallback) { $humanStart = $humanItem.CreationTime }
+                $thisSend = Get-LogBestTime -Entries $Entries -Action "复回复" -Reference $humanItem.LastWriteTime
+                $tsFallback = ($null -eq $thisSend)
+                if ($tsFallback) { $thisSend = $humanItem.LastWriteTime }
 
-            $thisSend = Get-LogBestTime -Entries $Entries -Action "复回复" -Reference $humanItem.LastWriteTime
-            $tsFallback = ($null -eq $thisSend)
-            if ($tsFallback) { $thisSend = $humanItem.LastWriteTime }
-
-            return [PSCustomObject]@{
-                humanStart = $humanStart
-                thisSend   = $thisSend
-                realLog    = (-not ($hsFallback -or $tsFallback))
+                return [PSCustomObject]@{
+                    humanStart = $humanStart
+                    thisSend   = $thisSend
+                    realLog    = (-not ($hsFallback -or $tsFallback))
+                }
+            }
+            else {
+                # 执行轮（无人类回复）：human=0，ai=复执行→now
+                $exec = Get-LatestActionTime -Entries $Entries -Action "复执行"
+                $esFallback = ($null -eq $exec)
+                return [PSCustomObject]@{
+                    humanStart = $null
+                    thisSend   = $exec
+                    realLog    = (-not $esFallback)
+                }
             }
         }
         else {
@@ -222,6 +253,16 @@ function Get-ThemeRoundInfo {
             humanStart = $humanStart
             thisSend   = $thisSend
             realLog    = (-not ($hsFallback -or $tsFallback))
+        }
+    }
+    elseif ($FileName -eq "已实施.md") {
+        # 实施结果：仅执行时间（human=0，ai=复执行→now）
+        $exec = Get-LatestActionTime -Entries $Entries -Action "复执行"
+        $esFallback = ($null -eq $exec)
+        return [PSCustomObject]@{
+            humanStart = $null
+            thisSend   = $exec
+            realLog    = (-not $esFallback)
         }
     }
     return $null
