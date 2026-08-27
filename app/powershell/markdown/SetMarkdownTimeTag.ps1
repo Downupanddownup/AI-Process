@@ -215,7 +215,7 @@ function Get-ThemeRoundInfo {
         }
     }
     elseif ($FileName -eq "实施文档.md") {
-        $replyFiles = @(Get-ChildItem -LiteralPath $ThemeDir -File -Filter "对v*.回复.txt" -ErrorAction SilentlyContinue)
+        $replyFiles = @(Get-ChildItem -LiteralPath $ThemeDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^对v\d+的回复\.txt$' })
         $humanFile = $null
 
         if ($replyFiles.Count -gt 0) {
@@ -348,7 +348,9 @@ if ($null -eq $round) {
     exit 0
 }
 
-$aiEnd = Get-Date
+# AI 处理终点：优先用本文件的"完成通知"日志时间（可回溯、重算准确）；缺时用当前时间（创建当下≈AI 刚完成）
+$aiEnd = Get-LogBestTime -Entries $Entries -Action "完成通知" -Reference (Get-Item -LiteralPath $FilePath).CreationTime
+if ($null -eq $aiEnd) { $aiEnd = Get-Date }
 $breakdown = Get-RoundBreakdown -HumanStart $round.humanStart -ThisSend $round.thisSend -AiEnd $aiEnd -ThresholdMinutes $threshold
 
 # 无 log（时间点来自文件时间戳近似）时：只显示、不标忽略
