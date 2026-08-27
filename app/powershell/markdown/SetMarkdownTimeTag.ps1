@@ -173,6 +173,29 @@ function Get-LatestActionTimeBefore {
     return $latest
 }
 
+# ---------- 取指定动作在某一时刻之后的第一次时间（用于 aiEnd：本 md 完成通知） ----------
+function Get-FirstActionTimeAfter {
+    param(
+        [array]$Entries,
+        [string]$Action,
+        [object]$After
+    )
+    if ($null -eq $After) { return $null }
+    $cut = [datetime]$After
+    $first = $null
+    $firstTime = [datetime]::MaxValue
+    foreach ($e in $Entries) {
+        if ($e.action -ne $Action) { continue }
+        try {
+            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
+            if ($t -ge $cut -and $t -lt $firstTime) { $first = $t; $firstTime = $t }
+        } catch {
+            # 忽略无效时间
+        }
+    }
+    return $first
+}
+
 # ---------- 定位轮次并提取时间点；非轮次 md 返回 $null，无法定位时相应时间点取 $null ----------
 function Get-ThemeRoundInfo {
     param(
@@ -363,8 +386,8 @@ if ($null -eq $round) {
     exit 0
 }
 
-# AI 处理终点：优先用本文件的"完成通知"日志时间（可回溯、重算准确）；缺时用当前时间（创建当下≈AI 刚完成）
-$aiEnd = Get-LogBestTime -Entries $Entries -Action "完成通知" -Reference (Get-Item -LiteralPath $FilePath).CreationTime
+# AI 处理终点：取 thisSend（复X/复执行）之后的第一条"完成通知"（=本轮完成时刻）；无则用当前时刻（创建当下≈AI 刚完成）
+$aiEnd = Get-FirstActionTimeAfter -Entries $Entries -Action "完成通知" -After $round.thisSend
 if ($null -eq $aiEnd) { $aiEnd = Get-Date }
 $breakdown = Get-RoundBreakdown -HumanStart $round.humanStart -ThisSend $round.thisSend -AiEnd $aiEnd -ThresholdMinutes $threshold
 
