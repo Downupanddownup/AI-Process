@@ -165,17 +165,9 @@ function Get-ThemeRoundInfo {
             if (-not (Test-Path -LiteralPath $humanFile)) { return $null }
             $humanItem = Get-Item -LiteralPath $humanFile
 
-            $prevAi = Join-Path $ThemeDir ("v" + ($n - 1) + ".md")
-            $humanStart = $null
-            $hsFallback = $false
-            if (Test-Path -LiteralPath $prevAi) {
-                $prevAiItem = Get-Item -LiteralPath $prevAi
-                $humanStart = Get-LogBestTime -Entries $Entries -Action "完成通知" -Reference $prevAiItem.CreationTime
-                $hsFallback = ($null -eq $humanStart)
-                if ($hsFallback) { $humanStart = $prevAiItem.CreationTime }
-            } else {
-                $hsFallback = $true
-            }
+            $humanStart = Get-LogBestTime -Entries $Entries -Action "建回复" -Reference $humanItem.CreationTime
+            $hsFallback = ($null -eq $humanStart)
+            if ($hsFallback) { $humanStart = $humanItem.CreationTime }
 
             $thisSend = Get-LogBestTime -Entries $Entries -Action "复回复" -Reference $humanItem.LastWriteTime
             $tsFallback = ($null -eq $thisSend)
@@ -194,38 +186,31 @@ function Get-ThemeRoundInfo {
     elseif ($FileName -eq "实施文档.md") {
         $replyFiles = @(Get-ChildItem -LiteralPath $ThemeDir -File -Filter "对v*.回复.txt" -ErrorAction SilentlyContinue)
         $humanFile = $null
-        $prevAi = $null
 
         if ($replyFiles.Count -gt 0) {
             $maxReply = $replyFiles | Sort-Object { [int]($_.BaseName -replace "^对v(\d+)的回复$", "$1") } -Descending | Select-Object -First 1
             $humanFile = $maxReply.FullName
-            $nn = [int]($maxReply.BaseName -replace "^对v(\d+)的回复$", "$1")
-            $prevAi = Join-Path $ThemeDir ("v" + $nn + ".md")
         }
         else {
             $req = Join-Path $ThemeDir "需求.txt"
             if (Test-Path -LiteralPath $req) {
                 $humanFile = $req
-                $prevAi = $null
             }
         }
 
         if ($null -eq $humanFile) { return $null }
         $humanItem = Get-Item -LiteralPath $humanFile
 
-        $humanStart = $null
-        $hsFallback = $false
-        if ($null -ne $prevAi -and (Test-Path -LiteralPath $prevAi)) {
-            $prevAiItem = Get-Item -LiteralPath $prevAi
-            $humanStart = Get-LogBestTime -Entries $Entries -Action "完成通知" -Reference $prevAiItem.CreationTime
+        if ($humanItem.Name -eq "需求.txt") {
+            # 无上一轮（仅需求.txt）：人思考起点用需求.txt 创建时间（同第 1 轮）
+            $humanStart = Get-LogBestTime -Entries $Entries -Action "建需求" -Reference $humanItem.CreationTime
             $hsFallback = ($null -eq $humanStart)
-            if ($hsFallback) { $humanStart = $prevAiItem.CreationTime }
-        } elseif ($null -ne $prevAi) {
-            $hsFallback = $true
+            if ($hsFallback) { $humanStart = $humanItem.CreationTime }
         } else {
-            # 无上一轮（仅需求.txt）：人思考起点用需求.txt 创建时间
-            $humanStart = $humanItem.CreationTime
-            $hsFallback = $true
+            # 实施确认轮：人思考起点用该轮 建回复（人类文件创建）
+            $humanStart = Get-LogBestTime -Entries $Entries -Action "建回复" -Reference $humanItem.CreationTime
+            $hsFallback = ($null -eq $humanStart)
+            if ($hsFallback) { $humanStart = $humanItem.CreationTime }
         }
 
         $sendAction = if ($humanItem.Name -eq "需求.txt") { "复需求" } else { "复回复" }
