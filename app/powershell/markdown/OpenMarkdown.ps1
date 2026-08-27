@@ -77,6 +77,12 @@ if ((Test-Path $tagScript) -and $WindowId -ne "") {
     & powershell -ExecutionPolicy Bypass -File "`"$tagScript`"" -FilePath "`"$FilePath`"" -WindowId "`"$WindowId`""
 }
 
+# 写入耗时标记（人思考时长/AI处理时长；独立业务脚本，失败不影响打开流程）
+$timeTagScript = Join-Path $scriptDirectory "SetMarkdownTimeTag.ps1"
+if (Test-Path $timeTagScript) {
+    & powershell -ExecutionPolicy Bypass -File "`"$timeTagScript`"" -FilePath "`"$FilePath`"" -WindowId "`"$WindowId`""
+}
+
 $arguments = @("-FilePath", "`"$FilePath`"")
 if ($WindowId -ne "") {
     $arguments += @("-WindowId", "`"$WindowId`"")
