@@ -150,6 +150,29 @@ function Get-LatestActionTime {
     return $latest
 }
 
+# ---------- 取指定动作在某一时刻之前的最近一次时间（用于"建X→复X"配对，避免复用文件导致的旧时间锚点） ----------
+function Get-LatestActionTimeBefore {
+    param(
+        [array]$Entries,
+        [string]$Action,
+        [object]$Before
+    )
+    if ($null -eq $Before) { return $null }
+    $cut = [datetime]$Before
+    $latest = $null
+    $latestTime = [datetime]::MinValue
+    foreach ($e in $Entries) {
+        if ($e.action -ne $Action) { continue }
+        try {
+            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
+            if ($t -le $cut -and $t -gt $latestTime) { $latest = $t; $latestTime = $t }
+        } catch {
+            # 忽略无效时间
+        }
+    }
+    return $latest
+}
+
 # ---------- 定位轮次并提取时间点；非轮次 md 返回 $null，无法定位时相应时间点取 $null ----------
 function Get-ThemeRoundInfo {
     param(
@@ -163,16 +186,15 @@ function Get-ThemeRoundInfo {
             $req = Join-Path $ThemeDir "需求.txt"
             if (-not (Test-Path -LiteralPath $req)) { return $null }
             $reqItem = Get-Item -LiteralPath $req
-            $creation = $reqItem.CreationTime
             $lastWrite = $reqItem.LastWriteTime
-
-            $humanStart = Get-LogBestTime -Entries $Entries -Action "建需求" -Reference $creation
-            $hsFallback = ($null -eq $humanStart)
-            if ($hsFallback) { $humanStart = $creation }
 
             $thisSend = Get-LogBestTime -Entries $Entries -Action "复需求" -Reference $lastWrite
             $tsFallback = ($null -eq $thisSend)
             if ($tsFallback) { $thisSend = $lastWrite }
+
+            $humanStart = Get-LatestActionTimeBefore -Entries $Entries -Action "建需求" -Before $thisSend
+            $hsFallback = ($null -eq $humanStart)
+            if ($hsFallback) { $humanStart = $thisSend.AddSeconds(-60) }
 
             return [PSCustomObject]@{
                 humanStart = $humanStart
@@ -185,13 +207,13 @@ function Get-ThemeRoundInfo {
             if (Test-Path -LiteralPath $humanFile) {
                 # 讨论轮
                 $humanItem = Get-Item -LiteralPath $humanFile
-                $humanStart = Get-LogBestTime -Entries $Entries -Action "建回复" -Reference $humanItem.CreationTime
-                $hsFallback = ($null -eq $humanStart)
-                if ($hsFallback) { $humanStart = $humanItem.CreationTime }
-
                 $thisSend = Get-LogBestTime -Entries $Entries -Action "复回复" -Reference $humanItem.LastWriteTime
                 $tsFallback = ($null -eq $thisSend)
                 if ($tsFallback) { $thisSend = $humanItem.LastWriteTime }
+
+                $humanStart = Get-LatestActionTimeBefore -Entries $Entries -Action "建回复" -Before $thisSend
+                $hsFallback = ($null -eq $humanStart)
+                if ($hsFallback) { $humanStart = $thisSend.AddSeconds(-60) }
 
                 return [PSCustomObject]@{
                     humanStart = $humanStart
@@ -232,22 +254,15 @@ function Get-ThemeRoundInfo {
         if ($null -eq $humanFile) { return $null }
         $humanItem = Get-Item -LiteralPath $humanFile
 
-        if ($humanItem.Name -eq "需求.txt") {
-            # 无上一轮（仅需求.txt）：人思考起点用需求.txt 创建时间（同第 1 轮）
-            $humanStart = Get-LogBestTime -Entries $Entries -Action "建需求" -Reference $humanItem.CreationTime
-            $hsFallback = ($null -eq $humanStart)
-            if ($hsFallback) { $humanStart = $humanItem.CreationTime }
-        } else {
-            # 实施确认轮：人思考起点用该轮 建回复（人类文件创建）
-            $humanStart = Get-LogBestTime -Entries $Entries -Action "建回复" -Reference $humanItem.CreationTime
-            $hsFallback = ($null -eq $humanStart)
-            if ($hsFallback) { $humanStart = $humanItem.CreationTime }
-        }
-
+        $buildAction = if ($humanItem.Name -eq "需求.txt") { "建需求" } else { "建回复" }
         $sendAction = if ($humanItem.Name -eq "需求.txt") { "复需求" } else { "复回复" }
         $thisSend = Get-LogBestTime -Entries $Entries -Action $sendAction -Reference $humanItem.LastWriteTime
         $tsFallback = ($null -eq $thisSend)
         if ($tsFallback) { $thisSend = $humanItem.LastWriteTime }
+
+        $humanStart = Get-LatestActionTimeBefore -Entries $Entries -Action $buildAction -Before $thisSend
+        $hsFallback = ($null -eq $humanStart)
+        if ($hsFallback) { $humanStart = $thisSend.AddSeconds(-60) }
 
         return [PSCustomObject]@{
             humanStart = $humanStart
