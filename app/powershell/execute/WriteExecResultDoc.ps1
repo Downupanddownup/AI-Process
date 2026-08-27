@@ -95,9 +95,9 @@ if (-not (Test-Path -LiteralPath $templatePath)) { exit 0 }
 $body = [System.IO.File]::ReadAllText($templatePath, [System.Text.Encoding]::UTF8)
 $body = $body.Replace("{{prevDocName}}", $prevDocName)
 
-# 落盘结果 md（UTF-8 BOM 更稳妥）
-$utf8Bom = New-Object System.Text.UTF8Encoding($true)
-[System.IO.File]::WriteAllText($resultPath, $body, $utf8Bom)
+# 落盘结果 md（无 BOM，与讨论 md 一致；避免编辑器顶部出现 BOM 杂点）
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($resultPath, $body, $utf8NoBom)
 
 # 走 OpenMarkdown：注入 ai-agent、统一耗时标记，并按 MdActivationMode 打开
 if (Test-Path -LiteralPath $openMarkdownScript) {
