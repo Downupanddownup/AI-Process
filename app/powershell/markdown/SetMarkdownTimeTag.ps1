@@ -247,10 +247,14 @@ function Write-FrontMatterTag {
     param(
         [string]$Path,
         [string]$Human,
-        [string]$Ai
+        [string]$Ai,
+        [string]$Total
     )
-    $humanLine = '人思考时长: "' + $Human + '"'
-    $aiLine = 'AI处理时长: "' + $Ai + '"'
+    # 英文短键，冒号/值对齐到同一列（与 ai-agent: "..." 的单空格布局对齐，值列 = 11）
+    $padWidth = 10
+    $humanLine = ("human:").PadRight($padWidth) + '"' + $Human + '"'
+    $aiLine = ("ai:").PadRight($padWidth) + '"' + $Ai + '"'
+    $totalLine = ("total:").PadRight($padWidth) + '"' + $Total + '"'
 
     $rawBytes = [System.IO.File]::ReadAllBytes($Path)
     $hasBom = ($rawBytes.Length -ge 3 -and $rawBytes[0] -eq 0xEF -and $rawBytes[1] -eq 0xBB -and $rawBytes[2] -eq 0xBF)
@@ -267,47 +271,43 @@ function Write-FrontMatterTag {
         }
     }
 
-    $changed = $false
     $newContent = $null
 
     if ($closingIndex -gt 0) {
+        # 已有 front matter：移除旧的 human/ai/total 及中文旧键，保留其余键（含 ai-agent），再统一插入 new 三键
         $built = [System.Collections.Generic.List[string]]::new()
         $built.Add($lines[0])   # 开 ---
 
         $bodyStart = 1
         $bodyEnd = $closingIndex - 1
-        $hadHuman = $false
-        $hadAi = $false
-
         if ($bodyEnd -ge $bodyStart) {
             foreach ($kv in $lines[$bodyStart..$bodyEnd]) {
-                if ($kv -match "^\s*人思考时长\s*:") {
-                    $hadHuman = $true
-                    if ($kv -ne $humanLine) { $built.Add($humanLine); $changed = $true } else { $built.Add($kv) }
-                } elseif ($kv -match "^\s*AI处理时长\s*:") {
-                    $hadAi = $true
-                    if ($kv -ne $aiLine) { $built.Add($aiLine); $changed = $true } else { $built.Add($kv) }
-                } else {
-                    $built.Add($kv)
-                }
+                $t = $kv.Trim()
+                # 新的 human/ai/total 键：跳过，稍后统一插回
+                if ($t -match "^(human|ai|total)\s*:") { continue }
+                # 旧中文键：跳过（迁移为英文键）
+                if ($t -match "^(人思考时长|AI处理时长|本轮合计)\s*:") { continue }
+                $built.Add($kv)
             }
         }
-
-        if (-not $hadHuman) { $built.Add($humanLine); $changed = $true }
-        if (-not $hadAi) { $built.Add($aiLine); $changed = $true }
+        $built.Add($humanLine)
+        $built.Add($aiLine)
+        $built.Add($totalLine)
 
         for ($i = $closingIndex; $i -lt $lines.Length; $i++) { $built.Add($lines[$i]) }
 
-        if ($changed) { $newContent = [string]::Join($newLine, $built) }
+        $newLines = @($built)
+        if ([string]::Join("`n", $newLines) -ne [string]::Join("`n", $lines)) {
+            $newContent = [string]::Join($newLine, $newLines)
+        }
     } else {
         # 无 front matter：文件头插入新块
-        $block = @("---", $humanLine, $aiLine, "---", "")
+        $block = @("---", $humanLine, $aiLine, $totalLine, "---", "")
         $combined = @($block) + @($lines)
         $newContent = [string]::Join($newLine, $combined)
-        $changed = $true
     }
 
-    if ($changed) {
+    if ($null -ne $newContent) {
         $encoding = New-Object System.Text.UTF8Encoding($hasBom)
         [System.IO.File]::WriteAllText($Path, $newContent, $encoding)
     }
@@ -333,7 +333,8 @@ if (-not $round.realLog) {
 
 $humanDisplay = Format-FriendlyDuration -Seconds $breakdown.humanSeconds -Ignored $breakdown.humanIgnored
 $aiDisplay = Format-FriendlyDuration -Seconds $breakdown.aiSeconds -Ignored $breakdown.aiIgnored
+$totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
 
-Write-FrontMatterTag -Path $FilePath -Human $humanDisplay -Ai $aiDisplay
+Write-FrontMatterTag -Path $FilePath -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
 
 exit 0

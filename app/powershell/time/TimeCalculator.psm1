@@ -53,11 +53,17 @@ function Get-RoundBreakdown {
         }
     }
 
+    # 本轮合计 = 人思考 + AI处理 中【未忽略】部分之和（跨天忽略段不计入）
+    $totalSeconds = 0
+    if (-not $humanIgnored) { $totalSeconds += $humanSeconds }
+    if (-not $aiIgnored) { $totalSeconds += $aiSeconds }
+
     return [PSCustomObject]@{
         humanSeconds = $humanSeconds
         aiSeconds    = $aiSeconds
         humanIgnored = $humanIgnored
         aiIgnored    = $aiIgnored
+        totalSeconds = $totalSeconds
     }
 }
 
