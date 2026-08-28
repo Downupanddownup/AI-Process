@@ -198,7 +198,7 @@ CreateRequirementFile(*) {
         ShowFeedback("文件已存在：需求.txt", true)
     }
 
-    LogActivity("建需求", "")
+    LogActivity("建需求", "", Map("target", "需求.txt"))
 
     if GetSession(GetActiveWindowId(), "OpenWithIdea") {
         OpenFileInTool(filePath)
@@ -238,7 +238,7 @@ CreateReplyFile(*) {
         ShowFeedback("文件已存在：" ExtractFileName(replyPath), true)
     }
 
-    LogActivity("建回复", "")
+    LogActivity("建回复", "", Map("target", ExtractFileName(replyPath)))
 
     if GetSession(GetActiveWindowId(), "OpenWithIdea") {
         OpenFileInTool(replyPath)

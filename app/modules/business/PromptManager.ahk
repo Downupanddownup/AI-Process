@@ -150,18 +150,18 @@ AppendExecuteNotificationIfNeeded(content) {
         template := FileRead(templatePath, "UTF-8")
         template := StrReplace(template, "{{scriptPath}}", AppConfig["ExecResultScriptPath"])
         template := StrReplace(template, "{{windowId}}", windowId)
+        template := StrReplace(template, "{{silentArg}}", "")
         baseContent := RTrim(content, "`r`n")
         return baseContent "`r`n`r`n" template
     }
 
-    ; 其它策略：仅当"显示通知"开启才追加，指向 ShowCenterNotification
-    if (!GetSession(windowId, "ShowExecuteNotification")) {
-        return content
-    }
-
+    ; 其它策略：无条件追加（日志补全：完成时刻必须落日志）；
+    ; "显示通知"开关关闭时以 -Silent 调用：日志照写、不弹窗
     template := FileRead(templatePath, "UTF-8")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
     template := StrReplace(template, "{{windowId}}", windowId)
+    silentArg := GetSession(windowId, "ShowExecuteNotification") ? "" : " -Silent"
+    template := StrReplace(template, "{{silentArg}}", silentArg)
 
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n`r`n" template
@@ -204,7 +204,7 @@ CopyRequirementPrompt(*) {
     content := AppendQuestionTemplateIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
     A_Clipboard := content
-    LogActivity("复需求", content)
+    LogActivity("复需求", content, Map("target", "v1.md", "source", "需求.txt"))
     ShowFeedback("需求提示词已复制")
     HandleAgentWindowAfterCopy()
 
@@ -236,8 +236,12 @@ CopyReplyPrompt(*) {
     content := AppendOpenMdPromptIfNeeded(content)
 
     properties := Map()
+    properties["source"] := "对v" latestVersion "的回复.txt"
     if (GetSession(GetActiveWindowId(), "AppendImplementationTail")) {
         properties["实"] := true
+        properties["target"] := nextVersionFile "|实施文档.md"
+    } else {
+        properties["target"] := nextVersionFile
     }
 
     A_Clipboard := content
@@ -294,6 +298,14 @@ CopyExecutePrompt(*) {
     content := AppendExecuteNotificationIfNeeded(content)
 
     properties := Map("执行策略", strategyMeta["label"])
+    if (selectedStrategy = "tweak") {
+        ; 改吧会产出结果 md：按 WriteExecResultDoc 同一命名规则预填 target
+        if FileExist(currentDir "\实施文档.md") {
+            properties["target"] := "已实施.md"
+        } else {
+            properties["target"] := "v" (GetLatestVersionNumber(currentDir) + 1) ".md"
+        }
+    }
 
     A_Clipboard := content
     LogActivity("复执行", content, properties)

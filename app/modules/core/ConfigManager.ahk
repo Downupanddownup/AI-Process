@@ -400,33 +400,49 @@ LoadWindowSessions() {
     }
 }
 
+; 带重试的配置写入：settings.ini 会被 PowerShell 侧（日志/打标/通知）并发读写，
+; 偶发文件占用（Error 32）重试即可恢复；重试仍失败则静默跳过——丢失一次配置保存可接受，崩溃不可接受
+SafeIniWrite(value, fileName, section, key) {
+    Loop 3 {
+        try {
+            IniWrite(value, fileName, section, key)
+            return true
+        } catch {
+            if (A_Index < 3) {
+                Sleep(120)
+            }
+        }
+    }
+    return false
+}
+
 ; 保存指定窗口的会话数据
 SaveWindowSession(windowId) {
     global WindowSessions, SettingsFile
     section := "Window" windowId
-    IniWrite(WindowSessions[windowId]["CurrentDir"], SettingsFile, section, "CurrentDir")
-    IniWrite(WindowSessions[windowId]["AgentTitleContains"], SettingsFile, section, "AgentTitleContains")
-    IniWrite(WindowSessions[windowId]["AgentProcessName"], SettingsFile, section, "AgentProcessName")
-    IniWrite(WindowSessions[windowId]["AgentClassName"], SettingsFile, section, "AgentClassName")
-    IniWrite(WindowSessions[windowId]["AgentHwnd"], SettingsFile, section, "AgentHwnd")
-    IniWrite(WindowSessions[windowId]["AgentName"], SettingsFile, section, "AgentName")
-    IniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
-    IniWrite(WindowSessions[windowId]["OpenWithIdea"] ? "1" : "0", SettingsFile, section, "OpenWithIdea")
-    IniWrite(WindowSessions[windowId]["OpenMdWithIdea"] ? "1" : "0", SettingsFile, section, "OpenMdWithIdea")
-    IniWrite(WindowSessions[windowId]["AppendNoModifyPrompt"] ? "1" : "0", SettingsFile, section, "AppendNoModifyPrompt")
-    IniWrite(WindowSessions[windowId]["AutoHideAfterCreate"] ? "1" : "0", SettingsFile, section, "AutoHideAfterCreate")
-    IniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
-    IniWrite(WindowSessions[windowId]["AppendQuestionRules"] ? "1" : "0", SettingsFile, section, "AppendQuestionRules")
-    IniWrite(WindowSessions[windowId]["AppendQuestionTemplate"] ? "1" : "0", SettingsFile, section, "AppendQuestionTemplate")
-    IniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
-    IniWrite(WindowSessions[windowId]["ShowExecuteNotification"] ? "1" : "0", SettingsFile, section, "ShowExecuteNotification")
+    SafeIniWrite(WindowSessions[windowId]["CurrentDir"], SettingsFile, section, "CurrentDir")
+    SafeIniWrite(WindowSessions[windowId]["AgentTitleContains"], SettingsFile, section, "AgentTitleContains")
+    SafeIniWrite(WindowSessions[windowId]["AgentProcessName"], SettingsFile, section, "AgentProcessName")
+    SafeIniWrite(WindowSessions[windowId]["AgentClassName"], SettingsFile, section, "AgentClassName")
+    SafeIniWrite(WindowSessions[windowId]["AgentHwnd"], SettingsFile, section, "AgentHwnd")
+    SafeIniWrite(WindowSessions[windowId]["AgentName"], SettingsFile, section, "AgentName")
+    SafeIniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
+    SafeIniWrite(WindowSessions[windowId]["OpenWithIdea"] ? "1" : "0", SettingsFile, section, "OpenWithIdea")
+    SafeIniWrite(WindowSessions[windowId]["OpenMdWithIdea"] ? "1" : "0", SettingsFile, section, "OpenMdWithIdea")
+    SafeIniWrite(WindowSessions[windowId]["AppendNoModifyPrompt"] ? "1" : "0", SettingsFile, section, "AppendNoModifyPrompt")
+    SafeIniWrite(WindowSessions[windowId]["AutoHideAfterCreate"] ? "1" : "0", SettingsFile, section, "AutoHideAfterCreate")
+    SafeIniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
+    SafeIniWrite(WindowSessions[windowId]["AppendQuestionRules"] ? "1" : "0", SettingsFile, section, "AppendQuestionRules")
+    SafeIniWrite(WindowSessions[windowId]["AppendQuestionTemplate"] ? "1" : "0", SettingsFile, section, "AppendQuestionTemplate")
+    SafeIniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
+    SafeIniWrite(WindowSessions[windowId]["ShowExecuteNotification"] ? "1" : "0", SettingsFile, section, "ShowExecuteNotification")
 }
 
 ; 保存窗口位置到配置文件，并同步更新 AppConfig
 SaveWindowPositionToConfig(x, y) {
     global SettingsFile, AppConfig
-    IniWrite(x, SettingsFile, "Window", "PosX")
-    IniWrite(y, SettingsFile, "Window", "PosY")
+    SafeIniWrite(x, SettingsFile, "Window", "PosX")
+    SafeIniWrite(y, SettingsFile, "Window", "PosY")
     AppConfig["WindowPosX"] := x
     AppConfig["WindowPosY"] := y
 }
@@ -434,13 +450,13 @@ SaveWindowPositionToConfig(x, y) {
 ; 保存 2 号窗口启用状态
 SaveEnableWindow2(enabled) {
     global SettingsFile
-    IniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow2")
+    SafeIniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow2")
 }
 
 ; 保存 3 号窗口启用状态
 SaveEnableWindow3(enabled) {
     global SettingsFile
-    IniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow3")
+    SafeIniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow3")
 }
 
 ; 确保 INI 文件使用 UTF-16 LE 带 BOM 格式，避免中文乱码

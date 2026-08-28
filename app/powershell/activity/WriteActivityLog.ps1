@@ -76,6 +76,9 @@ try {
         exit 0
     }
 
+    # 窗口绑定的 AI 名称（顶级字段 agent；读不到则省略该键）
+    $agentName = Read-IniValue -Path $settingsPath -Section "Window$WindowId" -Key "AgentName"
+
     $properties = @{}
     if (-not [string]::IsNullOrWhiteSpace($PropertiesFile) -and (Test-Path -Path $PropertiesFile)) {
         $propertiesJson = [System.IO.File]::ReadAllText($PropertiesFile, [System.Text.Encoding]::UTF8)
@@ -106,10 +109,13 @@ try {
     $record = [ordered]@{
         time = $time
         window = $window
-        action = $Action
-        properties = $properties
-        content = $content
     }
+    if (-not [string]::IsNullOrWhiteSpace($agentName)) {
+        $record["agent"] = $agentName.Trim()
+    }
+    $record["action"] = $Action
+    $record["properties"] = $properties
+    $record["content"] = $content
 
     $jsonLine = ($record | ConvertTo-Json -Compress) + "`n"
 

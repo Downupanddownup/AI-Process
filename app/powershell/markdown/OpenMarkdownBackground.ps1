@@ -42,10 +42,13 @@ Assert-PathExists -Path $notificationScript -Description "Notification script"
 Assert-PathExists -Path $FilePath -Description "Markdown file"
 
 function Invoke-CenterNotification {
-    param([string]$Id = "")
+    param([string]$Id = "", [string]$TargetFile = "")
     $notifyArgs = @("-ExecutionPolicy", "Bypass", "-File", "`"$notificationScript`"")
     if ($Id -ne "") {
         $notifyArgs += @("-WindowId", "`"$Id`"")
+    }
+    if ($TargetFile -ne "") {
+        $notifyArgs += @("-TargetFile", "`"$TargetFile`"")
     }
     Start-Process -FilePath "powershell" -ArgumentList $notifyArgs -NoNewWindow
 }
@@ -70,4 +73,4 @@ $pendingKey = "Window" + $WindowId + "PendingMd"
 
 Write-Host "Cached '$FilePath' to [PendingMd] $pendingKey for Window $WindowId."
 
-Invoke-CenterNotification -Id $WindowId
+Invoke-CenterNotification -Id $WindowId -TargetFile (Split-Path -Leaf $FilePath)

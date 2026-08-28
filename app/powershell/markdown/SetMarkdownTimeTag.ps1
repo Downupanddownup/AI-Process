@@ -1,22 +1,24 @@
 ﻿<#
 .SYNOPSIS
-    向 Markdown 文件写入/更新"人思考时长 / AI处理时长"耗时标记（YAML Front Matter）。
+    向 Markdown 文件写入/更新耗时标记（YAML Front Matter 的 human/ai/total 键）。
 
 .DESCRIPTION
-    仅处理"轮次 md"（vN.md / 实施文档.md）。依据主题目录 .aiprocess/log.jsonl，
-    计算本轮"人思考/AI处理"时长；若某段 > 阈值（默认 60 分钟）视为跨天/离开则标记忽略
-    （显示"忽略·X..."）。其余文件直接跳过。
+    仅处理"轮次 md"（vN.md / 实施文档.md / 已实施.md）。依据主题目录 .aiprocess/log.jsonl
+    中动作的归属标识（properties.target / source）做确定性配对，计算本轮耗时：
 
-    以 YAML Front Matter 形式写入 md 头部：
-        ---
-        ai-agent: "..."
-        人思考时长: "5 分 12 秒"
-        AI处理时长: "1 分 3 秒"
-        ---
+      human = 同 source 的 建X → 复X          （执行类文件恒 0）
+      ai    = 同 target 的 复X → 其后第一条同 target 的完成通知（无则用当前时刻兜底，重算收敛）
+      消歧  = 同 target 多次发送 → 配最后一次
+      total = 未忽略段之和；任一段 > 阈值（默认 60 分钟）标"忽略·<时长>"
 
-    - 文件已有 front matter：在其中合并/更新这两个键，其余键（含 ai-agent）与正文不动；
+    边界语义：
+      - 允许重算：配对锚点是事实记录，重算幂等收敛；
+      - 老数据保护：配对失败（老日志无 target）且文件已有时间键 → 不覆盖，直接退出；
+      - 配对失败且无时间键 → 写"未知"，不编造数字。
+
+    - 文件已有 front matter：在其中合并/更新这三个键，其余键（含 ai-agent）与正文不动；
     - 文件无 front matter：在头部插入新块；
-    - 幂等：两键值均未变化则不写盘；
+    - 幂等：键值均未变化则不写盘；
     - 保留原文件 BOM 与换行风格（LF/CRLF）；
     - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程。
 
@@ -84,7 +86,7 @@ function Get-IdleThresholdMinutes {
     return $defaultValue
 }
 
-# ---------- 读取操作日志 ----------
+# ---------- 读取操作日志（含归属标识 target/source；损坏行静默跳过） ----------
 function Get-LogEntries {
     param([string]$LogFile)
     $result = @()
@@ -96,7 +98,19 @@ function Get-LogEntries {
         if ([string]::IsNullOrWhiteSpace($t)) { continue }
         try {
             $obj = $t | ConvertFrom-Json
-            $result += [PSCustomObject]@{ time = $obj.time; action = $obj.action }
+            $time = [datetime]::ParseExact($obj.time, "yyyy-MM-dd HH:mm:ss", $null)
+            $target = ""
+            $source = ""
+            if ($obj.properties) {
+                if ($obj.properties.target) { $target = [string]$obj.properties.target }
+                if ($obj.properties.source) { $source = [string]$obj.properties.source }
+            }
+            $result += [PSCustomObject]@{
+                time   = $time
+                action = [string]$obj.action
+                target = $target
+                source = $source
+            }
         } catch {
             # 忽略无效行
         }
@@ -104,206 +118,106 @@ function Get-LogEntries {
     return $result
 }
 
-# ---------- 在指定动作里找距参考时间最近且在窗口内的记录时间 ----------
-function Get-LogBestTime {
+# ---------- target 匹配：支持"|"分隔的候选（如 "v5.md|实施文档.md"），精确匹配文件名 ----------
+function Test-TargetMatch {
+    param(
+        [string]$TargetValue,
+        [string]$FileName
+    )
+    if ([string]::IsNullOrWhiteSpace($TargetValue)) { return $false }
+    foreach ($part in ($TargetValue -split '\|')) {
+        if ($part.Trim() -eq $FileName) { return $true }
+    }
+    return $false
+}
+
+# ---------- 按 target/source 定位本轮：非轮次 md 返回 $null；配对失败返回 matched=$false ----------
+function Get-TargetRoundInfo {
     param(
         [array]$Entries,
-        [string]$Action,
-        [datetime]$Reference,
-        [int]$WindowSeconds = 300
+        [string]$FileName
     )
-    $best = $null
-    $bestDiff = [double]::MaxValue
+    # 仅处理轮次 md
+    if ($FileName -notmatch '^v\d+\.md$' -and $FileName -ne '实施文档.md' -and $FileName -ne '已实施.md') {
+        return $null
+    }
+
+    # 找指向本文件的发送动作；同 target 多次 → 配最后一次（消歧）
+    $send = $null
     foreach ($e in $Entries) {
-        if ($e.action -ne $Action) { continue }
-        try {
-            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
-            $diff = [math]::Abs(($t - $Reference).TotalSeconds)
-            if ($diff -lt $bestDiff -and $diff -le $WindowSeconds) {
-                $best = $t
-                $bestDiff = $diff
+        if ($e.action -ne '复需求' -and $e.action -ne '复回复' -and $e.action -ne '复执行') { continue }
+        if (-not (Test-TargetMatch -TargetValue $e.target -FileName $FileName)) { continue }
+        if ($null -eq $send -or $e.time -gt $send.time) { $send = $e }
+    }
+    if ($null -eq $send) {
+        return [PSCustomObject]@{ matched = $false }
+    }
+
+    $humanStart = $null
+    $humanUnknown = $false
+    if ($send.action -eq '复执行') {
+        # 执行类文件（改吧结果 / 已实施.md）：human 恒 0
+        $humanStart = $null
+    } else {
+        # 讨论轮：source 定位人思考段（复需求无 source 时按 需求.txt）
+        $src = $send.source
+        if ($send.action -eq '复需求' -and [string]::IsNullOrWhiteSpace($src)) { $src = '需求.txt' }
+        if ([string]::IsNullOrWhiteSpace($src)) {
+            $humanUnknown = $true
+        } else {
+            $buildAction = if ($src -eq '需求.txt') { '建需求' } else { '建回复' }
+            foreach ($e in $Entries) {
+                if ($e.action -ne $buildAction) { continue }
+                if ($e.target -ne $src) { continue }
+                if ($e.time -le $send.time -and ($null -eq $humanStart -or $e.time -gt $humanStart)) {
+                    $humanStart = $e.time
+                }
             }
-        } catch {
-            # 忽略无效时间
+            if ($null -eq $humanStart) { $humanUnknown = $true }
         }
     }
-    return $best
-}
 
-# ---------- 取指定动作的最近一次时间（无窗口约束，用于执行轮的复执行起点） ----------
-function Get-LatestActionTime {
-    param(
-        [array]$Entries,
-        [string]$Action
-    )
-    $latest = $null
-    $latestTime = [datetime]::MinValue
-    foreach ($e in $Entries) {
-        if ($e.action -ne $Action) { continue }
-        try {
-            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
-            if ($t -gt $latestTime) { $latestTime = $t; $latest = $t }
-        } catch {
-            # 忽略无效时间
-        }
+    return [PSCustomObject]@{
+        matched      = $true
+        humanStart   = $humanStart
+        humanUnknown = $humanUnknown
+        thisSend     = $send.time
     }
-    return $latest
 }
 
-# ---------- 取指定动作在某一时刻之前的最近一次时间（用于"建X→复X"配对，避免复用文件导致的旧时间锚点） ----------
-function Get-LatestActionTimeBefore {
+# ---------- aiEnd：thisSend 之后第一条同 target 的完成通知 ----------
+function Get-FirstTargetNotificationAfter {
     param(
         [array]$Entries,
-        [string]$Action,
-        [object]$Before
+        [string]$FileName,
+        [datetime]$After
     )
-    if ($null -eq $Before) { return $null }
-    $cut = [datetime]$Before
-    $latest = $null
-    $latestTime = [datetime]::MinValue
-    foreach ($e in $Entries) {
-        if ($e.action -ne $Action) { continue }
-        try {
-            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
-            if ($t -le $cut -and $t -gt $latestTime) { $latest = $t; $latestTime = $t }
-        } catch {
-            # 忽略无效时间
-        }
-    }
-    return $latest
-}
-
-# ---------- 取指定动作在某一时刻之后的第一次时间（用于 aiEnd：本 md 完成通知） ----------
-function Get-FirstActionTimeAfter {
-    param(
-        [array]$Entries,
-        [string]$Action,
-        [object]$After
-    )
-    if ($null -eq $After) { return $null }
-    $cut = [datetime]$After
     $first = $null
-    $firstTime = [datetime]::MaxValue
     foreach ($e in $Entries) {
-        if ($e.action -ne $Action) { continue }
-        try {
-            $t = [datetime]::ParseExact($e.time, "yyyy-MM-dd HH:mm:ss", $null)
-            if ($t -ge $cut -and $t -lt $firstTime) { $first = $t; $firstTime = $t }
-        } catch {
-            # 忽略无效时间
-        }
+        if ($e.action -ne '完成通知') { continue }
+        if (-not (Test-TargetMatch -TargetValue $e.target -FileName $FileName)) { continue }
+        if ($e.time -ge $After -and ($null -eq $first -or $e.time -lt $first)) { $first = $e.time }
     }
     return $first
 }
 
-# ---------- 定位轮次并提取时间点；非轮次 md 返回 $null，无法定位时相应时间点取 $null ----------
-function Get-ThemeRoundInfo {
-    param(
-        [array]$Entries,
-        [string]$ThemeDir,
-        [string]$FileName
-    )
-    if ($FileName -match '^v(\d+)\.md$') {
-        $n = [int]$matches[1]
-        if ($n -eq 1) {
-            $req = Join-Path $ThemeDir "需求.txt"
-            if (-not (Test-Path -LiteralPath $req)) { return $null }
-            $reqItem = Get-Item -LiteralPath $req
-            $lastWrite = $reqItem.LastWriteTime
-
-            $thisSend = Get-LogBestTime -Entries $Entries -Action "复需求" -Reference $lastWrite
-            $tsFallback = ($null -eq $thisSend)
-            if ($tsFallback) { $thisSend = $lastWrite }
-
-            $humanStart = Get-LatestActionTimeBefore -Entries $Entries -Action "建需求" -Before $thisSend
-            $hsFallback = ($null -eq $humanStart)
-            if ($hsFallback) { $humanStart = $thisSend.AddSeconds(-60) }
-
-            return [PSCustomObject]@{
-                humanStart = $humanStart
-                thisSend   = $thisSend
-                realLog    = (-not ($hsFallback -or $tsFallback))
-            }
+# ---------- 老数据保护：front matter 中已存在时间键（含旧中文键） ----------
+function Test-TimeKeysPresent {
+    param([string]$Path)
+    try {
+        $content = [System.IO.File]::ReadAllText($Path)
+        $lines = @($content -split "`r`n|`n", -1)
+        if ($lines.Length -lt 2 -or $lines[0].Trim() -ne "---") { return $false }
+        $limit = [Math]::Min($lines.Length - 1, 50)
+        for ($i = 1; $i -le $limit; $i++) {
+            $t = $lines[$i].Trim()
+            if ($t -eq "---") { return $false }
+            if ($t -match "^(human|ai|total|人思考时长|AI处理时长|本轮合计)\s*:") { return $true }
         }
-        elseif ($n -ge 2) {
-            $humanFile = Join-Path $ThemeDir ("对v" + ($n - 1) + "的回复.txt")
-            if (Test-Path -LiteralPath $humanFile) {
-                # 讨论轮
-                $humanItem = Get-Item -LiteralPath $humanFile
-                $thisSend = Get-LogBestTime -Entries $Entries -Action "复回复" -Reference $humanItem.LastWriteTime
-                $tsFallback = ($null -eq $thisSend)
-                if ($tsFallback) { $thisSend = $humanItem.LastWriteTime }
-
-                $humanStart = Get-LatestActionTimeBefore -Entries $Entries -Action "建回复" -Before $thisSend
-                $hsFallback = ($null -eq $humanStart)
-                if ($hsFallback) { $humanStart = $thisSend.AddSeconds(-60) }
-
-                return [PSCustomObject]@{
-                    humanStart = $humanStart
-                    thisSend   = $thisSend
-                    realLog    = (-not ($hsFallback -or $tsFallback))
-                }
-            }
-            else {
-                # 执行轮（无人类回复）：human=0，ai=复执行→now
-                $exec = Get-LatestActionTime -Entries $Entries -Action "复执行"
-                $esFallback = ($null -eq $exec)
-                return [PSCustomObject]@{
-                    humanStart = $null
-                    thisSend   = $exec
-                    realLog    = (-not $esFallback)
-                }
-            }
-        }
-        else {
-            return $null
-        }
+    } catch {
+        # 读取失败按无键处理
     }
-    elseif ($FileName -eq "实施文档.md") {
-        $replyFiles = @(Get-ChildItem -LiteralPath $ThemeDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^对v\d+的回复\.txt$' })
-        $humanFile = $null
-
-        if ($replyFiles.Count -gt 0) {
-            $maxReply = $replyFiles | Sort-Object { [int]($_.BaseName -replace "^对v(\d+)的回复$", "$1") } -Descending | Select-Object -First 1
-            $humanFile = $maxReply.FullName
-        }
-        else {
-            $req = Join-Path $ThemeDir "需求.txt"
-            if (Test-Path -LiteralPath $req) {
-                $humanFile = $req
-            }
-        }
-
-        if ($null -eq $humanFile) { return $null }
-        $humanItem = Get-Item -LiteralPath $humanFile
-
-        $buildAction = if ($humanItem.Name -eq "需求.txt") { "建需求" } else { "建回复" }
-        $sendAction = if ($humanItem.Name -eq "需求.txt") { "复需求" } else { "复回复" }
-        $thisSend = Get-LogBestTime -Entries $Entries -Action $sendAction -Reference $humanItem.LastWriteTime
-        $tsFallback = ($null -eq $thisSend)
-        if ($tsFallback) { $thisSend = $humanItem.LastWriteTime }
-
-        $humanStart = Get-LatestActionTimeBefore -Entries $Entries -Action $buildAction -Before $thisSend
-        $hsFallback = ($null -eq $humanStart)
-        if ($hsFallback) { $humanStart = $thisSend.AddSeconds(-60) }
-
-        return [PSCustomObject]@{
-            humanStart = $humanStart
-            thisSend   = $thisSend
-            realLog    = (-not ($hsFallback -or $tsFallback))
-        }
-    }
-    elseif ($FileName -eq "已实施.md") {
-        # 实施结果：仅执行时间（human=0，ai=复执行→now）
-        $exec = Get-LatestActionTime -Entries $Entries -Action "复执行"
-        $esFallback = ($null -eq $exec)
-        return [PSCustomObject]@{
-            humanStart = $null
-            thisSend   = $exec
-            realLog    = (-not $esFallback)
-        }
-    }
-    return $null
+    return $false
 }
 
 # ---------- 合并写入 front matter ----------
@@ -381,25 +295,32 @@ function Write-FrontMatterTag {
 
 $threshold = Get-IdleThresholdMinutes -SettingsPath $settingsPath
 $entries = Get-LogEntries -LogFile $logFile
-$round = Get-ThemeRoundInfo -Entries $entries -ThemeDir $themeDir -FileName $fileName
+$round = Get-TargetRoundInfo -Entries $entries -FileName $fileName
 if ($null -eq $round) {
     exit 0
 }
 
-# AI 处理终点：取 thisSend（复X/复执行）之后的第一条"完成通知"（=本轮完成时刻）；无则用当前时刻（创建当下≈AI 刚完成）
-$aiEnd = Get-FirstActionTimeAfter -Entries $Entries -Action "完成通知" -After $round.thisSend
+# 配对失败（老日志无 target）：老文件已有时间键不覆盖；无键写"未知"，不编造
+if (-not $round.matched) {
+    if (Test-TimeKeysPresent -Path $FilePath) { exit 0 }
+    Write-FrontMatterTag -Path $FilePath -Human "未知" -Ai "未知" -Total "未知"
+    exit 0
+}
+
+# AI 处理终点：thisSend 之后第一条同 target 的完成通知；无则用当前时刻（创建当下≈AI 刚完成，重算时收敛到真实通知）
+$aiEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $round.thisSend
 if ($null -eq $aiEnd) { $aiEnd = Get-Date }
 $breakdown = Get-RoundBreakdown -HumanStart $round.humanStart -ThisSend $round.thisSend -AiEnd $aiEnd -ThresholdMinutes $threshold
 
-# 无 log（时间点来自文件时间戳近似）时：只显示、不标忽略
-if (-not $round.realLog) {
-    $breakdown.humanIgnored = $false
-    $breakdown.aiIgnored = $false
-}
-
-$humanDisplay = Format-FriendlyDuration -Seconds $breakdown.humanSeconds -Ignored $breakdown.humanIgnored
 $aiDisplay = Format-FriendlyDuration -Seconds $breakdown.aiSeconds -Ignored $breakdown.aiIgnored
-$totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
+if ($round.humanUnknown) {
+    # human 段配不齐：不编造，human/total 均显"未知"
+    $humanDisplay = "未知"
+    $totalDisplay = "未知"
+} else {
+    $humanDisplay = Format-FriendlyDuration -Seconds $breakdown.humanSeconds -Ignored $breakdown.humanIgnored
+    $totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
+}
 
 Write-FrontMatterTag -Path $FilePath -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
 

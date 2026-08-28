@@ -109,7 +109,7 @@ $mode = Read-IniValue -Path $settingsPath -Section "Behavior" -Key "MdActivation
 if ([string]::IsNullOrWhiteSpace($mode)) { $mode = "activate" }
 $showNotify = Read-IniValue -Path $settingsPath -Section $section -Key "ShowExecuteNotification"
 if ($mode -ne "background" -and $showNotify -eq "1" -and (Test-Path -LiteralPath $notifyScript)) {
-    & powershell -ExecutionPolicy Bypass -File "`"$notifyScript`"" -WindowId "`"$WindowId`""
+    & powershell -ExecutionPolicy Bypass -File "`"$notifyScript`"" -WindowId "`"$WindowId`"" -TargetFile "`"$resultName`""
 }
 
 Write-Host "Created '$resultName' as '$prevDocName' execution result."

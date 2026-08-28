@@ -218,11 +218,11 @@ OpenPendingMarkdownIfAny(windowId) {
         return
     }
     if (!FileExist(pendingPath)) {
-        IniWrite("", SettingsFile, "PendingMd", key)
+        SafeIniWrite("", SettingsFile, "PendingMd", key)
         return
     }
     OpenFileInTool(pendingPath)
-    IniWrite("", SettingsFile, "PendingMd", key)
+    SafeIniWrite("", SettingsFile, "PendingMd", key)
 }
 
 RefreshMainWindow() {
@@ -380,7 +380,7 @@ OnMdActivationModeChange(ctrl, *) {
     global SettingsFile, AppConfig
     mode := ctrl.Value = 2 ? "background" : "activate"
     AppConfig["MdActivationMode"] := mode
-    IniWrite(mode, SettingsFile, "Behavior", "MdActivationMode")
+    SafeIniWrite(mode, SettingsFile, "Behavior", "MdActivationMode")
 }
 
 ShowFeedback(message, isError := false) {

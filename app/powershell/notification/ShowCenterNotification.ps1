@@ -16,12 +16,24 @@
 
 .PARAMETER WindowId
     窗口编号，1 或 2 或 3。可选。
+
+.PARAMETER TargetFile
+    本次通知归属的目标文件名（写入日志 properties.target）。可选。
+
+.PARAMETER Silent
+    静默模式：只写日志（通知开始/完成通知），不弹窗。
 #>
 
 param(
     [Parameter(Mandatory = $false)]
     [ValidateSet("1", "2", "3")]
-    [string]$WindowId = ""
+    [string]$WindowId = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$TargetFile = "",
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Silent
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,13 +49,22 @@ function Write-NotificationLog {
     )
     try {
         if (-not (Test-Path $activityLogScript)) { return }
-        if ([string]::IsNullOrWhiteSpace($Detail)) {
-            & powershell -ExecutionPolicy Bypass -File "$activityLogScript" -WindowId $WindowId -Action $Action
-        } else {
+        $propsFile = ""
+        if (-not [string]::IsNullOrWhiteSpace($TargetFile)) {
+            $propsFile = Join-Path $env:TEMP ("aiprocess_notify_props_" + [guid]::NewGuid().ToString("N") + ".json")
+            $propsJson = (@{ target = $TargetFile } | ConvertTo-Json -Compress)
+            [System.IO.File]::WriteAllText($propsFile, $propsJson, [System.Text.Encoding]::UTF8)
+        }
+        $logArgs = @("-ExecutionPolicy", "Bypass", "-File", "`"$activityLogScript`"", "-WindowId", "`"$WindowId`"", "-Action", "`"$Action`"")
+        if ($propsFile -ne "") {
+            $logArgs += @("-PropertiesFile", "`"$propsFile`"")
+        }
+        if (-not [string]::IsNullOrWhiteSpace($Detail)) {
             $detailFile = Join-Path $env:TEMP ("aiprocess_notify_detail_" + [guid]::NewGuid().ToString("N") + ".txt")
             [System.IO.File]::WriteAllText($detailFile, $Detail, [System.Text.Encoding]::UTF8)
-            & powershell -ExecutionPolicy Bypass -File "$activityLogScript" -WindowId $WindowId -Action $Action -ContentFile "$detailFile"
+            $logArgs += @("-ContentFile", "`"$detailFile`"")
         }
+        & powershell $logArgs
     } catch {
         # 静默忽略
     }
@@ -74,6 +95,13 @@ function Clear-OldNotificationInstances {
 }
 
 try {
+    # 静默模式：只写日志不弹窗（开关关闭时的完成时刻补全，不受清场影响）
+    if ($Silent) {
+        Write-NotificationLog -Action "通知开始"
+        Write-NotificationLog -Action "完成通知"
+        exit 0
+    }
+
     Clear-OldNotificationInstances
     Write-NotificationLog -Action "通知开始"
 
