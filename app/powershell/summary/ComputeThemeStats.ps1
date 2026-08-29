@@ -430,12 +430,12 @@ $childSpanText = if ($children.Count -eq 0) { '—' } else { Format-Stat $childS
 $overviewRows = @(
     @{ Label = '总投入（人+AI）'; S = (Format-Stat $roundTotalSec); C = (Format-Stat $childRound); T = (Format-Stat $aggregate.roundTotalSec) }
     @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-Stat $humanSecTotal) / $(Format-Stat $aiSecTotal)"; C = "$(Format-Stat $childHuman) / $(Format-Stat $childAi)"; T = "$(Format-Stat $aggregate.humanSec) / $(Format-Stat $aggregate.aiSec)" }
-    @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
-    @{ Label = '文件数'; S = "$fileTotal"; C = "$childFiles"; T = "$($aggregate.files)" }
-    @{ Label = '字符数（人 / AI）'; S = "$(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal)"; C = "$(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars)"; T = "$(Format-FriendlyCount $aggregate.humanChars) / $(Format-FriendlyCount $aggregate.aiChars)" }
     @{ Label = '活跃时长（剔除空闲段）'; S = (Format-Stat $activeSec); C = (Format-Stat ($aggregate.activeSec - $activeSec)); T = (Format-Stat $aggregate.activeSec) }
     @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
     @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
+    @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
+    @{ Label = '文件数'; S = "$fileTotal"; C = "$childFiles"; T = "$($aggregate.files)" }
+    @{ Label = '字符数（人 / AI）'; S = "$(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal)"; C = "$(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars)"; T = "$(Format-FriendlyCount $aggregate.humanChars) / $(Format-FriendlyCount $aggregate.aiChars)" }
 )
 [void]$sb.AppendLine("| 指标 | 自身 | 子主题 | 总（含子主题） |")
 [void]$sb.AppendLine("|---|---|---|---|")
@@ -448,17 +448,17 @@ foreach ($row in $overviewRows) {
 [void]$sb.AppendLine("| 指标 | 值 |")
 [void]$sb.AppendLine("|---|---|")
 [void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-Stat $roundTotalSec) |")
+[void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-Stat $humanSecTotal) |")
+[void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-Stat $aiSecTotal) |")
 [void]$sb.AppendLine("| 轮间间隔合计 | $(Format-Stat $gapTotalSec) |")
 [void]$sb.AppendLine("| 总时长（活跃，剔除 >${threshold}min 空闲段） | $(Format-Stat $activeSec) |")
 [void]$sb.AppendLine("| 墙钟时长（首末日志原始跨度） | $(Format-Stat $wallClockSec) |")
-[void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-Stat $humanSecTotal) |")
-[void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-Stat $aiSecTotal) |")
 [void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-Stat $idleIgnoredSec) / $idleIgnoredCount 段 |")
-[void]$sb.AppendLine("| 文件数（总 / 人 / AI） | $fileTotal / $humanFiles / $aiFiles |")
-[void]$sb.AppendLine("| 字符数（人 / AI） | $(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal) 字符 |")
 $strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
 if ($strategyText -eq '') { $strategyText = '无' }
 [void]$sb.AppendLine("| 讨论轮 / 执行轮 | $discussion / $execute（$strategyText） |")
+[void]$sb.AppendLine("| 文件数（总 / 人 / AI） | $fileTotal / $humanFiles / $aiFiles |")
+[void]$sb.AppendLine("| 字符数（人 / AI） | $(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal) 字符 |")
 [void]$sb.AppendLine("| 未知轮数（老日志配不上对） | $unknown |")
 [void]$sb.AppendLine("| 平均每轮耗时（人 / AI） | $(Format-Stat $avgHumanSec) / $(Format-Stat $avgAiSec) |")
 $longestText = if ($longestFile -eq '') { '无' } else { "$longestFile（$(Format-Stat $longestSec)）" }
