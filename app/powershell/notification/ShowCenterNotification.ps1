@@ -40,6 +40,7 @@ $ErrorActionPreference = "Stop"
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $activityLogScript = Join-Path $scriptDirectory "..\activity\WriteActivityLog.ps1"
+$themeStatsScript = Join-Path $scriptDirectory "..\summary\ComputeThemeStats.ps1"
 
 # 写操作日志（失败静默忽略，日志不能反过来影响通知）
 function Write-NotificationLog {
@@ -65,6 +66,32 @@ function Write-NotificationLog {
             $logArgs += @("-ContentFile", "`"$detailFile`"")
         }
         & powershell $logArgs
+    } catch {
+        # 静默忽略
+    }
+}
+
+# 完成通知后自动重算主题总体统计（同步、毫秒级；失败静默，绝不影响通知主流程）
+function Invoke-ThemeStatsRecompute {
+    try {
+        if ([string]::IsNullOrWhiteSpace($WindowId)) { return }
+        if (-not (Test-Path $themeStatsScript)) { return }
+        $settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
+        if (-not (Test-Path $settingsPath)) { return }
+        # 与 WriteActivityLog 同款：从 settings.ini 读 [WindowN] CurrentDir
+        $currentDir = $null
+        $currentSection = $null
+        foreach ($line in [System.IO.File]::ReadAllLines($settingsPath, [System.Text.Encoding]::Unicode)) {
+            $t = $line.Trim()
+            if ([string]::IsNullOrWhiteSpace($t) -or $t.StartsWith(";")) { continue }
+            if ($t -match "^\[(.+)\]$") { $currentSection = $matches[1]; continue }
+            if ($currentSection -eq "Window$WindowId" -and $t -match "^(.+?)\s*=\s*(.*)$") {
+                if ($matches[1].Trim() -eq "CurrentDir") { $currentDir = $matches[2].Trim(); break }
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($currentDir)) { return }
+        if (-not (Test-Path -LiteralPath $currentDir)) { return }
+        & powershell -ExecutionPolicy Bypass -File $themeStatsScript -ThemePath $currentDir
     } catch {
         # 静默忽略
     }
@@ -99,6 +126,7 @@ try {
     if ($Silent) {
         Write-NotificationLog -Action "通知开始"
         Write-NotificationLog -Action "完成通知"
+        Invoke-ThemeStatsRecompute
         exit 0
     }
 
@@ -405,6 +433,9 @@ public class NotificationWindow : Window {
 
     # 通知显示完成后，写入操作日志
     Write-NotificationLog -Action "完成通知"
+
+    # 本轮日志已写全，顺带全量重算主题总体统计
+    Invoke-ThemeStatsRecompute
 } catch {
     Write-NotificationLog -Action "通知异常" -Detail $_.Exception.Message
     exit 1

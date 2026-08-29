@@ -47,6 +47,7 @@ trap {
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
 $modulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
+$resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
 
 if (-not (Test-Path -LiteralPath $FilePath)) {
     exit 0
@@ -54,8 +55,12 @@ if (-not (Test-Path -LiteralPath $FilePath)) {
 if (-not (Test-Path -LiteralPath $modulePath)) {
     exit 0
 }
+if (-not (Test-Path -LiteralPath $resolverPath)) {
+    exit 0
+}
 try {
     Import-Module $modulePath -ErrorAction Stop
+    Import-Module $resolverPath -ErrorAction Stop
 } catch {
     exit 0
 }
@@ -86,120 +91,7 @@ function Get-IdleThresholdMinutes {
     return $defaultValue
 }
 
-# ---------- 读取操作日志（含归属标识 target/source；损坏行静默跳过） ----------
-function Get-LogEntries {
-    param([string]$LogFile)
-    $result = @()
-    if (-not (Test-Path -LiteralPath $LogFile)) {
-        return $result
-    }
-    foreach ($line in (Get-Content -LiteralPath $LogFile -Encoding UTF8 -ErrorAction SilentlyContinue)) {
-        $t = $line.Trim()
-        if ([string]::IsNullOrWhiteSpace($t)) { continue }
-        try {
-            $obj = $t | ConvertFrom-Json
-            $time = [datetime]::ParseExact($obj.time, "yyyy-MM-dd HH:mm:ss", $null)
-            $target = ""
-            $source = ""
-            if ($obj.properties) {
-                if ($obj.properties.target) { $target = [string]$obj.properties.target }
-                if ($obj.properties.source) { $source = [string]$obj.properties.source }
-            }
-            $result += [PSCustomObject]@{
-                time   = $time
-                action = [string]$obj.action
-                target = $target
-                source = $source
-            }
-        } catch {
-            # 忽略无效行
-        }
-    }
-    return $result
-}
-
-# ---------- target 匹配：支持"|"分隔的候选（如 "v5.md|实施文档.md"），精确匹配文件名 ----------
-function Test-TargetMatch {
-    param(
-        [string]$TargetValue,
-        [string]$FileName
-    )
-    if ([string]::IsNullOrWhiteSpace($TargetValue)) { return $false }
-    foreach ($part in ($TargetValue -split '\|')) {
-        if ($part.Trim() -eq $FileName) { return $true }
-    }
-    return $false
-}
-
-# ---------- 按 target/source 定位本轮：非轮次 md 返回 $null；配对失败返回 matched=$false ----------
-function Get-TargetRoundInfo {
-    param(
-        [array]$Entries,
-        [string]$FileName
-    )
-    # 仅处理轮次 md
-    if ($FileName -notmatch '^v\d+\.md$' -and $FileName -ne '实施文档.md' -and $FileName -ne '已实施.md') {
-        return $null
-    }
-
-    # 找指向本文件的发送动作；同 target 多次 → 配最后一次（消歧）
-    $send = $null
-    foreach ($e in $Entries) {
-        if ($e.action -ne '复需求' -and $e.action -ne '复回复' -and $e.action -ne '复执行') { continue }
-        if (-not (Test-TargetMatch -TargetValue $e.target -FileName $FileName)) { continue }
-        if ($null -eq $send -or $e.time -gt $send.time) { $send = $e }
-    }
-    if ($null -eq $send) {
-        return [PSCustomObject]@{ matched = $false }
-    }
-
-    $humanStart = $null
-    $humanUnknown = $false
-    if ($send.action -eq '复执行') {
-        # 执行类文件（改吧结果 / 已实施.md）：human 恒 0
-        $humanStart = $null
-    } else {
-        # 讨论轮：source 定位人思考段（复需求无 source 时按 需求.txt）
-        $src = $send.source
-        if ($send.action -eq '复需求' -and [string]::IsNullOrWhiteSpace($src)) { $src = '需求.txt' }
-        if ([string]::IsNullOrWhiteSpace($src)) {
-            $humanUnknown = $true
-        } else {
-            $buildAction = if ($src -eq '需求.txt') { '建需求' } else { '建回复' }
-            foreach ($e in $Entries) {
-                if ($e.action -ne $buildAction) { continue }
-                if ($e.target -ne $src) { continue }
-                if ($e.time -le $send.time -and ($null -eq $humanStart -or $e.time -gt $humanStart)) {
-                    $humanStart = $e.time
-                }
-            }
-            if ($null -eq $humanStart) { $humanUnknown = $true }
-        }
-    }
-
-    return [PSCustomObject]@{
-        matched      = $true
-        humanStart   = $humanStart
-        humanUnknown = $humanUnknown
-        thisSend     = $send.time
-    }
-}
-
-# ---------- aiEnd：thisSend 之后第一条同 target 的完成通知 ----------
-function Get-FirstTargetNotificationAfter {
-    param(
-        [array]$Entries,
-        [string]$FileName,
-        [datetime]$After
-    )
-    $first = $null
-    foreach ($e in $Entries) {
-        if ($e.action -ne '完成通知') { continue }
-        if (-not (Test-TargetMatch -TargetValue $e.target -FileName $FileName)) { continue }
-        if ($e.time -ge $After -and ($null -eq $first -or $e.time -lt $first)) { $first = $e.time }
-    }
-    return $first
-}
+# ---------- 轮次配对逻辑已抽取至 app/powershell/time/RoundResolver.psm1（顶部导入） ----------
 
 # ---------- 老数据保护：front matter 中已存在时间键（含旧中文键） ----------
 function Test-TimeKeysPresent {
