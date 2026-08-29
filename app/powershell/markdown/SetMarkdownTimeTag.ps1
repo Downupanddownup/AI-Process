@@ -116,15 +116,20 @@ function Test-TimeKeysPresent {
 function Write-FrontMatterTag {
     param(
         [string]$Path,
+        [string]$Gap,        # $null = 老文档（已有时间键）：不写 gap，保持原三键布局逐字节不变
         [string]$Human,
         [string]$Ai,
         [string]$Total
     )
     # 英文短键，冒号/值对齐到同一列（与 ai-agent: "..." 的单空格布局对齐，值列 = 11）
     $padWidth = 10
-    $humanLine = ("human:").PadRight($padWidth) + '"' + $Human + '"'
-    $aiLine = ("ai:").PadRight($padWidth) + '"' + $Ai + '"'
-    $totalLine = ("total:").PadRight($padWidth) + '"' + $Total + '"'
+    # 注意：PS 5.1 未绑定的 [string] 参数会被强制转为空串而非 $null，必须用 PSBoundParameters 判定
+    $includeGap = $PSBoundParameters.ContainsKey('Gap')
+    $tagLines = @()
+    if ($includeGap) { $tagLines += (("gap:").PadRight($padWidth) + '"' + $Gap + '"') }
+    $tagLines += (("human:").PadRight($padWidth) + '"' + $Human + '"')
+    $tagLines += (("ai:").PadRight($padWidth) + '"' + $Ai + '"')
+    $tagLines += (("total:").PadRight($padWidth) + '"' + $Total + '"')
 
     $rawBytes = [System.IO.File]::ReadAllBytes($Path)
     $hasBom = ($rawBytes.Length -ge 3 -and $rawBytes[0] -eq 0xEF -and $rawBytes[1] -eq 0xBB -and $rawBytes[2] -eq 0xBF)
@@ -144,7 +149,7 @@ function Write-FrontMatterTag {
     $newContent = $null
 
     if ($closingIndex -gt 0) {
-        # 已有 front matter：移除旧的 human/ai/total 及中文旧键，保留其余键（含 ai-agent），再统一插入 new 三键
+        # 已有 front matter：移除旧的 gap/human/ai/total 及中文旧键，保留其余键（含 ai-agent），再统一插入 new 键组
         $built = [System.Collections.Generic.List[string]]::new()
         $built.Add($lines[0])   # 开 ---
 
@@ -153,16 +158,14 @@ function Write-FrontMatterTag {
         if ($bodyEnd -ge $bodyStart) {
             foreach ($kv in $lines[$bodyStart..$bodyEnd]) {
                 $t = $kv.Trim()
-                # 新的 human/ai/total 键：跳过，稍后统一插回
-                if ($t -match "^(human|ai|total)\s*:") { continue }
+                # 新的 gap/human/ai/total 键：跳过，稍后统一插回
+                if ($t -match "^(gap|human|ai|total)\s*:") { continue }
                 # 旧中文键：跳过（迁移为英文键）
                 if ($t -match "^(人思考时长|AI处理时长|本轮合计)\s*:") { continue }
                 $built.Add($kv)
             }
         }
-        $built.Add($humanLine)
-        $built.Add($aiLine)
-        $built.Add($totalLine)
+        foreach ($tl in $tagLines) { $built.Add($tl) }
 
         for ($i = $closingIndex; $i -lt $lines.Length; $i++) { $built.Add($lines[$i]) }
 
@@ -172,7 +175,7 @@ function Write-FrontMatterTag {
         }
     } else {
         # 无 front matter：文件头插入新块
-        $block = @("---", $humanLine, $aiLine, $totalLine, "---", "")
+        $block = @("---") + $tagLines + @("---", "")
         $combined = @($block) + @($lines)
         $newContent = [string]::Join($newLine, $combined)
     }
@@ -195,14 +198,21 @@ if ($null -eq $round) {
 # 配对失败（老日志无 target）：老文件已有时间键不覆盖；无键写"未知"，不编造
 if (-not $round.matched) {
     if (Test-TimeKeysPresent -Path $FilePath) { exit 0 }
-    Write-FrontMatterTag -Path $FilePath -Human "未知" -Ai "未知" -Total "未知"
+    Write-FrontMatterTag -Path $FilePath -Gap "未知" -Human "未知" -Ai "未知" -Total "未知"
     exit 0
 }
+
+# 老文档保护：已有时间键的文档不补 gap（用户拍板：老文件不用管），仅新打标文档带 gap 键
+$hasTimeKeys = Test-TimeKeysPresent -Path $FilePath
 
 # AI 处理终点：thisSend 之后第一条同 target 的完成通知；无则用当前时刻（创建当下≈AI 刚完成，重算时收敛到真实通知）
 $aiEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $round.thisSend
 if ($null -eq $aiEnd) { $aiEnd = Get-Date }
 $breakdown = Get-RoundBreakdown -HumanStart $round.humanStart -ThisSend $round.thisSend -AiEnd $aiEnd -ThresholdMinutes $threshold
+
+# 轮间间隔：本轮起点（建X，配不上则复X）− 此前最近一条完成通知；打标时刻两端均已发生，一次写入终身准确
+$gapStart = if ($null -ne $round.humanStart) { $round.humanStart } else { $round.thisSend }
+$gapDisplay = Format-FriendlyDuration -Seconds (Get-RoundGap -Entries $entries -RoundStart $gapStart)
 
 $aiDisplay = Format-FriendlyDuration -Seconds $breakdown.aiSeconds -Ignored $breakdown.aiIgnored
 if ($round.humanUnknown) {
@@ -214,6 +224,10 @@ if ($round.humanUnknown) {
     $totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
 }
 
-Write-FrontMatterTag -Path $FilePath -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
+if ($hasTimeKeys) {
+    Write-FrontMatterTag -Path $FilePath -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
+} else {
+    Write-FrontMatterTag -Path $FilePath -Gap $gapDisplay -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
+}
 
 exit 0

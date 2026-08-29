@@ -11,11 +11,12 @@
       - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程；
       - .aiprocess 目录不存在时直接跳过（不主动创建）。
 
-    口径要点（实施文档 §三）：
+    口径要点（实施文档 §三 + 测试/对整体统计的测试 v4 定稿）：
       - 人思考时长：仅讨论轮（建X→复X）；执行轮恒 0；
       - 未知轮数：仅 复需求/复回复/复执行 三类发送中无 target 的计数；
       - 复关系（交接指令）：单列 handoff 指标，不计轮次/unknown/人字符串数；
-      - 老日志无 agent 字段记空串；配不上对的轮次时长记 null，不编造。
+      - 老日志无 agent 字段记空串；配不上对的轮次时长记 null，不编造；
+      - 轮次总耗时（人+AI）= 各轮 humanSec+aiSec 合计；轮间间隔 = 本轮起点（建X，无则复X）− 上一轮完成通知，首轮恒 0。
 
 .PARAMETER ThemePath
     主题目录绝对路径。
@@ -73,6 +74,24 @@ function Get-IdleThresholdMinutes {
         # 使用默认
     }
     return $defaultValue
+}
+
+# ---------- 字符数友好显示：<1万 原样+千分位；>=1万 按万/亿缩写（3 位有效数字）；stats.json 恒为精确整数 ----------
+function Format-FriendlyCount {
+    param([object]$Number)
+    if ($null -eq $Number) { return '未知' }
+    $v = [double]$Number
+    if ($v -lt 10000) { return ([int64]$v).ToString('N0') }
+    if ($v -lt 100000000) {
+        $w = $v / 10000
+        if ($w -lt 10) { return $w.ToString('0.00') + '万' }
+        if ($w -lt 100) { return $w.ToString('0.0') + '万' }
+        return ([int64][Math]::Round($w)).ToString('N0') + '万'
+    }
+    $y = $v / 100000000
+    if ($y -lt 10) { return $y.ToString('0.00') + '亿' }
+    if ($y -lt 100) { return $y.ToString('0.0') + '亿' }
+    return ([int64][Math]::Round($y)).ToString('N0') + '亿'
 }
 
 # ---------- 字符数：isAiBody=$true 时剥离 front matter（首行 --- 起 50 行内闭合 --- 的块，与打标同一判定） ----------
@@ -157,6 +176,11 @@ foreach ($e in $entries) {
     $human = $null
     if (-not $isExecute) { $human = Get-HumanStartForSend -Entries $entries -Send $e }
 
+    # 轮间间隔：本轮起点（建X，配不上则复X）− 此前最近一条完成通知；首轮恒 0（与打标同调 RoundResolver.Get-RoundGap）
+    $roundStart = $e.time
+    if ($null -ne $human -and -not $human.humanUnknown -and $null -ne $human.humanStart) { $roundStart = $human.humanStart }
+    $gapSec = Get-RoundGap -Entries $entries -RoundStart $roundStart
+
     # 人文件字符数：讨论轮取 source 文件（复需求无 source 按 需求.txt）
     $srcChars = $null
     if (-not $isExecute) {
@@ -181,6 +205,12 @@ foreach ($e in $entries) {
         if ($isExecute) { $humanSec = 0 }
         elseif (-not $human.humanUnknown) { $humanSec = $breakdown.humanSeconds }
         $aiChars = Get-FileCharCount -Path (Join-Path $ThemePath $fileName) -AiBody $true
+        $totalSec = $null
+        if ($null -ne $humanSec -or $null -ne $aiSec) {
+            $totalSec = 0
+            if ($null -ne $humanSec) { $totalSec += $humanSec }
+            if ($null -ne $aiSec) { $totalSec += $aiSec }
+        }
 
         $roundDetail += [PSCustomObject][ordered]@{
             file       = $fileName
@@ -188,6 +218,8 @@ foreach ($e in $entries) {
             agent      = $e.agent
             humanSec   = $humanSec
             aiSec      = $aiSec
+            totalSec   = $totalSec
+            gapSec     = $gapSec
             humanChars = $(if ($isExecute) { 0 } else { $srcChars })
             aiChars    = $aiChars
             known      = ($aiEndKnown -and ($isExecute -or -not $human.humanUnknown))
@@ -232,6 +264,13 @@ foreach ($r in $roundDetail) {
     if ($null -ne $r.humanSec) { $humanSecTotal += $r.humanSec }
     if ($null -ne $r.aiSec) { $aiSecTotal += $r.aiSec }
 }
+$roundTotalSec = $humanSecTotal + $aiSecTotal
+$gapTotalSec = 0; $detailHumanChars = 0; $detailAiChars = 0
+foreach ($r in $roundDetail) {
+    if ($null -ne $r.gapSec) { $gapTotalSec += $r.gapSec }
+    if ($null -ne $r.humanChars) { $detailHumanChars += $r.humanChars }
+    if ($null -ne $r.aiChars) { $detailAiChars += $r.aiChars }
+}
 
 # ---------- 派生 ----------
 $avgHumanSec = 0; $avgAiSec = 0
@@ -260,6 +299,8 @@ $stats = [PSCustomObject][ordered]@{
     theme      = [PSCustomObject][ordered]@{ path = $ThemePath; name = (Split-Path -Leaf $ThemePath) }
     agents     = $agents
     time       = [PSCustomObject][ordered]@{
+        roundTotalSec    = $roundTotalSec
+        gapTotalSec      = $gapTotalSec
         activeSec        = $activeSec
         wallClockSec     = $wallClockSec
         humanSec         = $humanSecTotal
@@ -312,13 +353,15 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("| 指标 | 值 |")
 [void]$sb.AppendLine("|---|---|")
+[void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-Stat $roundTotalSec) |")
+[void]$sb.AppendLine("| 轮间间隔合计 | $(Format-Stat $gapTotalSec) |")
 [void]$sb.AppendLine("| 总时长（活跃，剔除 >${threshold}min 空闲段） | $(Format-Stat $activeSec) |")
 [void]$sb.AppendLine("| 墙钟时长（首末日志原始跨度） | $(Format-Stat $wallClockSec) |")
 [void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-Stat $humanSecTotal) |")
 [void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-Stat $aiSecTotal) |")
 [void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-Stat $idleIgnoredSec) / $idleIgnoredCount 段 |")
 [void]$sb.AppendLine("| 文件数（总 / 人 / AI） | $fileTotal / $humanFiles / $aiFiles |")
-[void]$sb.AppendLine("| 字符串数（人 / AI） | $humanCharsTotal / $aiCharsTotal |")
+[void]$sb.AppendLine("| 字符数（人 / AI） | $(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal) 字符 |")
 $strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
 if ($strategyText -eq '') { $strategyText = '无' }
 [void]$sb.AppendLine("| 讨论轮 / 执行轮 | $discussion / $execute（$strategyText） |")
@@ -333,19 +376,30 @@ $agentsText = if ($agents.Count -gt 0) { $agents -join '、' } else { '未知' }
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## 轮次明细")
 [void]$sb.AppendLine("")
-[void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 人字数 | AI字数 | Agent |")
-[void]$sb.AppendLine("|---|---|---|---|---|---|---|")
+[void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 人字数 | AI字数 | Agent |")
+[void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|")
 foreach ($r in $roundDetail) {
     $typeText = if ($r.type -eq 'execute') { '执行' } else { '讨论' }
-    $hc = if ($null -eq $r.humanChars) { '未知' } else { $r.humanChars }
-    $ac = if ($null -eq $r.aiChars) { '未知' } else { $r.aiChars }
+    $hc = Format-FriendlyCount $r.humanChars
+    $ac = Format-FriendlyCount $r.aiChars
     $ag = if ([string]::IsNullOrWhiteSpace($r.agent)) { '' } else { $r.agent }
-    [void]$sb.AppendLine("| $($r.file) | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $hc | $ac | $ag |")
+    [void]$sb.AppendLine("| $($r.file) | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-Stat $r.totalSec) | $(Format-Stat $r.gapSec) | $hc | $ac | $ag |")
+}
+if ($roundDetail.Count -gt 0) {
+    [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-Stat $roundTotalSec) | $(Format-Stat $gapTotalSec) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
 }
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("---")
 [void]$sb.AppendLine("")
-[void]$sb.AppendLine("口径：人思考=建X→复X（仅讨论轮，执行轮恒 0）；AI执行=复X→同 target 完成通知；活跃时长剔除 >${threshold}min 空闲段；人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）；复关系单列不计轮次。计算时间：$($now.ToString('yyyy-MM-dd HH:mm:ss'))")
+[void]$sb.AppendLine("**口径说明**")
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine("- 轮次总耗时（人+AI）= 各轮 人耗时+AI耗时 合计；轮间间隔 = 本轮起点 − 上一轮完成通知（首轮为 0）")
+[void]$sb.AppendLine("- 人思考=建X→复X（仅讨论轮，执行轮恒 0）；AI执行=复X→同 target 完成通知（无通知记未知，不编造）")
+[void]$sb.AppendLine("- 总时长（活跃）= 首末日志剔除 >${threshold}min 空闲段；墙钟=首末日志原始跨度")
+[void]$sb.AppendLine("- 人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）")
+[void]$sb.AppendLine("- 字符数 >=1万 按量级缩写（如 2.05万），精确值见 stats.json")
+[void]$sb.AppendLine("- 复关系单列不计轮次；未知轮数=三类发送中无 target 的计数")
+[void]$sb.AppendLine("- 计算时间：$($now.ToString('yyyy-MM-dd HH:mm:ss'))（脚本自动生成，每次重算全量覆盖）")
 
 [System.IO.File]::WriteAllText((Join-Path $aiProcessDir "统计.md"), $sb.ToString(), $utf8NoBom)
 

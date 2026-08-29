@@ -9,6 +9,7 @@
       - Get-TargetRoundInfo：按 target/source 定位本轮；非轮次 md 返回 $null；配对失败返回 matched=$false。
       - Get-FirstTargetNotificationAfter：thisSend 之后第一条同 target 的完成通知。
       - Get-HumanStartForSend：按发送动作的 source 定位人思考起点（建X）；复执行恒无（人耗时 0）。
+      - Get-RoundGap：轮间间隔 = 本轮起点 − 此前最近一条完成通知；首轮或无先例通知时为 0。
 
     兼容 Windows PowerShell 5.1。保持单向依赖：本模块不引用任何调用方/业务模块。
 #>
@@ -145,4 +146,19 @@ function Get-FirstTargetNotificationAfter {
     return $first
 }
 
-Export-ModuleMember -Function Get-LogEntries, Test-TargetMatch, Get-TargetRoundInfo, Get-FirstTargetNotificationAfter, Get-HumanStartForSend
+# ---------- 轮间间隔：本轮起点（建X，无则复X）− 此前最近一条完成通知；首轮为 0 ----------
+function Get-RoundGap {
+    param(
+        [array]$Entries,
+        [datetime]$RoundStart
+    )
+    $prevEnd = $null
+    foreach ($e in $Entries) {
+        if ($e.action -ne '完成通知') { continue }
+        if ($e.time -lt $RoundStart -and ($null -eq $prevEnd -or $e.time -gt $prevEnd)) { $prevEnd = $e.time }
+    }
+    if ($null -eq $prevEnd) { return 0 }
+    return [int][Math]::Round(($RoundStart - $prevEnd).TotalSeconds)
+}
+
+Export-ModuleMember -Function Get-LogEntries, Test-TargetMatch, Get-TargetRoundInfo, Get-FirstTargetNotificationAfter, Get-HumanStartForSend, Get-RoundGap
