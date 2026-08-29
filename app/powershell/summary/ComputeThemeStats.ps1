@@ -309,6 +309,7 @@ $selfAgg = [PSCustomObject][ordered]@{
     aiSec         = $aiSecTotal
     roundTotalSec = $roundTotalSec
     gapTotalSec   = $gapTotalSec
+    activeSec     = $activeSec
     files         = $fileTotal
     humanFiles    = $humanFiles
     aiFiles       = $aiFiles
@@ -407,20 +408,34 @@ $childFiles = $aggregate.files - $fileTotal
 $childHChars = $aggregate.humanChars - $humanCharsTotal
 $childAChars = $aggregate.aiChars - $aiCharsTotal
 $spanText = '未知'
+$spanSec = $null
 if ($aggregate.createdAt -and $aggregate.lastActiveAt) {
     $spanD0 = [datetime]::ParseExact($aggregate.createdAt, 'yyyy-MM-dd HH:mm:ss', $null)
     $spanD1 = [datetime]::ParseExact($aggregate.lastActiveAt, 'yyyy-MM-dd HH:mm:ss', $null)
     $spanSec = [int][Math]::Round(($spanD1 - $spanD0).TotalSeconds)
-    $spanText = "$($aggregate.createdAt) → $($aggregate.lastActiveAt)（$(Format-FriendlyDuration -Seconds $spanSec)）"
+    $spanText = "$($aggregate.createdAt) → $($aggregate.lastActiveAt)"
 }
+# 墙钟子主题列：全部子主题的首末跨度（不求和、取极值）
+$childSpanSec = $null
+if ($children.Count -gt 0) {
+    $cCreated = @($children | ForEach-Object { $_.aggregate.createdAt } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object)
+    $cLast = @($children | ForEach-Object { $_.aggregate.lastActiveAt } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object)
+    if ($cCreated.Count -gt 0 -and $cLast.Count -gt 0) {
+        $cD0 = [datetime]::ParseExact($cCreated[0], 'yyyy-MM-dd HH:mm:ss', $null)
+        $cD1 = [datetime]::ParseExact($cLast[-1], 'yyyy-MM-dd HH:mm:ss', $null)
+        $childSpanSec = [int][Math]::Round(($cD1 - $cD0).TotalSeconds)
+    }
+}
+$childSpanText = if ($children.Count -eq 0) { '—' } else { Format-Stat $childSpanSec }
 $overviewRows = @(
     @{ Label = '总投入（人+AI）'; S = (Format-Stat $roundTotalSec); C = (Format-Stat $childRound); T = (Format-Stat $aggregate.roundTotalSec) }
     @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-Stat $humanSecTotal) / $(Format-Stat $aiSecTotal)"; C = "$(Format-Stat $childHuman) / $(Format-Stat $childAi)"; T = "$(Format-Stat $aggregate.humanSec) / $(Format-Stat $aggregate.aiSec)" }
     @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
     @{ Label = '文件数'; S = "$fileTotal"; C = "$childFiles"; T = "$($aggregate.files)" }
     @{ Label = '字符数（人 / AI）'; S = "$(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal)"; C = "$(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars)"; T = "$(Format-FriendlyCount $aggregate.humanChars) / $(Format-FriendlyCount $aggregate.aiChars)" }
-    @{ Label = '活跃时长（仅自身，参考）'; S = (Format-Stat $activeSec); C = '—'; T = '—' }
-    @{ Label = '总跨度'; S = '—'; C = '—'; T = $spanText }
+    @{ Label = '活跃时长（剔除空闲段）'; S = (Format-Stat $activeSec); C = (Format-Stat ($aggregate.activeSec - $activeSec)); T = (Format-Stat $aggregate.activeSec) }
+    @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
+    @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
 )
 [void]$sb.AppendLine("| 指标 | 自身 | 子主题 | 总（含子主题） |")
 [void]$sb.AppendLine("|---|---|---|---|")

@@ -49,7 +49,7 @@ function Merge-Aggregate {
         [array]$ChildAggs = @()
     )
     $sumFields = @(
-        'humanSec', 'aiSec', 'roundTotalSec', 'gapTotalSec',
+        'humanSec', 'aiSec', 'roundTotalSec', 'gapTotalSec', 'activeSec',
         'files', 'humanFiles', 'aiFiles', 'humanChars', 'aiChars',
         'discussion', 'execute', 'unknown', 'handoffCount'
     )
