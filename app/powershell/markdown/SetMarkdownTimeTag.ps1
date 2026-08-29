@@ -13,8 +13,7 @@
 
     边界语义：
       - 允许重算：配对锚点是事实记录，重算幂等收敛；
-      - 老数据保护：配对失败（老日志无 target）且文件已有时间键 → 不覆盖，直接退出；
-      - 配对失败且无时间键 → 写"未知"，不编造数字。
+      - 配对失败（日志无 target）→ 写"未知"四键，不编造数字。
 
     - 文件已有 front matter：在其中合并/更新这三个键，其余键（含 ai-agent）与正文不动；
     - 文件无 front matter：在头部插入新块；
@@ -93,40 +92,19 @@ function Get-IdleThresholdMinutes {
 
 # ---------- 轮次配对逻辑已抽取至 app/powershell/time/RoundResolver.psm1（顶部导入） ----------
 
-# ---------- 老数据保护：front matter 中已存在时间键（含旧中文键） ----------
-function Test-TimeKeysPresent {
-    param([string]$Path)
-    try {
-        $content = [System.IO.File]::ReadAllText($Path)
-        $lines = @($content -split "`r`n|`n", -1)
-        if ($lines.Length -lt 2 -or $lines[0].Trim() -ne "---") { return $false }
-        $limit = [Math]::Min($lines.Length - 1, 50)
-        for ($i = 1; $i -le $limit; $i++) {
-            $t = $lines[$i].Trim()
-            if ($t -eq "---") { return $false }
-            if ($t -match "^(human|ai|total|人思考时长|AI处理时长|本轮合计)\s*:") { return $true }
-        }
-    } catch {
-        # 读取失败按无键处理
-    }
-    return $false
-}
-
 # ---------- 合并写入 front matter ----------
 function Write-FrontMatterTag {
     param(
         [string]$Path,
-        [string]$Gap,        # $null = 老文档（已有时间键）：不写 gap，保持原三键布局逐字节不变
+        [string]$Gap,
         [string]$Human,
         [string]$Ai,
         [string]$Total
     )
     # 英文短键，冒号/值对齐到同一列（与 ai-agent: "..." 的单空格布局对齐，值列 = 11）
     $padWidth = 10
-    # 注意：PS 5.1 未绑定的 [string] 参数会被强制转为空串而非 $null，必须用 PSBoundParameters 判定
-    $includeGap = $PSBoundParameters.ContainsKey('Gap')
     $tagLines = @()
-    if ($includeGap) { $tagLines += (("gap:").PadRight($padWidth) + '"' + $Gap + '"') }
+    $tagLines += (("gap:").PadRight($padWidth) + '"' + $Gap + '"')
     $tagLines += (("human:").PadRight($padWidth) + '"' + $Human + '"')
     $tagLines += (("ai:").PadRight($padWidth) + '"' + $Ai + '"')
     $tagLines += (("total:").PadRight($padWidth) + '"' + $Total + '"')
@@ -160,8 +138,6 @@ function Write-FrontMatterTag {
                 $t = $kv.Trim()
                 # 新的 gap/human/ai/total 键：跳过，稍后统一插回
                 if ($t -match "^(gap|human|ai|total)\s*:") { continue }
-                # 旧中文键：跳过（迁移为英文键）
-                if ($t -match "^(人思考时长|AI处理时长|本轮合计)\s*:") { continue }
                 $built.Add($kv)
             }
         }
@@ -195,15 +171,11 @@ if ($null -eq $round) {
     exit 0
 }
 
-# 配对失败（老日志无 target）：老文件已有时间键不覆盖；无键写"未知"，不编造
+# 配对失败（日志无 target，如首轮直建实施文档.md）：写"未知"四键，不编造数字
 if (-not $round.matched) {
-    if (Test-TimeKeysPresent -Path $FilePath) { exit 0 }
     Write-FrontMatterTag -Path $FilePath -Gap "未知" -Human "未知" -Ai "未知" -Total "未知"
     exit 0
 }
-
-# 老文档保护：已有时间键的文档不补 gap（用户拍板：老文件不用管），仅新打标文档带 gap 键
-$hasTimeKeys = Test-TimeKeysPresent -Path $FilePath
 
 # AI 处理终点：thisSend 之后第一条同 target 的完成通知；无则用当前时刻（创建当下≈AI 刚完成，重算时收敛到真实通知）
 $aiEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $round.thisSend
@@ -224,10 +196,6 @@ if ($round.humanUnknown) {
     $totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
 }
 
-if ($hasTimeKeys) {
-    Write-FrontMatterTag -Path $FilePath -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
-} else {
-    Write-FrontMatterTag -Path $FilePath -Gap $gapDisplay -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
-}
+Write-FrontMatterTag -Path $FilePath -Gap $gapDisplay -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
 
 exit 0
