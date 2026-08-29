@@ -8,6 +8,9 @@
       - 活跃时长复用 ActiveDurationCalculator.ps1（剔除超阈值空闲段）；
       - 友好时长复用 TimeCalculator.psm1 Format-FriendlyDuration；
       - 产出：{ThemePath}/.aiprocess/stats.json（机器可读）+ 统计.md（人类友好），均 UTF-8 无 BOM；
+      - 父子聚合：stats.json 恒带 aggregate（自身+全部后代汇总）与 children（直接子摘要）；
+        父.aggregate = 父自身 + Σ 直接子.aggregate（孙已含在子内，不穿透）；
+      - 级联联动：算完自己后若存在父主题则自调用触发父重算（只触发不写父文件，深度保护 10 层）；
       - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程；
       - .aiprocess 目录不存在时直接跳过（不主动创建）。
 
@@ -20,11 +23,17 @@
 
 .PARAMETER ThemePath
     主题目录绝对路径。
+
+.PARAMETER CascadeDepth
+    级联深度（内部自调用用），外部调用勿传。
 #>
 
 param(
     [Parameter(Mandatory = $true)]
-    [string]$ThemePath
+    [string]$ThemePath,
+
+    [Parameter(Mandatory = $false)]
+    [int]$CascadeDepth = 0
 )
 
 # 失败隔离：本脚本为增强功能，任何情况下都不以非零退出码阻断调用方
@@ -38,15 +47,17 @@ $settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
 $timeModulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
 $resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
 $activeCalcPath = Join-Path $scriptDirectory "ActiveDurationCalculator.ps1"
+$aggModulePath = Join-Path $scriptDirectory "ThemeAggregation.psm1"
 
 $aiProcessDir = Join-Path $ThemePath ".aiprocess"
 if (-not (Test-Path -LiteralPath $aiProcessDir)) { exit 0 }
-foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath)) {
+foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath, $aggModulePath)) {
     if (-not (Test-Path -LiteralPath $p)) { exit 0 }
 }
 try {
     Import-Module $timeModulePath -ErrorAction Stop
     Import-Module $resolverPath -ErrorAction Stop
+    Import-Module $aggModulePath -ErrorAction Stop
     . $activeCalcPath
 } catch {
     exit 0
@@ -292,6 +303,39 @@ foreach ($r in $roundDetail) {
 
 $agents = @($entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.agent) } | ForEach-Object { $_.agent } | Select-Object -Unique)
 
+# ---------- 父子聚合：父.aggregate = 自身 + Σ 直接子.aggregate（子的发布数据，不翻子的日志） ----------
+$selfAgg = [PSCustomObject][ordered]@{
+    humanSec      = $humanSecTotal
+    aiSec         = $aiSecTotal
+    roundTotalSec = $roundTotalSec
+    gapTotalSec   = $gapTotalSec
+    files         = $fileTotal
+    humanFiles    = $humanFiles
+    aiFiles       = $aiFiles
+    humanChars    = $humanCharsTotal
+    aiChars       = $aiCharsTotal
+    discussion    = $discussion
+    execute       = $execute
+    unknown       = $unknown
+    handoffCount  = $handoffCount
+    createdAt     = $createdAt
+    lastActiveAt  = $lastAt
+}
+$children = @()
+$childAggs = @()
+foreach ($childPath in @(Get-ChildThemes -Dir $ThemePath)) {
+    $pub = Get-ChildAggregate -ChildPath $childPath
+    if ($null -eq $pub) { continue }   # 子未就绪：跳过，其下次轮次级联补齐
+    $childAggs += $pub.aggregate
+    $children += [PSCustomObject][ordered]@{
+        name       = Split-Path -Leaf $childPath
+        relPath    = $childPath.Substring($ThemePath.Length).TrimStart('\', '/')
+        aggregate  = $pub.aggregate
+        computedAt = $pub.computedAt
+    }
+}
+$aggregate = Merge-Aggregate -Self $selfAgg -ChildAggs $childAggs
+
 # ---------- stats.json ----------
 $stats = [PSCustomObject][ordered]@{
     version    = 1
@@ -330,6 +374,8 @@ $stats = [PSCustomObject][ordered]@{
         longestRound = [PSCustomObject][ordered]@{ file = $longestFile; sec = $longestSec }
     }
     roundDetail = $roundDetail
+    aggregate   = $aggregate
+    children    = $children
 }
 
 $json = ConvertTo-Json $stats -Depth 6 -Compress
@@ -350,6 +396,39 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("> 本文件由 ComputeThemeStats.ps1 脚本自动生成，每次重算全量覆盖，请勿手改。")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## 总览")
+[void]$sb.AppendLine("")
+# 三列对照（自身 | 子主题 | 总）：行定义数组驱动，加指标=加一行；子值=aggregate−自身，有子无子同一套
+$childRound = $aggregate.roundTotalSec - $roundTotalSec
+$childHuman = $aggregate.humanSec - $humanSecTotal
+$childAi = $aggregate.aiSec - $aiSecTotal
+$childDisc = $aggregate.discussion - $discussion
+$childExec = $aggregate.execute - $execute
+$childFiles = $aggregate.files - $fileTotal
+$childHChars = $aggregate.humanChars - $humanCharsTotal
+$childAChars = $aggregate.aiChars - $aiCharsTotal
+$spanText = '未知'
+if ($aggregate.createdAt -and $aggregate.lastActiveAt) {
+    $spanD0 = [datetime]::ParseExact($aggregate.createdAt, 'yyyy-MM-dd HH:mm:ss', $null)
+    $spanD1 = [datetime]::ParseExact($aggregate.lastActiveAt, 'yyyy-MM-dd HH:mm:ss', $null)
+    $spanSec = [int][Math]::Round(($spanD1 - $spanD0).TotalSeconds)
+    $spanText = "$($aggregate.createdAt) → $($aggregate.lastActiveAt)（$(Format-FriendlyDuration -Seconds $spanSec)）"
+}
+$overviewRows = @(
+    @{ Label = '总投入（人+AI）'; S = (Format-Stat $roundTotalSec); C = (Format-Stat $childRound); T = (Format-Stat $aggregate.roundTotalSec) }
+    @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-Stat $humanSecTotal) / $(Format-Stat $aiSecTotal)"; C = "$(Format-Stat $childHuman) / $(Format-Stat $childAi)"; T = "$(Format-Stat $aggregate.humanSec) / $(Format-Stat $aggregate.aiSec)" }
+    @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
+    @{ Label = '文件数'; S = "$fileTotal"; C = "$childFiles"; T = "$($aggregate.files)" }
+    @{ Label = '字符数（人 / AI）'; S = "$(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal)"; C = "$(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars)"; T = "$(Format-FriendlyCount $aggregate.humanChars) / $(Format-FriendlyCount $aggregate.aiChars)" }
+    @{ Label = '活跃时长（仅自身，参考）'; S = (Format-Stat $activeSec); C = '—'; T = '—' }
+    @{ Label = '总跨度'; S = '—'; C = '—'; T = $spanText }
+)
+[void]$sb.AppendLine("| 指标 | 自身 | 子主题 | 总（含子主题） |")
+[void]$sb.AppendLine("|---|---|---|---|")
+foreach ($row in $overviewRows) {
+    [void]$sb.AppendLine("| $($row.Label) | $($row.S) | $($row.C) | $($row.T) |")
+}
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine("## 自身统计")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("| 指标 | 值 |")
 [void]$sb.AppendLine("|---|---|")
@@ -389,6 +468,22 @@ if ($roundDetail.Count -gt 0) {
     [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-Stat $roundTotalSec) | $(Format-Stat $gapTotalSec) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
 }
 [void]$sb.AppendLine("")
+[void]$sb.AppendLine("## 子主题汇总")
+[void]$sb.AppendLine("")
+if ($children.Count -gt 0) {
+    [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执) | 总投入 | 人 / AI | 文件数 | 字符数(人/AI) | 最后活动 |")
+    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|")
+    foreach ($ch in $children) {
+        $ca = $ch.aggregate
+        $lastText = if ($ca.lastActiveAt) { $ca.lastActiveAt } else { '未知' }
+        [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
+    }
+    # 合计行：与"总览"的"子主题"列数值一致，可互查
+    [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
+} else {
+    [void]$sb.AppendLine("无子主题。")
+}
+[void]$sb.AppendLine("")
 [void]$sb.AppendLine("---")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("**口径说明**")
@@ -398,9 +493,23 @@ if ($roundDetail.Count -gt 0) {
 [void]$sb.AppendLine("- 总时长（活跃）= 首末日志剔除 >${threshold}min 空闲段；墙钟=首末日志原始跨度")
 [void]$sb.AppendLine("- 人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）")
 [void]$sb.AppendLine("- 字符数 >=1万 按量级缩写（如 2.05万），精确值见 stats.json")
-[void]$sb.AppendLine("- 复关系单列不计轮次；未知轮数=三类发送中无 target 的计数")
+[void]$sb.AppendLine("- 复关系单列不计轮次；未知轮数=三类发送中无 target 的计数
+- 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；活跃/墙钟类仅自身不求和，总跨度取最早创建→最晚活动
+- 子主题识别：后代目录含 .aiprocess 即子主题（结果微调为容器），只聚合直接子")
 [void]$sb.AppendLine("- 计算时间：$($now.ToString('yyyy-MM-dd HH:mm:ss'))（脚本自动生成，每次重算全量覆盖）")
 
 [System.IO.File]::WriteAllText((Join-Path $aiProcessDir "统计.md"), $sb.ToString(), $utf8NoBom)
+
+# ---------- 级联向上：子算完触发父重算（父自身数据幂等不变，仅重新聚合）；子只触发不写父文件 ----------
+# 父主题定位：父目录为"结果微调"等容器时上跳；第一个含 .aiprocess 的祖先即父主题。目录树无环 + 深度保护双保险
+$parentDir = Split-Path -Parent $ThemePath
+while ($parentDir -and -not (Test-Path -LiteralPath (Join-Path $parentDir '.aiprocess'))) {
+    $next = Split-Path -Parent $parentDir
+    if ($next -eq $parentDir) { $parentDir = $null; break }
+    $parentDir = $next
+}
+if ($CascadeDepth -lt 10 -and $parentDir) {
+    & $PSCommandPath -ThemePath $parentDir -CascadeDepth ($CascadeDepth + 1)
+}
 
 exit 0
