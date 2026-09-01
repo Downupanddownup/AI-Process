@@ -32,13 +32,18 @@ LogActivity(action, content, properties := "") {
         FileAppend(propertiesJson, propertiesFile, "UTF-8")
 
         windowId := GetActiveWindowId()
+        agentName := GetSession(windowId, "AgentName")
         psScript := AppRoot "\powershell\activity\WriteActivityLog.ps1"
 
         ; 构造 PowerShell 命令
         cmd := 'powershell -ExecutionPolicy Bypass -File "' psScript '"'
             . ' -WindowId "' windowId '"'
             . ' -Action "' action '"'
-            . ' -PropertiesFile "' propertiesFile '"'
+            . ' -CurrentDir "' currentDir '"'
+        if (agentName != "") {
+            cmd .= ' -AgentName "' agentName '"'
+        }
+        cmd .= ' -PropertiesFile "' propertiesFile '"'
             . ' -ContentFile "' contentFile '"'
 
         ; 调试：把命令写入日志

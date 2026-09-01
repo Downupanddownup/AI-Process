@@ -26,32 +26,7 @@ $ErrorActionPreference = "Stop"
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
 
-function Read-IniValue {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Section,
-        [Parameter(Mandatory = $true)][string]$Key
-    )
-
-    $currentSection = $null
-    foreach ($line in Get-Content -Path $Path -Encoding UTF8) {
-        $trimmedLine = $line.Trim()
-        if ([string]::IsNullOrWhiteSpace($trimmedLine) -or $trimmedLine.StartsWith(";")) {
-            continue
-        }
-        if ($trimmedLine -match "^\[(.+)\]$") {
-            $currentSection = $matches[1]
-            continue
-        }
-        if ($currentSection -eq $Section -and $trimmedLine -match "^(.+?)\s*=\s*(.*)$") {
-            $currentKey = $matches[1].Trim()
-            if ($currentKey -eq $Key) {
-                return $matches[2].Trim()
-            }
-        }
-    }
-    return $null
-}
+Import-Module (Join-Path $scriptDirectory "..\config\AppSettings.psm1")
 
 function Assert-PathExists {
     param([string]$Path, [string]$Description)
@@ -63,10 +38,7 @@ function Assert-PathExists {
 
 Assert-PathExists -Path $settingsPath -Description "settings.ini"
 
-$mode = Read-IniValue -Path $settingsPath -Section "Behavior" -Key "MdActivationMode"
-if ([string]::IsNullOrWhiteSpace($mode)) {
-    $mode = "activate"
-}
+$mode = Get-MdActivationMode
 
 $activateScript = Join-Path $scriptDirectory "OpenMarkdownActivate.ps1"
 $backgroundScript = Join-Path $scriptDirectory "OpenMarkdownBackground.ps1"

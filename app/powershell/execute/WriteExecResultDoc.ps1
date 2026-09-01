@@ -27,41 +27,13 @@ trap {
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $appRoot = Split-Path (Split-Path $scriptDirectory -Parent) -Parent   # powershell/execute -> powershell -> app
-$settingsPath = Join-Path $appRoot "config\settings.ini"
 $templatePath = Join-Path $appRoot "templates\execute\result_doc.md"
 $openMarkdownScript = Join-Path (Join-Path $appRoot "powershell\markdown") "OpenMarkdown.ps1"
 $notifyScript = Join-Path (Join-Path $appRoot "powershell\notification") "ShowCenterNotification.ps1"
 
-if (-not (Test-Path -LiteralPath $settingsPath)) { exit 0 }
+Import-Module (Join-Path $appRoot "powershell\config\AppSettings.psm1")
 
-function Read-IniValue {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Section,
-        [Parameter(Mandatory = $true)][string]$Key
-    )
-    $currentSection = $null
-    foreach ($line in Get-Content -Path $Path -Encoding UTF8) {
-        $trimmedLine = $line.Trim()
-        if ([string]::IsNullOrWhiteSpace($trimmedLine) -or $trimmedLine.StartsWith(";")) {
-            continue
-        }
-        if ($trimmedLine -match "^\[(.+)\]$") {
-            $currentSection = $matches[1]
-            continue
-        }
-        if ($currentSection -eq $Section -and $trimmedLine -match "^(.+?)\s*=\s*(.*)$") {
-            $currentKey = $matches[1].Trim()
-            if ($currentKey -eq $Key) {
-                return $matches[2].Trim()
-            }
-        }
-    }
-    return $null
-}
-
-$section = "Window" + $WindowId
-$currentDir = Read-IniValue -Path $settingsPath -Section $section -Key "CurrentDir"
+$currentDir = Get-WindowCurrentDir -WindowId $WindowId
 if ([string]::IsNullOrWhiteSpace($currentDir) -or (-not (Test-Path -LiteralPath $currentDir -PathType Container))) {
     exit 0
 }
@@ -105,9 +77,8 @@ if (Test-Path -LiteralPath $openMarkdownScript) {
 }
 
 # 完成通知：仅 activate 模式且 ShowExecuteNotification 开启时自行弹；background 由 OpenMarkdown 自带，避免双弹
-$mode = Read-IniValue -Path $settingsPath -Section "Behavior" -Key "MdActivationMode"
-if ([string]::IsNullOrWhiteSpace($mode)) { $mode = "activate" }
-$showNotify = Read-IniValue -Path $settingsPath -Section $section -Key "ShowExecuteNotification"
+$mode = Get-MdActivationMode
+$showNotify = Get-WindowShowExecuteNotification -WindowId $WindowId
 if ($mode -ne "background" -and $showNotify -eq "1" -and (Test-Path -LiteralPath $notifyScript)) {
     & powershell -ExecutionPolicy Bypass -File "`"$notifyScript`"" -WindowId "`"$WindowId`"" -TargetFile "`"$resultName`""
 }

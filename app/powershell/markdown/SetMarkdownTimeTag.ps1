@@ -44,9 +44,9 @@ trap {
 }
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
-$settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
 $modulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
 $resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
+$appSettingsPath = Join-Path $scriptDirectory "..\config\AppSettings.psm1"
 
 if (-not (Test-Path -LiteralPath $FilePath)) {
     exit 0
@@ -57,9 +57,13 @@ if (-not (Test-Path -LiteralPath $modulePath)) {
 if (-not (Test-Path -LiteralPath $resolverPath)) {
     exit 0
 }
+if (-not (Test-Path -LiteralPath $appSettingsPath)) {
+    exit 0
+}
 try {
     Import-Module $modulePath -ErrorAction Stop
     Import-Module $resolverPath -ErrorAction Stop
+    Import-Module $appSettingsPath -ErrorAction Stop
 } catch {
     exit 0
 }
@@ -67,28 +71,6 @@ try {
 $themeDir = Split-Path -Parent $FilePath
 $fileName = Split-Path -Leaf $FilePath
 $logFile = Join-Path (Join-Path $themeDir ".aiprocess") "log.jsonl"
-
-# ---------- 读取阈值 ----------
-function Get-IdleThresholdMinutes {
-    param([string]$SettingsPath)
-    $defaultValue = 60
-    try {
-        $lines = [System.IO.File]::ReadAllLines($SettingsPath, [System.Text.Encoding]::Unicode)
-        $inReport = $false
-        foreach ($line in $lines) {
-            $t = $line.Trim()
-            if ($t -eq "[Report]") { $inReport = $true; continue }
-            if ($t -match "^\[.*\]$") { $inReport = $false; continue }
-            if ($inReport -and $t -match "^IdleThresholdMinutes\s*=\s*(\d+)") {
-                $v = [int]$matches[1]
-                if ($v -gt 0) { return $v }
-            }
-        }
-    } catch {
-        # 使用默认
-    }
-    return $defaultValue
-}
 
 # ---------- 轮次配对逻辑已抽取至 app/powershell/time/RoundResolver.psm1（顶部导入） ----------
 
@@ -164,7 +146,7 @@ function Write-FrontMatterTag {
 
 # ============ main ============
 
-$threshold = Get-IdleThresholdMinutes -SettingsPath $settingsPath
+$threshold = Get-IdleThresholdMinutes
 $entries = Get-LogEntries -LogFile $logFile
 $round = Get-TargetRoundInfo -Entries $entries -FileName $fileName
 if ($null -eq $round) {

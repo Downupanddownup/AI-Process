@@ -43,46 +43,13 @@ if ($WindowId -eq "") {
 }
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
-$settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
-
-function Read-IniValue {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Section,
-        [Parameter(Mandatory = $true)][string]$Key
-    )
-
-    $currentSection = $null
-    foreach ($line in Get-Content -Path $Path -Encoding UTF8) {
-        $trimmedLine = $line.Trim()
-        if ([string]::IsNullOrWhiteSpace($trimmedLine) -or $trimmedLine.StartsWith(";")) {
-            continue
-        }
-        if ($trimmedLine -match "^\[(.+)\]$") {
-            $currentSection = $matches[1]
-            continue
-        }
-        if ($currentSection -eq $Section -and $trimmedLine -match "^(.+?)\s*=\s*(.*)$") {
-            $currentKey = $matches[1].Trim()
-            if ($currentKey -eq $Key) {
-                return $matches[2].Trim()
-            }
-        }
-    }
-    return $null
-}
-
-if (-not (Test-Path -Path $settingsPath)) {
-    Write-Warning "settings.ini not found: $settingsPath"
-    exit 0
-}
+Import-Module (Join-Path $scriptDirectory "..\config\AppSettings.psm1")
 if (-not (Test-Path -Path $FilePath)) {
     Write-Warning "Markdown file not found: $FilePath"
     exit 0
 }
 
-$section = "Window" + $WindowId
-$agentName = Read-IniValue -Path $settingsPath -Section $section -Key "AgentName"
+$agentName = Get-WindowAgentName -WindowId $WindowId
 if ([string]::IsNullOrWhiteSpace($agentName)) {
     exit 0
 }

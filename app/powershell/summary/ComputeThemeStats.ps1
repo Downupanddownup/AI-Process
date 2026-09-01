@@ -43,21 +43,22 @@ trap {
 }
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
-$settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
 $timeModulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
 $resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
 $activeCalcPath = Join-Path $scriptDirectory "ActiveDurationCalculator.ps1"
 $aggModulePath = Join-Path $scriptDirectory "ThemeAggregation.psm1"
+$appSettingsPath = Join-Path $scriptDirectory "..\config\AppSettings.psm1"
 
 $aiProcessDir = Join-Path $ThemePath ".aiprocess"
 if (-not (Test-Path -LiteralPath $aiProcessDir)) { exit 0 }
-foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath, $aggModulePath)) {
+foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath, $aggModulePath, $appSettingsPath)) {
     if (-not (Test-Path -LiteralPath $p)) { exit 0 }
 }
 try {
     Import-Module $timeModulePath -ErrorAction Stop
     Import-Module $resolverPath -ErrorAction Stop
     Import-Module $aggModulePath -ErrorAction Stop
+    Import-Module $appSettingsPath -ErrorAction Stop
     . $activeCalcPath
 } catch {
     exit 0
@@ -65,27 +66,7 @@ try {
 
 $logFile = Join-Path $aiProcessDir "log.jsonl"
 
-# ---------- 读取阈值 ----------
-function Get-IdleThresholdMinutes {
-    param([string]$SettingsPath)
-    $defaultValue = 60
-    try {
-        $lines = [System.IO.File]::ReadAllLines($SettingsPath, [System.Text.Encoding]::Unicode)
-        $inReport = $false
-        foreach ($line in $lines) {
-            $t = $line.Trim()
-            if ($t -eq "[Report]") { $inReport = $true; continue }
-            if ($t -match "^\[.*\]$") { $inReport = $false; continue }
-            if ($inReport -and $t -match "^IdleThresholdMinutes\s*=\s*(\d+)") {
-                $v = [int]$matches[1]
-                if ($v -gt 0) { return $v }
-            }
-        }
-    } catch {
-        # 使用默认
-    }
-    return $defaultValue
-}
+# ---------- 读取阈值（领域层 AppSettings.psm1，默认 60 唯一收编） ----------
 
 # ---------- 字符数友好显示：<1万 原样+千分位；>=1万 按万/亿缩写（3 位有效数字）；stats.json 恒为精确整数 ----------
 function Format-FriendlyCount {
@@ -145,7 +126,7 @@ function Test-AiFile {
 
 # ============ main ============
 
-$threshold = Get-IdleThresholdMinutes -SettingsPath $settingsPath
+$threshold = Get-IdleThresholdMinutes
 $entries = @(Get-LogEntries -LogFile $logFile)
 $now = Get-Date
 

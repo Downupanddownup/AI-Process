@@ -42,6 +42,20 @@ $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $activityLogScript = Join-Path $scriptDirectory "..\activity\WriteActivityLog.ps1"
 $themeStatsScript = Join-Path $scriptDirectory "..\summary\ComputeThemeStats.ps1"
 
+# 当前窗口的主题目录与 Agent 名（领域层读取；WindowId 为空/未配置/读取失败时为 ""，绝不影响通知主流程）
+$script:currentDir = ''
+$script:agentName = ''
+try {
+    Import-Module (Join-Path $scriptDirectory "..\config\AppSettings.psm1") -ErrorAction Stop
+    if ($WindowId -ne '') {
+        $script:currentDir = Get-WindowCurrentDir -WindowId $WindowId
+        $script:agentName = Get-WindowAgentName -WindowId $WindowId
+    }
+} catch {
+    $script:currentDir = ''
+    $script:agentName = ''
+}
+
 # 写操作日志（失败静默忽略，日志不能反过来影响通知）
 function Write-NotificationLog {
     param(
@@ -56,7 +70,10 @@ function Write-NotificationLog {
             $propsJson = (@{ target = $TargetFile } | ConvertTo-Json -Compress)
             [System.IO.File]::WriteAllText($propsFile, $propsJson, [System.Text.Encoding]::UTF8)
         }
-        $logArgs = @("-ExecutionPolicy", "Bypass", "-File", "`"$activityLogScript`"", "-WindowId", "`"$WindowId`"", "-Action", "`"$Action`"")
+        $logArgs = @("-ExecutionPolicy", "Bypass", "-File", "`"$activityLogScript`"", "-WindowId", "`"$WindowId`"", "-Action", "`"$Action`"", "-CurrentDir", "`"$($script:currentDir)`"")
+        if (-not [string]::IsNullOrWhiteSpace($script:agentName)) {
+            $logArgs += @("-AgentName", "`"$($script:agentName)`"")
+        }
         if ($propsFile -ne "") {
             $logArgs += @("-PropertiesFile", "`"$propsFile`"")
         }
@@ -76,19 +93,8 @@ function Invoke-ThemeStatsRecompute {
     try {
         if ([string]::IsNullOrWhiteSpace($WindowId)) { return }
         if (-not (Test-Path $themeStatsScript)) { return }
-        $settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
-        if (-not (Test-Path $settingsPath)) { return }
-        # 与 WriteActivityLog 同款：从 settings.ini 读 [WindowN] CurrentDir
-        $currentDir = $null
-        $currentSection = $null
-        foreach ($line in [System.IO.File]::ReadAllLines($settingsPath, [System.Text.Encoding]::Unicode)) {
-            $t = $line.Trim()
-            if ([string]::IsNullOrWhiteSpace($t) -or $t.StartsWith(";")) { continue }
-            if ($t -match "^\[(.+)\]$") { $currentSection = $matches[1]; continue }
-            if ($currentSection -eq "Window$WindowId" -and $t -match "^(.+?)\s*=\s*(.*)$") {
-                if ($matches[1].Trim() -eq "CurrentDir") { $currentDir = $matches[2].Trim(); break }
-            }
-        }
+        # 与 WriteActivityLog 同款：从 settings.ini 读 [WindowN] CurrentDir（领域层）
+        $currentDir = $script:currentDir
         if ([string]::IsNullOrWhiteSpace($currentDir)) { return }
         if (-not (Test-Path -LiteralPath $currentDir)) { return }
         & powershell -ExecutionPolicy Bypass -File $themeStatsScript -ThemePath $currentDir

@@ -29,6 +29,8 @@ $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $settingsPath = Join-Path $scriptDirectory "..\..\config\settings.ini"
 $notificationScript = Join-Path $scriptDirectory "..\..\powershell\notification\ShowCenterNotification.ps1"
 
+Import-Module (Join-Path $scriptDirectory "..\config\AppSettings.psm1")
+
 function Assert-PathExists {
     param([string]$Path, [string]$Description)
     if (-not (Test-Path -Path $Path)) {
@@ -58,18 +60,8 @@ if ($WindowId -eq "") {
     exit 0
 }
 
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-
-public class IniUtil {
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    public static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-}
-"@
-
 $pendingKey = "Window" + $WindowId + "PendingMd"
-[void][IniUtil]::WritePrivateProfileString("PendingMd", $pendingKey, $FilePath, $settingsPath)
+[void](Set-PendingMd -WindowId $WindowId -FilePath $FilePath)
 
 Write-Host "Cached '$FilePath' to [PendingMd] $pendingKey for Window $WindowId."
 

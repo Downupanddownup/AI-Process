@@ -23,6 +23,8 @@ $ErrorActionPreference = "Stop"
 
 # Load active duration calculator
 . "$PSScriptRoot\ActiveDurationCalculator.ps1"
+# Load domain config module (single source for threshold reading)
+Import-Module "$PSScriptRoot\..\config\AppSettings.psm1"
 
 $excludedDirs = @('.aiprocess', '.git', '.idea')
 
@@ -31,39 +33,6 @@ function Resolve-ThemePath {
         throw "Theme directory not found: $ThemePath"
     }
     return (Resolve-Path -Path $ThemePath).Path
-}
-
-function Get-IdleThresholdMinutes {
-    $settingsFile = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'config\settings.ini'
-    $defaultValue = 60
-    if (-not (Test-Path -Path $settingsFile)) {
-        return $defaultValue
-    }
-    try {
-        $lines = [System.IO.File]::ReadAllLines($settingsFile, [System.Text.Encoding]::Unicode)
-        $inReportSection = $false
-        foreach ($line in $lines) {
-            $trimmed = $line.Trim()
-            if ($trimmed -eq '[Report]') {
-                $inReportSection = $true
-                continue
-            }
-            if ($trimmed -match '^\[.*\]$') {
-                $inReportSection = $false
-                continue
-            }
-            if ($inReportSection -and $trimmed -match '^IdleThresholdMinutes\s*=\s*(\d+)') {
-                $value = [int]$matches[1]
-                if ($value -gt 0) {
-                    return $value
-                }
-            }
-        }
-    }
-    catch {
-        # use default
-    }
-    return $defaultValue
 }
 
 function Read-LogEntries {

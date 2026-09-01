@@ -23,6 +23,8 @@ $ErrorActionPreference = "Stop"
 
 # 引入活跃时长计算工具
 . "$PSScriptRoot\ActiveDurationCalculator.ps1"
+# 引入领域配置模块（阈值读取唯一出处）
+Import-Module "$PSScriptRoot\..\config\AppSettings.psm1"
 
 # ============ 配置 ============
 
@@ -30,39 +32,6 @@ $excludedDirs = @('.aiprocess', '.git', '.idea')
 $binaryExtensions = @('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.exe', '.dll', '.zip', '.rar', '.7z', '.pdf', '.docx', '.xlsx', '.pptx', '.mp3', '.mp4', '.avi', '.mkv')
 
 # ============ 工具函数 ============
-
-function Get-IdleThresholdMinutes {
-    $settingsFile = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'config\settings.ini'
-    $defaultValue = 60
-    if (-not (Test-Path -Path $settingsFile)) {
-        return $defaultValue
-    }
-    try {
-        $lines = [System.IO.File]::ReadAllLines($settingsFile, [System.Text.Encoding]::Unicode)
-        $inReportSection = $false
-        foreach ($line in $lines) {
-            $trimmed = $line.Trim()
-            if ($trimmed -eq '[Report]') {
-                $inReportSection = $true
-                continue
-            }
-            if ($trimmed -match '^\[.*\]$') {
-                $inReportSection = $false
-                continue
-            }
-            if ($inReportSection -and $trimmed -match '^IdleThresholdMinutes\s*=\s*(\d+)') {
-                $value = [int]$matches[1]
-                if ($value -gt 0) {
-                    return $value
-                }
-            }
-        }
-    }
-    catch {
-        # 读取失败时使用默认值
-    }
-    return $defaultValue
-}
 
 function Resolve-ThemePath {
     if (-not (Test-Path -Path $ThemePath -PathType Container)) {
