@@ -88,20 +88,6 @@ AppendOpenMdPromptIfNeeded(content) {
 
 
 
-AppendReplyImplementationTailIfNeeded(content) {
-    if !GetSession(GetActiveWindowId(), "AppendImplementationTail") {
-        return content
-    }
-
-    tailContent := Trim(LoadTemplate("reply_prompt_impl_tail.txt"), "`r`n `t")
-    if (tailContent = "") {
-        return content
-    }
-
-    baseContent := RTrim(content, "`r`n")
-    return baseContent "`r`n" tailContent
-}
-
 AppendQuestionRulesIfNeeded(content) {
     if !GetSession(GetActiveWindowId(), "AppendQuestionRules") {
         return content
@@ -227,19 +213,26 @@ CopyReplyPrompt(*) {
 
     currentReplyFile := currentDir "\对v" latestVersion "的回复.txt"
     nextVersionFile := "v" (latestVersion + 1) ".md"
-    content := LoadTemplate("reply_prompt.txt")
-    content := StrReplace(content, "{{filePath}}", currentReplyFile)
-    content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
-    content := AppendReplyImplementationTailIfNeeded(content)
+    implChecked := GetSession(GetActiveWindowId(), "AppendImplementationTail")
+
+    if (implChecked) {
+        content := LoadTemplate("reply_prompt_impl_tail.txt")
+        content := StrReplace(content, "{{filePath}}", currentReplyFile)
+    } else {
+        content := LoadTemplate("reply_prompt.txt")
+        content := StrReplace(content, "{{filePath}}", currentReplyFile)
+        content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
+    }
+
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendQuestionTemplateIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
 
     properties := Map()
     properties["source"] := "对v" latestVersion "的回复.txt"
-    if (GetSession(GetActiveWindowId(), "AppendImplementationTail")) {
+    if (implChecked) {
         properties["实"] := true
-        properties["target"] := nextVersionFile "|实施文档.md"
+        properties["target"] := "实施文档.md"
     } else {
         properties["target"] := nextVersionFile
     }
