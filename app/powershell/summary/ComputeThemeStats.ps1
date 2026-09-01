@@ -429,11 +429,12 @@ function Format-Stat {
     return Format-FriendlyDuration -Seconds ([int]$Seconds)
 }
 
-# 百分比：友好时长后追加（xx.x%）；值为 null 显'未知'，分母 null/<=0 时不追加（除零保护）。仅展示层现算，不落 stats.json
+# 百分比：友好时长后追加（xx.x%）；值为 null 显'未知'，分母 null/<=0 时不追加（除零保护）；SuppressZero 时 0 值不挂百分比。仅展示层现算，不落 stats.json
 function Format-WithPercent {
-    param([object]$Seconds, [object]$BaseSec)
+    param([object]$Seconds, [object]$BaseSec, [bool]$SuppressZero = $false)
     if ($null -eq $Seconds) { return '未知' }
     $text = Format-FriendlyDuration -Seconds ([int]$Seconds)
+    if ($SuppressZero -and [double]$Seconds -eq 0) { return $text }
     if ($null -eq $BaseSec -or [double]$BaseSec -le 0) { return $text }
     $pct = [double]$Seconds / [double]$BaseSec * 100
     return "$text（$($pct.ToString('0.0'))%）"
@@ -476,11 +477,12 @@ if ($children.Count -gt 0) {
     }
 }
 $childSpanText = if ($children.Count -eq 0) { '—' } else { Format-Stat $childSpanSec }
+# 总览三列统一分母 = 总跨度（$spanSec，三列中最大）：横向可比、自身+子主题可相加出总列；0 值不挂百分比
 $overviewRows = @(
-    @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $wallClockSec); C = (Format-WithPercent $childRound $childSpanSec); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec) }
-    @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $wallClockSec) / $(Format-WithPercent $aiSecTotal $wallClockSec)"; C = "$(Format-WithPercent $childHuman $childSpanSec) / $(Format-WithPercent $childAi $childSpanSec)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec) / $(Format-WithPercent $aggregate.aiSec $spanSec)" }
-    @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $wallClockSec); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $childSpanSec); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec) }
-    @{ Label = '活跃时长（剔除空闲段）'; S = (Format-WithPercent $activeSec $wallClockSec); C = (Format-WithPercent ($aggregate.activeSec - $activeSec) $childSpanSec); T = (Format-WithPercent $aggregate.activeSec $spanSec) }
+    @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $spanSec $true); C = (Format-WithPercent $childRound $spanSec $true); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec $true) }
+    @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $spanSec $true) / $(Format-WithPercent $aiSecTotal $spanSec $true)"; C = "$(Format-WithPercent $childHuman $spanSec $true) / $(Format-WithPercent $childAi $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec $true) / $(Format-WithPercent $aggregate.aiSec $spanSec $true)" }
+    @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $spanSec $true); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $spanSec $true); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec $true) }
+    @{ Label = '活跃时长（剔除空闲段）'; S = (Format-WithPercent $activeSec $spanSec $true); C = (Format-WithPercent ($aggregate.activeSec - $activeSec) $spanSec $true); T = (Format-WithPercent $aggregate.activeSec $spanSec $true) }
     @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
     @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
     @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
@@ -564,7 +566,7 @@ if ($children.Count -gt 0) {
 [void]$sb.AppendLine("- 字符数 >=1万 按量级缩写（如 2.05万），精确值见 stats.json")
 [void]$sb.AppendLine("- 重复发送去重：同 target 且配对同一完成通知的重复发送合并为一轮，取首次发送数值（明细文件列标注已合并）")
 [void]$sb.AppendLine("- 多 target 发送：人耗时/轮间间隔只计入第一个有效文件行，其余记 0；文件不存在且无通知的虚空行不列入明细（全虚空时保留首行记未闭环）")
-[void]$sb.AppendLine("- 百分比分母：自身墙钟时长（总览子主题列/总列分别为子主题跨度/总跨度）；无发送记录的孤儿时段不计轮，故百分比合计可能不足 100%")
+[void]$sb.AppendLine("- 百分比分母：总览三列统一为总跨度（可跨列相加：自身+子主题≈总）；自身统计与轮次明细为自身墙钟；无发送记录的孤儿时段不计轮，故百分比合计可能不足 100%")
 [void]$sb.AppendLine("- 复关系单列不计轮次；未知轮数=三类发送中无 target 的计数
 - 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；活跃/墙钟类仅自身不求和，总跨度取最早创建→最晚活动
 - 子主题识别：后代目录含 .aiprocess 即子主题（结果微调为容器），只聚合直接子")
