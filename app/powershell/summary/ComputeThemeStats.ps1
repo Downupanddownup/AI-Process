@@ -170,9 +170,27 @@ $sendActions = @('复需求', '复回复', '复执行')
 $discussion = 0; $execute = 0; $unknown = 0
 $executeByStrategy = [ordered]@{}
 $roundDetail = @()
+# 重复发送去重：同 target 且配对同一完成通知 → 合并为一轮（取首次发送数值）；$pairedNotifKeyByTarget 登记 target→通知键，$dupSendCountByTarget 记重复次数供统计.md 标注
+$pairedNotifKeyByTarget = @{}
+$dupSendCountByTarget = @{}
 
 foreach ($e in $entries) {
     if ($sendActions -notcontains $e.action) { continue }
+
+    # 去重判定（仅单 target 发送参与；多 target 含 '|' 的维持逐文件配对现状）
+    $targetParts = @($e.target -split '\|' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+    if ($targetParts.Count -eq 1) {
+        $dupCheckEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $targetParts[0] -After $e.time
+        if ($null -ne $dupCheckEnd) {
+            $notifKey = $dupCheckEnd.ToString('yyyyMMddHHmmss')
+            if ($pairedNotifKeyByTarget.ContainsKey($targetParts[0]) -and $pairedNotifKeyByTarget[$targetParts[0]] -eq $notifKey) {
+                $dupSendCountByTarget[$targetParts[0]]++
+                continue
+            }
+            $pairedNotifKeyByTarget[$targetParts[0]] = $notifKey
+        }
+    }
+
     if ($e.action -eq '复执行') {
         $execute++
         $strategyKey = if ([string]::IsNullOrWhiteSpace($e.strategy)) { '未标注' } else { $e.strategy }
@@ -202,10 +220,26 @@ foreach ($e in $entries) {
         }
     }
 
+    # 多 target 逐文件配对：先判定各 target 是否有效（文件存在或有完成通知）；
+    # 虚空 target（文件不存在且无通知）剔除——统计只反映实际产出；全虚空时保留首个记"未闭环"（人的时间不丢账）；
+    # 人耗时/轮间间隔只归属第一个有效行，其余有效行记 0（一条发送只有一份）；AI耗时/字数仍逐文件独立
+    $partInfos = @()
     foreach ($part in ($e.target -split '\|')) {
         $fileName = $part.Trim()
         if ($fileName -eq '') { continue }
-        $aiEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $e.time
+        $partEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $e.time
+        $partInfos += [PSCustomObject]@{
+            fileName   = $fileName
+            aiEnd      = $partEnd
+            fileExists = (Test-Path -LiteralPath (Join-Path $ThemePath $fileName))
+        }
+    }
+    $kept = @($partInfos | Where-Object { $_.fileExists -or $null -ne $_.aiEnd })
+    if ($kept.Count -eq 0 -and $partInfos.Count -gt 0) { $kept = @($partInfos[0]) }
+    $isFirstKept = $true
+    foreach ($pi in $kept) {
+        $fileName = $pi.fileName
+        $aiEnd = $pi.aiEnd
         $aiEndKnown = ($null -ne $aiEnd)
         # 无完成通知 = 该轮未闭环：aiSec 记 null 不编造（统计脚本在完成通知后触发，缺通知即真未完成）；人耗时段不受影响照常计算
         $humanStart = if ($null -ne $human) { $human.humanStart } else { $null }
@@ -213,8 +247,12 @@ foreach ($e in $entries) {
         $aiSec = $null
         if ($aiEndKnown) { $aiSec = $breakdown.aiSeconds }
         $humanSec = $null
-        if ($isExecute) { $humanSec = 0 }
+        if (-not $isFirstKept) { $humanSec = 0 }
+        elseif ($isExecute) { $humanSec = 0 }
         elseif (-not $human.humanUnknown) { $humanSec = $breakdown.humanSeconds }
+        $rowGapSec = if ($isFirstKept) { $gapSec } else { 0 }
+        $rowHumanChars = 0
+        if ($isFirstKept -and -not $isExecute) { $rowHumanChars = $srcChars }
         $aiChars = Get-FileCharCount -Path (Join-Path $ThemePath $fileName) -AiBody $true
         $totalSec = $null
         if ($null -ne $humanSec -or $null -ne $aiSec) {
@@ -222,6 +260,7 @@ foreach ($e in $entries) {
             if ($null -ne $humanSec) { $totalSec += $humanSec }
             if ($null -ne $aiSec) { $totalSec += $aiSec }
         }
+        $isFirstKept = $false
 
         $roundDetail += [PSCustomObject][ordered]@{
             file       = $fileName
@@ -230,8 +269,8 @@ foreach ($e in $entries) {
             humanSec   = $humanSec
             aiSec      = $aiSec
             totalSec   = $totalSec
-            gapSec     = $gapSec
-            humanChars = $(if ($isExecute) { 0 } else { $srcChars })
+            gapSec     = $rowGapSec
+            humanChars = $rowHumanChars
             aiChars    = $aiChars
             known      = ($aiEndKnown -and ($isExecute -or -not $human.humanUnknown))
         }
@@ -390,6 +429,16 @@ function Format-Stat {
     return Format-FriendlyDuration -Seconds ([int]$Seconds)
 }
 
+# 百分比：友好时长后追加（xx.x%）；值为 null 显'未知'，分母 null/<=0 时不追加（除零保护）。仅展示层现算，不落 stats.json
+function Format-WithPercent {
+    param([object]$Seconds, [object]$BaseSec)
+    if ($null -eq $Seconds) { return '未知' }
+    $text = Format-FriendlyDuration -Seconds ([int]$Seconds)
+    if ($null -eq $BaseSec -or [double]$BaseSec -le 0) { return $text }
+    $pct = [double]$Seconds / [double]$BaseSec * 100
+    return "$text（$($pct.ToString('0.0'))%）"
+}
+
 $themeName = Split-Path -Leaf $ThemePath
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("# $themeName — 总体统计")
@@ -428,9 +477,10 @@ if ($children.Count -gt 0) {
 }
 $childSpanText = if ($children.Count -eq 0) { '—' } else { Format-Stat $childSpanSec }
 $overviewRows = @(
-    @{ Label = '总投入（人+AI）'; S = (Format-Stat $roundTotalSec); C = (Format-Stat $childRound); T = (Format-Stat $aggregate.roundTotalSec) }
-    @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-Stat $humanSecTotal) / $(Format-Stat $aiSecTotal)"; C = "$(Format-Stat $childHuman) / $(Format-Stat $childAi)"; T = "$(Format-Stat $aggregate.humanSec) / $(Format-Stat $aggregate.aiSec)" }
-    @{ Label = '活跃时长（剔除空闲段）'; S = (Format-Stat $activeSec); C = (Format-Stat ($aggregate.activeSec - $activeSec)); T = (Format-Stat $aggregate.activeSec) }
+    @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $wallClockSec); C = (Format-WithPercent $childRound $childSpanSec); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec) }
+    @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $wallClockSec) / $(Format-WithPercent $aiSecTotal $wallClockSec)"; C = "$(Format-WithPercent $childHuman $childSpanSec) / $(Format-WithPercent $childAi $childSpanSec)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec) / $(Format-WithPercent $aggregate.aiSec $spanSec)" }
+    @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $wallClockSec); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $childSpanSec); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec) }
+    @{ Label = '活跃时长（剔除空闲段）'; S = (Format-WithPercent $activeSec $wallClockSec); C = (Format-WithPercent ($aggregate.activeSec - $activeSec) $childSpanSec); T = (Format-WithPercent $aggregate.activeSec $spanSec) }
     @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
     @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
     @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
@@ -447,13 +497,13 @@ foreach ($row in $overviewRows) {
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("| 指标 | 值 |")
 [void]$sb.AppendLine("|---|---|")
-[void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-Stat $roundTotalSec) |")
-[void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-Stat $humanSecTotal) |")
-[void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-Stat $aiSecTotal) |")
-[void]$sb.AppendLine("| 轮间间隔合计 | $(Format-Stat $gapTotalSec) |")
-[void]$sb.AppendLine("| 总时长（活跃，剔除 >${threshold}min 空闲段） | $(Format-Stat $activeSec) |")
+[void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-WithPercent $roundTotalSec $wallClockSec) |")
+[void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-WithPercent $humanSecTotal $wallClockSec) |")
+[void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-WithPercent $aiSecTotal $wallClockSec) |")
+[void]$sb.AppendLine("| 轮间间隔合计 | $(Format-WithPercent $gapTotalSec $wallClockSec) |")
+[void]$sb.AppendLine("| 总时长（活跃，剔除 >${threshold}min 空闲段） | $(Format-WithPercent $activeSec $wallClockSec) |")
 [void]$sb.AppendLine("| 墙钟时长（首末日志原始跨度） | $(Format-Stat $wallClockSec) |")
-[void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-Stat $idleIgnoredSec) / $idleIgnoredCount 段 |")
+[void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-WithPercent $idleIgnoredSec $wallClockSec) / $idleIgnoredCount 段 |")
 $strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
 if ($strategyText -eq '') { $strategyText = '无' }
 [void]$sb.AppendLine("| 讨论轮 / 执行轮 | $discussion / $execute（$strategyText） |")
@@ -477,10 +527,14 @@ foreach ($r in $roundDetail) {
     $hc = Format-FriendlyCount $r.humanChars
     $ac = Format-FriendlyCount $r.aiChars
     $ag = if ([string]::IsNullOrWhiteSpace($r.agent)) { '' } else { $r.agent }
-    [void]$sb.AppendLine("| $($r.file) | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-Stat $r.totalSec) | $(Format-Stat $r.gapSec) | $hc | $ac | $ag |")
+    $fileText = $r.file
+    if ($dupSendCountByTarget.ContainsKey($r.file) -and $dupSendCountByTarget[$r.file] -gt 0) {
+        $fileText = "$($r.file)（重复发送 $($dupSendCountByTarget[$r.file] + 1) 次已合并）"
+    }
+    [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $hc | $ac | $ag |")
 }
 if ($roundDetail.Count -gt 0) {
-    [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-Stat $roundTotalSec) | $(Format-Stat $gapTotalSec) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
+    [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
 }
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## 子主题汇总")
@@ -508,6 +562,9 @@ if ($children.Count -gt 0) {
 [void]$sb.AppendLine("- 总时长（活跃）= 首末日志剔除 >${threshold}min 空闲段；墙钟=首末日志原始跨度")
 [void]$sb.AppendLine("- 人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）")
 [void]$sb.AppendLine("- 字符数 >=1万 按量级缩写（如 2.05万），精确值见 stats.json")
+[void]$sb.AppendLine("- 重复发送去重：同 target 且配对同一完成通知的重复发送合并为一轮，取首次发送数值（明细文件列标注已合并）")
+[void]$sb.AppendLine("- 多 target 发送：人耗时/轮间间隔只计入第一个有效文件行，其余记 0；文件不存在且无通知的虚空行不列入明细（全虚空时保留首行记未闭环）")
+[void]$sb.AppendLine("- 百分比分母：自身墙钟时长（总览子主题列/总列分别为子主题跨度/总跨度）；无发送记录的孤儿时段不计轮，故百分比合计可能不足 100%")
 [void]$sb.AppendLine("- 复关系单列不计轮次；未知轮数=三类发送中无 target 的计数
 - 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；活跃/墙钟类仅自身不求和，总跨度取最早创建→最晚活动
 - 子主题识别：后代目录含 .aiprocess 即子主题（结果微调为容器），只聚合直接子")
