@@ -171,6 +171,9 @@ GetAllFilesRecursive(dirPath) {
         result.Push(filePath)
     }
     for dir in sortedSubdirs {
+        if (ExtractFileName(dir) = ".aiprocess") {
+            continue
+        }
         subResult := GetAllFilesRecursive(dir)
         for subPath in subResult {
             result.Push(subPath)

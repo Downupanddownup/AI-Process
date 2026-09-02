@@ -155,6 +155,27 @@ AppendExecuteNotificationIfNeeded(content) {
 
 
 
+AppendContextRelationTailIfNeeded(content) {
+    global AppConfig, TemplateDir
+    windowId := GetActiveWindowId()
+
+    templatePath := TemplateDir "\context_relation_tail.txt"
+    if !FileExist(templatePath) {
+        return content
+    }
+
+    template := FileRead(templatePath, "UTF-8")
+    template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
+    template := StrReplace(template, "{{windowId}}", windowId)
+    silentArg := GetSession(windowId, "ShowExecuteNotification") ? "" : " -Silent"
+    template := StrReplace(template, "{{silentArg}}", silentArg)
+
+    baseContent := RTrim(content, "`r`n")
+    return baseContent "`r`n`r`n" template
+}
+
+
+
 BuildContextRelationsText() {
     currentDir := GetCurrentDir()
 
@@ -255,8 +276,9 @@ CopyContextRelations(*) {
     content := BuildContextRelationsText()
     content := AppendNoModifyPromptIfNeeded(content)
     content := AppendOpenMdPromptIfNeeded(content)
+    content := AppendContextRelationTailIfNeeded(content)
     A_Clipboard := content
-    LogActivity("复关系", content)
+    LogActivity("复关系", content, Map("target", "上下文重建"))
     ShowFeedback("文件关系说明已复制")
     HandleAgentWindowAfterCopy()
 

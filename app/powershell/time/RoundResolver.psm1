@@ -147,6 +147,17 @@ function Get-FirstTargetNotificationAfter {
 }
 
 # ---------- 轮间间隔：本轮起点（建X，无则复X）− 此前最近一条完成通知；首轮为 0 ----------
+# 完成通知按 target 锚定到具体轮次：非 round 文件（如 复关系 的 target=上下文重建）不算轮次结束，不参与轮间间隔
+function Test-RoundFileTarget {
+    param([string]$TargetValue)
+    if ([string]::IsNullOrWhiteSpace($TargetValue)) { return $false }
+    foreach ($part in ($TargetValue -split '\|')) {
+        $p = $part.Trim()
+        if ($p -match '^v\d+\.md$' -or $p -eq '实施文档.md' -or $p -eq '已实施.md') { return $true }
+    }
+    return $false
+}
+
 function Get-RoundGap {
     param(
         [array]$Entries,
@@ -155,6 +166,7 @@ function Get-RoundGap {
     $prevEnd = $null
     foreach ($e in $Entries) {
         if ($e.action -ne '完成通知') { continue }
+        if (-not (Test-RoundFileTarget $e.target)) { continue }
         if ($e.time -lt $RoundStart -and ($null -eq $prevEnd -or $e.time -gt $prevEnd)) { $prevEnd = $e.time }
     }
     if ($null -eq $prevEnd) { return 0 }
