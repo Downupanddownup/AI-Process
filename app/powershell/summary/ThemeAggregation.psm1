@@ -51,7 +51,7 @@ function Merge-Aggregate {
     $sumFields = @(
         'humanSec', 'aiSec', 'roundTotalSec', 'gapTotalSec', 'activeSec',
         'files', 'humanFiles', 'aiFiles', 'humanChars', 'aiChars',
-        'discussion', 'execute', 'unknown', 'handoffCount'
+        'discussion', 'execute', 'unknown', 'rebuild'
     )
     $merged = [ordered]@{}
     foreach ($f in $sumFields) {

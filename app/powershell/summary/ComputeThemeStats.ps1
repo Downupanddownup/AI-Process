@@ -17,7 +17,7 @@
     口径要点（实施文档 §三 + 测试/对整体统计的测试 v4 定稿）：
       - 人思考时长：仅讨论轮（建X→复X）；执行轮恒 0；
       - 未知轮数：仅 复需求/复回复/复执行 三类发送中无 target 的计数；
-      - 复关系（交接指令）：单列 handoff 指标，不计轮次/unknown/人字符串数；
+      - 复关系（上下文重建）：计为重建轮（与讨论/执行并列），人耗时/字数恒 0，其完成通知参与轮间间隔锚点；
       - 老日志无 agent 字段记空串；配不上对的轮次时长记 null，不编造；
       - 轮次总耗时（人+AI）= 各轮 humanSec+aiSec 合计；轮间间隔 = 本轮起点（建X，无则复X）− 上一轮完成通知，首轮恒 0。
 
@@ -252,6 +252,7 @@ foreach ($e in $entries) {
             file       = $fileName
             type       = $roundType
             agent      = $e.agent
+            sendTime   = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
             humanSec   = $humanSec
             aiSec      = $aiSec
             totalSec   = $totalSec
@@ -263,11 +264,12 @@ foreach ($e in $entries) {
     }
 }
 
-# ---------- 复关系（交接指令）：单列，不进轮次/unknown/人字符串 ----------
-$handoffCount = 0; $handoffChars = 0
-foreach ($e in $entries) {
-    if ($e.action -eq '复关系') { $handoffCount++; $handoffChars += $e.contentChars }
-}
+# ---------- 重建轮：复关系 → 上下文重建完成通知；人耗时/字数恒 0；按发送时间并入明细 ----------
+$rebuildRows = @(Get-RebuildRoundRows -Entries $entries)
+$rebuild = $rebuildRows.Count
+$rebuildAiSecTotal = 0
+foreach ($r in $rebuildRows) { if ($null -ne $r.aiSec) { $rebuildAiSecTotal += $r.aiSec } }
+$roundDetail = @($roundDetail + $rebuildRows | Sort-Object sendTime)
 
 # ---------- 时长类 ----------
 $activeSec = 0; $wallClockSec = 0; $idleIgnoredSec = 0; $idleIgnoredCount = 0
@@ -343,7 +345,7 @@ $selfAgg = [PSCustomObject][ordered]@{
     discussion    = $discussion
     execute       = $execute
     unknown       = $unknown
-    handoffCount  = $handoffCount
+    rebuild       = $rebuild
     createdAt     = $createdAt
     lastActiveAt  = $lastAt
 }
@@ -390,10 +392,10 @@ $stats = [PSCustomObject][ordered]@{
     rounds     = [PSCustomObject][ordered]@{
         discussion        = $discussion
         execute           = $execute
+        rebuild           = $rebuild
         executeByStrategy = $executeByStrategy
         unknown           = $unknown
     }
-    handoff    = [PSCustomObject][ordered]@{ count = $handoffCount; chars = $handoffChars }
     derived    = [PSCustomObject][ordered]@{
         avgHumanSec  = $avgHumanSec
         avgAiSec     = $avgAiSec
@@ -440,6 +442,7 @@ $childHuman = $aggregate.humanSec - $humanSecTotal
 $childAi = $aggregate.aiSec - $aiSecTotal
 $childDisc = $aggregate.discussion - $discussion
 $childExec = $aggregate.execute - $execute
+$childRebuild = $aggregate.rebuild - $rebuild
 $childFiles = $aggregate.files - $fileTotal
 $childHChars = $aggregate.humanChars - $humanCharsTotal
 $childAChars = $aggregate.aiChars - $aiCharsTotal
@@ -471,7 +474,7 @@ $overviewRows = @(
     @{ Label = '活跃时长（剔除空闲段）'; S = (Format-WithPercent $activeSec $spanSec $true); C = (Format-WithPercent ($aggregate.activeSec - $activeSec) $spanSec $true); T = (Format-WithPercent $aggregate.activeSec $spanSec $true) }
     @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
     @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
-    @{ Label = '轮次（讨论 / 执行）'; S = "$discussion / $execute"; C = "$childDisc / $childExec"; T = "$($aggregate.discussion) / $($aggregate.execute)" }
+    @{ Label = '轮次（讨论 / 执行 / 重建）'; S = "$discussion / $execute / $rebuild"; C = "$childDisc / $childExec / $childRebuild"; T = "$($aggregate.discussion) / $($aggregate.execute) / $($aggregate.rebuild)" }
     @{ Label = '文件数'; S = "$fileTotal"; C = "$childFiles"; T = "$($aggregate.files)" }
     @{ Label = '字符数（人 / AI）'; S = "$(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal)"; C = "$(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars)"; T = "$(Format-FriendlyCount $aggregate.humanChars) / $(Format-FriendlyCount $aggregate.aiChars)" }
 )
@@ -494,14 +497,14 @@ foreach ($row in $overviewRows) {
 [void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-WithPercent $idleIgnoredSec $wallClockSec) / $idleIgnoredCount 段 |")
 $strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
 if ($strategyText -eq '') { $strategyText = '无' }
-[void]$sb.AppendLine("| 讨论轮 / 执行轮 | $discussion / $execute（$strategyText） |")
+[void]$sb.AppendLine("| 讨论轮 / 执行轮 / 重建轮 | $discussion / $execute / $rebuild（$strategyText） |")
 [void]$sb.AppendLine("| 文件数（总 / 人 / AI） | $fileTotal / $humanFiles / $aiFiles |")
 [void]$sb.AppendLine("| 字符数（人 / AI） | $(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal) 字符 |")
 [void]$sb.AppendLine("| 未知轮数（老日志配不上对） | $unknown |")
 [void]$sb.AppendLine("| 平均每轮耗时（人 / AI） | $(Format-Stat $avgHumanSec) / $(Format-Stat $avgAiSec) |")
 $longestText = if ($longestFile -eq '') { '无' } else { "$longestFile（$(Format-Stat $longestSec)）" }
 [void]$sb.AppendLine("| 最长轮次 | $longestText |")
-[void]$sb.AppendLine("| 交接提示（复关系） | $handoffCount 次 / $handoffChars 字符 |")
+[void]$sb.AppendLine("| 重建轮（复关系） | $rebuild 次 / AI 耗时 $(Format-Stat $rebuildAiSecTotal) |")
 $agentsText = if ($agents.Count -gt 0) { $agents -join '、' } else { '未知' }
 [void]$sb.AppendLine("| 参与 Agent | $agentsText |")
 [void]$sb.AppendLine("| 主题创建 / 最后活动 | $(if ($createdAt) { $createdAt } else { '未知' }) / $(if ($lastAt) { $lastAt } else { '未知' }) |")
@@ -511,7 +514,7 @@ $agentsText = if ($agents.Count -gt 0) { $agents -join '、' } else { '未知' }
 [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 人字数 | AI字数 | Agent |")
 [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|")
 foreach ($r in $roundDetail) {
-    $typeText = if ($r.type -eq 'execute') { '执行' } else { '讨论' }
+    $typeText = if ($r.type -eq 'execute') { '执行' } elseif ($r.type -eq 'rebuild') { '重建' } else { '讨论' }
     $hc = Format-FriendlyCount $r.humanChars
     $ac = Format-FriendlyCount $r.aiChars
     $ag = if ([string]::IsNullOrWhiteSpace($r.agent)) { '' } else { $r.agent }
@@ -528,15 +531,15 @@ if ($roundDetail.Count -gt 0) {
 [void]$sb.AppendLine("## 子主题汇总")
 [void]$sb.AppendLine("")
 if ($children.Count -gt 0) {
-    [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执) | 总投入 | 人 / AI | 文件数 | 字符数(人/AI) | 最后活动 |")
+    [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执/建) | 总投入 | 人 / AI | 文件数 | 字符数(人/AI) | 最后活动 |")
     [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|")
     foreach ($ch in $children) {
         $ca = $ch.aggregate
         $lastText = if ($ca.lastActiveAt) { $ca.lastActiveAt } else { '未知' }
-        [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
+        [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) / $($ca.rebuild) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
     }
     # 合计行：与"总览"的"子主题"列数值一致，可互查
-    [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
+    [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec / $childRebuild | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
 } else {
     [void]$sb.AppendLine("无子主题。")
 }
@@ -553,7 +556,7 @@ if ($children.Count -gt 0) {
 [void]$sb.AppendLine("- 重复发送去重：同 target 且配对同一完成通知的重复发送合并为一轮，取首次发送数值（明细文件列标注已合并）")
 [void]$sb.AppendLine("- 多 target 发送：人耗时/轮间间隔只计入第一个有效文件行，其余记 0；文件不存在且无通知的虚空行不列入明细（全虚空时保留首行记未闭环）")
 [void]$sb.AppendLine("- 百分比分母：总览三列统一为总跨度（可跨列相加：自身+子主题≈总）；自身统计与轮次明细为自身墙钟；无发送记录的孤儿时段不计轮，故百分比合计可能不足 100%")
-[void]$sb.AppendLine("- 复关系单列不计轮次；未知轮数=三类发送中无 target 的计数
+[void]$sb.AppendLine("- 重建轮=复关系发送→上下文重建完成通知（人耗时/字数恒 0，轮间间隔照常，其完成通知参与轮间锚点）；未知轮数=三类发送中无 target 的计数
 - 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；活跃/墙钟类仅自身不求和，总跨度取最早创建→最晚活动
 - 子主题识别：后代目录含 .aiprocess 即子主题（结果微调为容器），只聚合直接子")
 [void]$sb.AppendLine("- 计算时间：$($now.ToString('yyyy-MM-dd HH:mm:ss'))（脚本自动生成，每次重算全量覆盖）")

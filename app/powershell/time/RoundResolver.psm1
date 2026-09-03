@@ -10,6 +10,7 @@
       - Get-FirstTargetNotificationAfter：thisSend 之后第一条同 target 的完成通知。
       - Get-HumanStartForSend：按发送动作的 source 定位人思考起点（建X）；复执行恒无（人耗时 0）。
       - Get-RoundGap：轮间间隔 = 本轮起点 − 此前最近一条完成通知；首轮或无先例通知时为 0。
+      - Get-RebuildRoundRows：重建轮（复关系 → 上下文重建完成通知）；人耗时/字数恒 0，轮间间隔照常。
 
     兼容 Windows PowerShell 5.1。保持单向依赖：本模块不引用任何调用方/业务模块。
 #>
@@ -151,13 +152,13 @@ function Get-FirstTargetNotificationAfter {
 }
 
 # ---------- 轮间间隔：本轮起点（建X，无则复X）− 此前最近一条完成通知；首轮为 0 ----------
-# 完成通知按 target 锚定到具体轮次：非 round 文件（如 复关系 的 target=上下文重建）不算轮次结束，不参与轮间间隔
+# 完成通知按 target 锚定到具体轮次：轮次文件与 上下文重建（复关系/重建轮）均算轮次结束，参与轮间间隔
 function Test-RoundFileTarget {
     param([string]$TargetValue)
     if ([string]::IsNullOrWhiteSpace($TargetValue)) { return $false }
     foreach ($part in ($TargetValue -split '\|')) {
         $p = $part.Trim()
-        if ($p -match '^v\d+\.md$' -or $p -eq '实施文档.md' -or $p -eq '已实施.md') { return $true }
+        if ($p -match '^v\d+\.md$' -or $p -eq '实施文档.md' -or $p -eq '已实施.md' -or $p -eq '上下文重建') { return $true }
     }
     return $false
 }
@@ -177,4 +178,37 @@ function Get-RoundGap {
     return [int][Math]::Round(($RoundStart - $prevEnd).TotalSeconds)
 }
 
-Export-ModuleMember -Function Get-LogEntries, Test-TargetMatch, Get-TargetRoundInfo, Get-FirstTargetNotificationAfter, Get-HumanStartForSend, Get-RoundGap
+# ---------- 重建轮：复关系发送 → target=上下文重建 完成通知；人耗时/字数恒 0；轮间间隔照常 ----------
+# 重复发送去重：与讨论/执行轮同口径——配对同一完成通知的重复 复关系 发送合并为一轮（取首次）
+function Get-RebuildRoundRows {
+    param([array]$Entries)
+    $rows = @()
+    $pairedNotifKey = $null
+    foreach ($e in $Entries) {
+        if ($e.action -ne '复关系') { continue }
+        $aiEnd = Get-FirstTargetNotificationAfter -Entries $Entries -FileName '上下文重建' -After $e.time
+        if ($null -ne $aiEnd) {
+            $notifKey = $aiEnd.ToString('yyyyMMddHHmmss')
+            if ($notifKey -eq $pairedNotifKey) { continue }
+            $pairedNotifKey = $notifKey
+        }
+        $aiSec = $null
+        if ($null -ne $aiEnd) { $aiSec = [int][Math]::Round(($aiEnd - $e.time).TotalSeconds) }
+        $rows += [PSCustomObject][ordered]@{
+            file       = '上下文重建'
+            type       = 'rebuild'
+            agent      = $e.agent
+            sendTime   = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
+            humanSec   = 0
+            aiSec      = $aiSec
+            totalSec   = $aiSec
+            gapSec     = (Get-RoundGap -Entries $Entries -RoundStart $e.time)
+            humanChars = 0
+            aiChars    = 0
+            known      = ($null -ne $aiEnd)
+        }
+    }
+    return $rows
+}
+
+Export-ModuleMember -Function Get-LogEntries, Test-TargetMatch, Get-TargetRoundInfo, Get-FirstTargetNotificationAfter, Get-HumanStartForSend, Get-RoundGap, Get-RebuildRoundRows
