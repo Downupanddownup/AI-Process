@@ -246,7 +246,9 @@ CopyReplyPrompt(*) {
     }
 
     content := AppendNoModifyPromptIfNeeded(content)
-    content := AppendQuestionTemplateIfNeeded(content)
+    if (!implChecked) {
+        content := AppendQuestionTemplateIfNeeded(content)
+    }
     content := AppendOpenMdPromptIfNeeded(content)
 
     properties := Map()
