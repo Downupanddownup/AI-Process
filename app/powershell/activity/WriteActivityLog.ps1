@@ -108,6 +108,16 @@ try {
         $record["agent"] = $AgentName.Trim()
     }
     $record["action"] = $Action
+    # 轮次类型：三类发送动作携带 round-type（复执行=execute，复需求/复回复=discussion），供统计直读
+    if ($Action -eq '复执行' -or $Action -eq '复需求' -or $Action -eq '复回复') {
+        $rt = 'discussion'
+        if ($Action -eq '复执行') { $rt = 'execute' }
+        if ($properties -is [System.Collections.IDictionary]) {
+            $properties["round-type"] = $rt
+        } else {
+            $properties | Add-Member -NotePropertyName 'round-type' -NotePropertyValue $rt -Force
+        }
+    }
     $record["properties"] = $properties
     $record["content"] = $content
 

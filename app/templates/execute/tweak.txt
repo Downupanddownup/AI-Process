@@ -1,1 +1,7 @@
-改吧
+改吧，请在完成后将执行结果写入 {{resultFilePath}}
+
+文件格式请参考：{{resultTemplatePath}}
+
+结束指令：保存后立即执行以下命令打开，随后结束回复。
+
+powershell -ExecutionPolicy Bypass -File "{{openMdScriptPath}}" -FilePath "{{resultFilePath}}" -WindowId "{{windowId}}"

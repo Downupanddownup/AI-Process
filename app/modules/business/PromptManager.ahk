@@ -131,16 +131,6 @@ AppendExecuteNotificationIfNeeded(content) {
         return content
     }
 
-    ; 改吧：无条件追加，指向 WriteExecResultDoc（结果文档+打开由其处理；通知由脚本按开关控制）
-    if (GetSelectedExecuteStrategy() = "tweak") {
-        template := FileRead(templatePath, "UTF-8")
-        template := StrReplace(template, "{{scriptPath}}", AppConfig["ExecResultScriptPath"])
-        template := StrReplace(template, "{{windowId}}", windowId)
-        template := StrReplace(template, "{{silentArg}}", "")
-        baseContent := RTrim(content, "`r`n")
-        return baseContent "`r`n`r`n" template
-    }
-
     ; 其它策略：无条件追加（日志补全：完成时刻必须落日志）；
     ; "显示通知"开关关闭时以 -Silent 调用：日志照写、不弹窗
     template := FileRead(templatePath, "UTF-8")
@@ -290,6 +280,7 @@ CopyContextRelations(*) {
 
 
 CopyExecutePrompt(*) {
+    global AppConfig, TemplateDir
     if !EnsureCurrentDirectory() {
         return
     }
@@ -299,8 +290,17 @@ CopyExecutePrompt(*) {
     strategyMeta := GetExecuteStrategyMeta(selectedStrategy)
 
     if (selectedStrategy = "tweak") {
-        ; "改吧"策略：不需要实施文档.md
+        ; "改吧"策略：结果文档由 AI 按模板撰写，文件名沿用同一规则（有实施文档.md→已实施.md，否则 v(N+1).md）
+        if FileExist(currentDir "\实施文档.md") {
+            resultName := "已实施.md"
+        } else {
+            resultName := "v" (GetLatestVersionNumber(currentDir) + 1) ".md"
+        }
         content := LoadTemplate(strategyMeta["template"])
+        content := StrReplace(content, "{{resultFilePath}}", currentDir "\" resultName)
+        content := StrReplace(content, "{{resultTemplatePath}}", TemplateDir "\execute\result_doc.md")
+        content := StrReplace(content, "{{openMdScriptPath}}", AppConfig["OpenMdScriptPath"])
+        content := StrReplace(content, "{{windowId}}", GetActiveWindowId())
     } else {
         ; 原有 4 种策略：必须存在实施文档.md
         implementationPath := currentDir "\实施文档.md"
@@ -312,16 +312,14 @@ CopyExecutePrompt(*) {
         content := StrReplace(content, "{{filePath}}", implementationPath)
     }
 
-    content := AppendExecuteNotificationIfNeeded(content)
+    if (selectedStrategy != "tweak") {
+        content := AppendExecuteNotificationIfNeeded(content)
+    }
 
     properties := Map("执行策略", strategyMeta["label"])
     if (selectedStrategy = "tweak") {
-        ; 改吧会产出结果 md：按 WriteExecResultDoc 同一命名规则预填 target
-        if FileExist(currentDir "\实施文档.md") {
-            properties["target"] := "已实施.md"
-        } else {
-            properties["target"] := "v" (GetLatestVersionNumber(currentDir) + 1) ".md"
-        }
+        ; 改吧会产出结果 md：target 复用上面已算出的 resultName
+        properties["target"] := resultName
     }
 
     A_Clipboard := content

@@ -148,7 +148,7 @@ foreach ($f in (Get-ChildItem -LiteralPath $ThemePath -File -ErrorAction Silentl
 
 # ---------- 轮次明细：遍历三类发送，按 target 拆候选逐文件配对 ----------
 $sendActions = @('复需求', '复回复', '复执行')
-$discussion = 0; $execute = 0; $unknown = 0
+$discussion = 0; $execute = 0; $unknown = 0; $untyped = 0
 $executeByStrategy = [ordered]@{}
 $roundDetail = @()
 # 重复发送去重：同 target 且配对同一完成通知 → 合并为一轮（取首次发送数值）；$pairedNotifKeyByTarget 登记 target→通知键，$dupSendCountByTarget 记重复次数供统计.md 标注
@@ -172,17 +172,22 @@ foreach ($e in $entries) {
         }
     }
 
-    if ($e.action -eq '复执行') {
+    # 轮次类型直读日志 round-type 字段；老日志缺字段 → 计“未标注”，不报错
+    $roundType = '未标注'
+    if (-not [string]::IsNullOrWhiteSpace($e.roundType)) { $roundType = $e.roundType }
+    if ($roundType -eq 'execute') {
         $execute++
         $strategyKey = if ([string]::IsNullOrWhiteSpace($e.strategy)) { '未标注' } else { $e.strategy }
         if (-not $executeByStrategy.Contains($strategyKey)) { $executeByStrategy[$strategyKey] = 0 }
         $executeByStrategy[$strategyKey]++
-    } else {
+    } elseif ($roundType -eq 'discussion') {
         $discussion++
+    } else {
+        $untyped++
     }
     if ([string]::IsNullOrWhiteSpace($e.target)) { $unknown++; continue }
 
-    $isExecute = ($e.action -eq '复执行')
+    $isExecute = ($roundType -eq 'execute')
     $human = $null
     if (-not $isExecute) { $human = Get-HumanStartForSend -Entries $entries -Send $e }
 
@@ -245,7 +250,7 @@ foreach ($e in $entries) {
 
         $roundDetail += [PSCustomObject][ordered]@{
             file       = $fileName
-            type       = $(if ($isExecute) { 'execute' } else { 'discussion' })
+            type       = $roundType
             agent      = $e.agent
             humanSec   = $humanSec
             aiSec      = $aiSec

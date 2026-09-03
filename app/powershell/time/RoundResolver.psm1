@@ -37,8 +37,10 @@ function Get-LogEntries {
             if ($obj.agent) { $agent = [string]$obj.agent }
             $strategy = ""
             $contentChars = 0
+            $roundType = ""
             if ($obj.properties) {
                 if ($obj.properties.'执行策略') { $strategy = [string]$obj.properties.'执行策略' }
+                if ($obj.properties.'round-type') { $roundType = [string]$obj.properties.'round-type' }
             }
             if ($null -ne $obj.content) { $contentChars = ([string]$obj.content).Length }
             $result += [PSCustomObject]@{
@@ -48,6 +50,7 @@ function Get-LogEntries {
                 source       = $source
                 agent        = $agent
                 strategy     = $strategy
+                roundType    = $roundType
                 contentChars = $contentChars
             }
         } catch {
@@ -127,6 +130,7 @@ function Get-TargetRoundInfo {
         humanStart   = $human.humanStart
         humanUnknown = $human.humanUnknown
         thisSend     = $send.time
+        sendAction   = $send.action
     }
 }
 

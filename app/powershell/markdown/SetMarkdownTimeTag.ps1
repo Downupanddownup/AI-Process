@@ -81,7 +81,8 @@ function Write-FrontMatterTag {
         [string]$Gap,
         [string]$Human,
         [string]$Ai,
-        [string]$Total
+        [string]$Total,
+        [string]$RoundType = ""
     )
     # 英文短键，冒号/值对齐到同一列（与 ai-agent: "..." 的单空格布局对齐，值列 = 11）
     $padWidth = 10
@@ -90,6 +91,9 @@ function Write-FrontMatterTag {
     $tagLines += (("human:").PadRight($padWidth) + '"' + $Human + '"')
     $tagLines += (("ai:").PadRight($padWidth) + '"' + $Ai + '"')
     $tagLines += (("total:").PadRight($padWidth) + '"' + $Total + '"')
+    if ($RoundType -ne "") {
+        $tagLines += ('round-type: ' + '"' + $RoundType + '"')
+    }
 
     $rawBytes = [System.IO.File]::ReadAllBytes($Path)
     $hasBom = ($rawBytes.Length -ge 3 -and $rawBytes[0] -eq 0xEF -and $rawBytes[1] -eq 0xBB -and $rawBytes[2] -eq 0xBF)
@@ -118,8 +122,8 @@ function Write-FrontMatterTag {
         if ($bodyEnd -ge $bodyStart) {
             foreach ($kv in $lines[$bodyStart..$bodyEnd]) {
                 $t = $kv.Trim()
-                # 新的 gap/human/ai/total 键：跳过，稍后统一插回
-                if ($t -match "^(gap|human|ai|total)\s*:") { continue }
+                # 新的 gap/human/ai/total/round-type 键：跳过，稍后统一插回
+                if ($t -match "^(gap|human|ai|total|round-type)\s*:") { continue }
                 $built.Add($kv)
             }
         }
@@ -153,9 +157,18 @@ if ($null -eq $round) {
     exit 0
 }
 
+# 轮次类型：配对成功按发送动作派生；配对失败仅文件名可确定的（实施文档/已实施）才写，vN.md 不编造
+$roundTypeValue = ""
+if ($round.matched) {
+    if ($round.sendAction -eq '复执行') { $roundTypeValue = 'execute' } else { $roundTypeValue = 'discussion' }
+} else {
+    if ($fileName -eq '已实施.md') { $roundTypeValue = 'execute' }
+    elseif ($fileName -eq '实施文档.md') { $roundTypeValue = 'discussion' }
+}
+
 # 配对失败（日志无 target，如首轮直建实施文档.md）：写"未知"四键，不编造数字
 if (-not $round.matched) {
-    Write-FrontMatterTag -Path $FilePath -Gap "未知" -Human "未知" -Ai "未知" -Total "未知"
+    Write-FrontMatterTag -Path $FilePath -Gap "未知" -Human "未知" -Ai "未知" -Total "未知" -RoundType $roundTypeValue
     exit 0
 }
 
@@ -178,6 +191,6 @@ if ($round.humanUnknown) {
     $totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
 }
 
-Write-FrontMatterTag -Path $FilePath -Gap $gapDisplay -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay
+Write-FrontMatterTag -Path $FilePath -Gap $gapDisplay -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay -RoundType $roundTypeValue
 
 exit 0
