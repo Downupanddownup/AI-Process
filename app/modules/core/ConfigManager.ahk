@@ -140,7 +140,7 @@ EnsureDefaultFiles() {
         IniWrite("1", SettingsFile, "Window1", "AppendQuestionTemplate")
     }
     if (IniRead(SettingsFile, "Window1", "ExecuteStrategy", "") = "") {
-        IniWrite("ai_judge", SettingsFile, "Window1", "ExecuteStrategy")
+        IniWrite("tweak", SettingsFile, "Window1", "ExecuteStrategy")
     }
     if (IniRead(SettingsFile, "Window1", "ShowExecuteNotification", "") = "") {
         IniWrite("0", SettingsFile, "Window1", "ShowExecuteNotification")
@@ -190,7 +190,7 @@ EnsureDefaultFiles() {
         IniWrite("1", SettingsFile, "Window2", "AppendQuestionTemplate")
     }
     if (IniRead(SettingsFile, "Window2", "ExecuteStrategy", "") = "") {
-        IniWrite("ai_judge", SettingsFile, "Window2", "ExecuteStrategy")
+        IniWrite("tweak", SettingsFile, "Window2", "ExecuteStrategy")
     }
     if (IniRead(SettingsFile, "Window2", "ShowExecuteNotification", "") = "") {
         IniWrite("0", SettingsFile, "Window2", "ShowExecuteNotification")
@@ -240,7 +240,7 @@ EnsureDefaultFiles() {
         IniWrite("1", SettingsFile, "Window3", "AppendQuestionTemplate")
     }
     if (IniRead(SettingsFile, "Window3", "ExecuteStrategy", "") = "") {
-        IniWrite("ai_judge", SettingsFile, "Window3", "ExecuteStrategy")
+        IniWrite("tweak", SettingsFile, "Window3", "ExecuteStrategy")
     }
     if (IniRead(SettingsFile, "Window3", "ShowExecuteNotification", "") = "") {
         IniWrite("0", SettingsFile, "Window3", "ShowExecuteNotification")
@@ -281,27 +281,6 @@ EnsureDefaultFiles() {
         FileAppend(
         "当前目录中的 需求.txt 是原始需求说明；vX.md 是 AI 沟通过程中的版本文档；对vX的回复.txt 是用户对对应版本的回复；实施文档.md 是整个需求沟通收敛后的最终结论文件，也是后续正式实施时最重要的执行依据。这些文件按时间顺序构成完整沟通过程。新会话接管时，应优先阅读这些文件并完成上下文重建。"
         , relationTemplate, "UTF-8")
-    }
-
-    executeDirectTemplate := executeTemplateDir "\direct.txt"
-    if !FileExist(executeDirectTemplate) {
-        FileAppend(
-        "请你根据当前的实施文档：{{filePath}}，修改正式代码和文件，完成整个方案的落地。"
-        , executeDirectTemplate, "UTF-8")
-    }
-
-    executeAiJudgeTemplate := executeTemplateDir "\ai_judge.txt"
-    if !FileExist(executeAiJudgeTemplate) {
-        FileAppend(
-        "请查看当前实施文档：{{filePath}}。`n`n请先判断该方案是否需要拆解为多个实施步骤：`n- 如果不需要拆解，请直接修改正式代码和相关文件，完成方案落地。`n- 如果需要拆解，请在当前目录下创建 `实施步骤` 目录，并按合理顺序创建多个步骤 md 文件，格式如 `01-xxx.md`、`02-xxx.md`，确保覆盖实施文档全部内容，完成后依次执行。`n`n拆分要求：单个步骤文件不宜过大，也不宜过小；不要把简单功能拆成几十个文件，也不要把复杂功能只拆成 2-3 份文件。"
-        , executeAiJudgeTemplate, "UTF-8")
-    }
-
-    executeStepsFileTemplate := executeTemplateDir "\steps_file.txt"
-    if !FileExist(executeStepsFileTemplate) {
-        FileAppend(
-        "请你查看当前的实施文档：{{filePath}}。`n`n请不要直接修改正式代码。请在当前目录下按照合理的执行顺序创建多个步骤 md 文件（格式如 01-xxx.md、02-xxx.md 等），确保所有步骤合起来覆盖实施文档的全部内容。步骤文档写完后请先停下来，告诉我已经写好，等待我验收。"
-        , executeStepsFileTemplate, "UTF-8")
     }
 
     executeStepsDirTemplate := executeTemplateDir "\steps_dir.txt"
@@ -394,7 +373,7 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AppendImplementationTail"] := IniRead(SettingsFile, section, "AppendImplementationTail", "1") = "1"
         WindowSessions[windowId]["AppendQuestionRules"] := IniRead(SettingsFile, section, "AppendQuestionRules", "1") = "1"
         WindowSessions[windowId]["AppendQuestionTemplate"] := IniRead(SettingsFile, section, "AppendQuestionTemplate", "1") = "1"
-        WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "ai_judge")
+        WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "tweak")
         WindowSessions[windowId]["ShowExecuteNotification"] := IniRead(SettingsFile, section, "ShowExecuteNotification", "0") = "1"
     }
 }

@@ -21,7 +21,7 @@ global WindowSessions := Map(
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
         "AppendQuestionTemplate", true,
-        "ExecuteStrategy", "ai_judge",
+        "ExecuteStrategy", "tweak",
         "ShowExecuteNotification", false
     ),
     2, Map(
@@ -38,7 +38,7 @@ global WindowSessions := Map(
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
         "AppendQuestionTemplate", true,
-        "ExecuteStrategy", "ai_judge",
+        "ExecuteStrategy", "tweak",
         "ShowExecuteNotification", false
     ),
     3, Map(
@@ -55,7 +55,7 @@ global WindowSessions := Map(
         "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
         "AppendQuestionTemplate", true,
-        "ExecuteStrategy", "ai_judge",
+        "ExecuteStrategy", "tweak",
         "ShowExecuteNotification", false
     )
 )
