@@ -255,66 +255,6 @@ EnsureDefaultFiles() {
         IniWrite("4", SettingsFile, "SummaryAgent", "AgentAfterCopyAction")
     }
 
-    requirementTemplate := TemplateDir "\requirement_prompt.txt"
-    if !FileExist(requirementTemplate) {
-        FileAppend(
-        "这是一个需求文件，请你查看这个文件：{{filePath}}。如果你有新的想法或问题，请创建 v1.md；如果没有新的问题，请创建 实施文档.md。"
-        , requirementTemplate, "UTF-8")
-    }
-
-    replyTemplate := TemplateDir "\reply_prompt.txt"
-    if !FileExist(replyTemplate) {
-        FileAppend(
-        "这是一个回复文件，请你查看这个文件：{{filePath}}。如果你还有新的想法或问题，请创建 {{nextVersionFile}}。"
-        , replyTemplate, "UTF-8")
-    }
-
-    replyImplementationTailTemplate := TemplateDir "\reply_prompt_impl_tail.txt"
-    if !FileExist(replyImplementationTailTemplate) {
-        FileAppend(
-        "如果没有新的问题，请创建 实施文档.md。"
-        , replyImplementationTailTemplate, "UTF-8")
-    }
-
-    relationTemplate := TemplateDir "\context_relation.txt"
-    if !FileExist(relationTemplate) {
-        FileAppend(
-        "当前目录中的 需求.txt 是原始需求说明；vX.md 是 AI 沟通过程中的版本文档；对vX的回复.txt 是用户对对应版本的回复；实施文档.md 是整个需求沟通收敛后的最终结论文件，也是后续正式实施时最重要的执行依据。这些文件按时间顺序构成完整沟通过程。新会话接管时，应优先阅读这些文件并完成上下文重建。"
-        , relationTemplate, "UTF-8")
-    }
-
-    executeStepsDirTemplate := executeTemplateDir "\steps_dir.txt"
-    if !FileExist(executeStepsDirTemplate) {
-        FileAppend(
-        "请你查看当前的实施文档：{{filePath}}。`n`n请不要直接修改正式代码。请在当前目录下按照合理的执行顺序创建多个步骤目录，目录名格式如 01-xxx、02-xxx 等，并在每个目录中创建一个与目录同名的 md 文档（例如 01-xxx\\01-xxx.md）。确保所有步骤目录和文档合起来覆盖实施文档的全部内容。写完后请先停下来，告诉我已经写好，等待我验收。"
-        , executeStepsDirTemplate, "UTF-8")
-    }
-
-    executeTweakTemplate := executeTemplateDir "\tweak.txt"
-    if !FileExist(executeTweakTemplate) {
-        FileAppend("改吧", executeTweakTemplate, "UTF-8")
-    }
-
-    executeNotificationTemplate := TemplateDir "\execute_notification_prompt.txt"
-    if !FileExist(executeNotificationTemplate) {
-        FileAppend(
-        "补充指令：当你完成本次执行后，请立即调用以下命令显示一个完成通知。`n`npowershell -ExecutionPolicy Bypass -File `"{{scriptPath}}`" -WindowId `"{{windowId}}`""
-        , executeNotificationTemplate, "UTF-8")
-    }
-
-    executeResultDocTemplate := executeTemplateDir "\result_doc.md"
-    if !FileExist(executeResultDocTemplate) {
-        FileAppend(
-        "# {{prevDocName}} 的执行结果`n`n对《{{prevDocName}}》的需求内容变更已完成。`n"
-        , executeResultDocTemplate, "UTF-8")
-    }
-
-    noModifyTemplate := TemplateDir "\no_modify_prompt.txt"
-    if !FileExist(noModifyTemplate) {
-        FileAppend(
-        "补充约束：当前阶段不要修改正式代码，不要修改已有正式文件。你可以按当前要求创建新的 vX.md 或 实施文档.md；如果你认为需要进入正式修改阶段，请先明确说明并等待确认。"
-        , noModifyTemplate, "UTF-8")
-    }
 }
 
 ; 加载配置

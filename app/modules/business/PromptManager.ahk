@@ -12,9 +12,19 @@ LoadTemplate(fileName) {
     global TemplateDir
     path := TemplateDir "\" fileName
     if !FileExist(path) {
+        LogError("模板文件不存在：" path)
         throw Error("模板文件不存在：" path)
     }
     return FileRead(path, "UTF-8")
+}
+
+EnsureTemplateExists(fileName) {
+    global TemplateDir
+    path := TemplateDir "\" fileName
+    if !FileExist(path) {
+        LogError("模板文件不存在：" path)
+        throw Error("模板文件不存在：" path)
+    }
 }
 
 
@@ -65,17 +75,12 @@ AppendNoModifyPromptIfNeeded(content) {
 
 
 AppendOpenMdPromptIfNeeded(content) {
-    global AppConfig, TemplateDir
+    global AppConfig
     if (!GetSession(GetActiveWindowId(), "OpenMdWithIdea")) {
         return content
     }
 
-    templatePath := TemplateDir "\open_md_prompt.txt"
-    if (!FileExist(templatePath)) {
-        return content
-    }
-
-    template := FileRead(templatePath, "UTF-8")
+    template := LoadTemplate("open_md_prompt.txt")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["OpenMdScriptPath"])
     template := StrReplace(template, "{{windowId}}", GetActiveWindowId())
 
@@ -107,12 +112,9 @@ AppendQuestionTemplateIfNeeded(content) {
         return content
     }
 
-    templatePath := TemplateDir "\question_format.txt"
-    if !FileExist(templatePath) {
-        return content
-    }
+    EnsureTemplateExists("question_format.txt")
 
-    hint := "如需提问，请参照提问模板：" templatePath
+    hint := "如需提问，请参照提问模板：" TemplateDir "\question_format.txt"
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n`r`n" hint
 }
@@ -120,17 +122,12 @@ AppendQuestionTemplateIfNeeded(content) {
 
 
 AppendExecuteNotificationIfNeeded(content) {
-    global AppConfig, TemplateDir
+    global AppConfig
     windowId := GetActiveWindowId()
-
-    templatePath := TemplateDir "\execute_notification_prompt.txt"
-    if (!FileExist(templatePath)) {
-        return content
-    }
 
     ; 其它策略：无条件追加（日志补全：完成时刻必须落日志）；
     ; "显示通知"开关关闭时以 -Silent 调用：日志照写、不弹窗
-    template := FileRead(templatePath, "UTF-8")
+    template := LoadTemplate("execute_notification_prompt.txt")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
     template := StrReplace(template, "{{windowId}}", windowId)
     silentArg := GetSession(windowId, "ShowExecuteNotification") ? "" : " -Silent"
@@ -143,15 +140,10 @@ AppendExecuteNotificationIfNeeded(content) {
 
 
 AppendContextRelationTailIfNeeded(content) {
-    global AppConfig, TemplateDir
+    global AppConfig
     windowId := GetActiveWindowId()
 
-    templatePath := TemplateDir "\context_relation_tail.txt"
-    if !FileExist(templatePath) {
-        return content
-    }
-
-    template := FileRead(templatePath, "UTF-8")
+    template := LoadTemplate("context_relation_tail.txt")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
     template := StrReplace(template, "{{windowId}}", windowId)
     silentArg := GetSession(windowId, "ShowExecuteNotification") ? "" : " -Silent"
@@ -186,143 +178,164 @@ BuildContextRelationsText() {
 
 
 CopyRequirementPrompt(*) {
-    if !EnsureCurrentDirectory() {
-        return
+    try {
+        if !EnsureCurrentDirectory() {
+            return
+        }
+
+        currentDir := GetCurrentDir()
+        content := LoadTemplate("requirement_prompt.txt")
+        content := StrReplace(content, "{{filePath}}", currentDir "\需求.txt")
+        content := AppendNoModifyPromptIfNeeded(content)
+        content := AppendQuestionRulesIfNeeded(content)
+        content := AppendQuestionTemplateIfNeeded(content)
+        content := AppendOpenMdPromptIfNeeded(content)
+        A_Clipboard := content
+        LogActivity("复需求", content, Map("target", "v1.md", "source", "需求.txt"))
+        ShowFeedback("需求提示词已复制")
+        HandleAgentWindowAfterCopy()
+
+        MaybeAutoHide()
+    } catch Error as err {
+        LogError("复需求提示词复制失败：" err.Message)
+        ShowFeedback("提示词复制失败：" err.Message, true)
     }
-
-    currentDir := GetCurrentDir()
-    content := LoadTemplate("requirement_prompt.txt")
-    content := StrReplace(content, "{{filePath}}", currentDir "\需求.txt")
-    content := AppendNoModifyPromptIfNeeded(content)
-    content := AppendQuestionRulesIfNeeded(content)
-    content := AppendQuestionTemplateIfNeeded(content)
-    content := AppendOpenMdPromptIfNeeded(content)
-    A_Clipboard := content
-    LogActivity("复需求", content, Map("target", "v1.md", "source", "需求.txt"))
-    ShowFeedback("需求提示词已复制")
-    HandleAgentWindowAfterCopy()
-
-    MaybeAutoHide()
 }
 
 
 
 CopyReplyPrompt(*) {
-    if !EnsureCurrentDirectory() {
-        return
+    try {
+        if !EnsureCurrentDirectory() {
+            return
+        }
+
+        currentDir := GetCurrentDir()
+        latestVersion := GetLatestVersionNumber(currentDir)
+        if (latestVersion = 0) {
+            ShowFeedback("当前目录下未找到 vX.md 文件", true)
+            return
+        }
+
+        currentReplyFile := currentDir "\对v" latestVersion "的回复.txt"
+        nextVersionFile := "v" (latestVersion + 1) ".md"
+        implChecked := GetSession(GetActiveWindowId(), "AppendImplementationTail")
+
+        if (implChecked) {
+            content := LoadTemplate("reply_prompt_impl_tail.txt")
+            content := StrReplace(content, "{{filePath}}", currentReplyFile)
+        } else {
+            content := LoadTemplate("reply_prompt.txt")
+            content := StrReplace(content, "{{filePath}}", currentReplyFile)
+            content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
+        }
+
+        content := AppendNoModifyPromptIfNeeded(content)
+        if (!implChecked) {
+            content := AppendQuestionTemplateIfNeeded(content)
+        }
+        content := AppendOpenMdPromptIfNeeded(content)
+
+        properties := Map()
+        properties["source"] := "对v" latestVersion "的回复.txt"
+        if (implChecked) {
+            properties["实"] := true
+            properties["target"] := "实施文档.md"
+        } else {
+            properties["target"] := nextVersionFile
+        }
+
+        A_Clipboard := content
+        LogActivity("复回复", content, properties)
+        ShowFeedback("回复提示词已复制")
+        HandleAgentWindowAfterCopy()
+
+        MaybeAutoHide()
+    } catch Error as err {
+        LogError("复回复提示词复制失败：" err.Message)
+        ShowFeedback("提示词复制失败：" err.Message, true)
     }
-
-    currentDir := GetCurrentDir()
-    latestVersion := GetLatestVersionNumber(currentDir)
-    if (latestVersion = 0) {
-        ShowFeedback("当前目录下未找到 vX.md 文件", true)
-        return
-    }
-
-    currentReplyFile := currentDir "\对v" latestVersion "的回复.txt"
-    nextVersionFile := "v" (latestVersion + 1) ".md"
-    implChecked := GetSession(GetActiveWindowId(), "AppendImplementationTail")
-
-    if (implChecked) {
-        content := LoadTemplate("reply_prompt_impl_tail.txt")
-        content := StrReplace(content, "{{filePath}}", currentReplyFile)
-    } else {
-        content := LoadTemplate("reply_prompt.txt")
-        content := StrReplace(content, "{{filePath}}", currentReplyFile)
-        content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
-    }
-
-    content := AppendNoModifyPromptIfNeeded(content)
-    if (!implChecked) {
-        content := AppendQuestionTemplateIfNeeded(content)
-    }
-    content := AppendOpenMdPromptIfNeeded(content)
-
-    properties := Map()
-    properties["source"] := "对v" latestVersion "的回复.txt"
-    if (implChecked) {
-        properties["实"] := true
-        properties["target"] := "实施文档.md"
-    } else {
-        properties["target"] := nextVersionFile
-    }
-
-    A_Clipboard := content
-    LogActivity("复回复", content, properties)
-    ShowFeedback("回复提示词已复制")
-    HandleAgentWindowAfterCopy()
-
-    MaybeAutoHide()
 }
 
 
 
 CopyContextRelations(*) {
-    if !EnsureCurrentDirectory() {
-        return
+    try {
+        if !EnsureCurrentDirectory() {
+            return
+        }
+
+        content := BuildContextRelationsText()
+        content := AppendNoModifyPromptIfNeeded(content)
+        content := AppendOpenMdPromptIfNeeded(content)
+        content := AppendContextRelationTailIfNeeded(content)
+        A_Clipboard := content
+        LogActivity("复关系", content, Map("target", "上下文重建"))
+        ShowFeedback("文件关系说明已复制")
+        HandleAgentWindowAfterCopy()
+
+        MaybeAutoHide()
+    } catch Error as err {
+        LogError("文件关系说明复制失败：" err.Message)
+        ShowFeedback("文件关系说明复制失败：" err.Message, true)
     }
-
-    content := BuildContextRelationsText()
-    content := AppendNoModifyPromptIfNeeded(content)
-    content := AppendOpenMdPromptIfNeeded(content)
-    content := AppendContextRelationTailIfNeeded(content)
-    A_Clipboard := content
-    LogActivity("复关系", content, Map("target", "上下文重建"))
-    ShowFeedback("文件关系说明已复制")
-    HandleAgentWindowAfterCopy()
-
-    MaybeAutoHide()
 }
 
 
 
 CopyExecutePrompt(*) {
     global AppConfig, TemplateDir
-    if !EnsureCurrentDirectory() {
-        return
-    }
-
-    currentDir := GetCurrentDir()
-    selectedStrategy := GetSelectedExecuteStrategy()
-    strategyMeta := GetExecuteStrategyMeta(selectedStrategy)
-
-    if (selectedStrategy = "tweak") {
-        ; "改吧"策略：结果文档由 AI 按模板撰写，文件名沿用同一规则（有实施文档.md→已实施.md，否则 v(N+1).md）
-        if FileExist(currentDir "\实施文档.md") {
-            resultName := "已实施.md"
-        } else {
-            resultName := "v" (GetLatestVersionNumber(currentDir) + 1) ".md"
-        }
-        content := LoadTemplate(strategyMeta["template"])
-        content := StrReplace(content, "{{resultFilePath}}", currentDir "\" resultName)
-        content := StrReplace(content, "{{resultTemplatePath}}", TemplateDir "\execute\result_doc.md")
-        content := StrReplace(content, "{{openMdScriptPath}}", AppConfig["OpenMdScriptPath"])
-        content := StrReplace(content, "{{windowId}}", GetActiveWindowId())
-    } else {
-        ; 原有 4 种策略：必须存在实施文档.md
-        implementationPath := currentDir "\实施文档.md"
-        if !FileExist(implementationPath) {
-            ShowFeedback("当前目录下未找到 实施文档.md", true)
+    try {
+        if !EnsureCurrentDirectory() {
             return
         }
-        content := LoadTemplate(strategyMeta["template"])
-        content := StrReplace(content, "{{filePath}}", implementationPath)
+
+        currentDir := GetCurrentDir()
+        selectedStrategy := GetSelectedExecuteStrategy()
+        strategyMeta := GetExecuteStrategyMeta(selectedStrategy)
+
+        if (selectedStrategy = "tweak") {
+            ; "改吧"策略：结果文档由 AI 按模板撰写，文件名沿用同一规则（有实施文档.md→已实施.md，否则 v(N+1).md）
+            if FileExist(currentDir "\实施文档.md") {
+                resultName := "已实施.md"
+            } else {
+                resultName := "v" (GetLatestVersionNumber(currentDir) + 1) ".md"
+            }
+            content := LoadTemplate(strategyMeta["template"])
+            content := StrReplace(content, "{{resultFilePath}}", currentDir "\" resultName)
+            EnsureTemplateExists("execute\result_doc.md")
+            content := StrReplace(content, "{{resultTemplatePath}}", TemplateDir "\execute\result_doc.md")
+            content := StrReplace(content, "{{openMdScriptPath}}", AppConfig["OpenMdScriptPath"])
+            content := StrReplace(content, "{{windowId}}", GetActiveWindowId())
+        } else {
+            ; 原有 4 种策略：必须存在实施文档.md
+            implementationPath := currentDir "\实施文档.md"
+            if !FileExist(implementationPath) {
+                ShowFeedback("当前目录下未找到 实施文档.md", true)
+                return
+            }
+            content := LoadTemplate(strategyMeta["template"])
+            content := StrReplace(content, "{{filePath}}", implementationPath)
+        }
+
+        if (selectedStrategy != "tweak") {
+            content := AppendExecuteNotificationIfNeeded(content)
+        }
+
+        properties := Map("执行策略", strategyMeta["label"])
+        if (selectedStrategy = "tweak") {
+            ; 改吧会产出结果 md：target 复用上面已算出的 resultName
+            properties["target"] := resultName
+        }
+
+        A_Clipboard := content
+        LogActivity("复执行", content, properties)
+        ShowFeedback(strategyMeta["feedback"])
+        HandleAgentWindowAfterCopy()
+
+        MaybeAutoHide()
+    } catch Error as err {
+        LogError("执行提示词复制失败：" err.Message)
+        ShowFeedback("执行提示词复制失败：" err.Message, true)
     }
-
-    if (selectedStrategy != "tweak") {
-        content := AppendExecuteNotificationIfNeeded(content)
-    }
-
-    properties := Map("执行策略", strategyMeta["label"])
-    if (selectedStrategy = "tweak") {
-        ; 改吧会产出结果 md：target 复用上面已算出的 resultName
-        properties["target"] := resultName
-    }
-
-    A_Clipboard := content
-    LogActivity("复执行", content, properties)
-    ShowFeedback(strategyMeta["feedback"])
-    HandleAgentWindowAfterCopy()
-
-    MaybeAutoHide()
 }
