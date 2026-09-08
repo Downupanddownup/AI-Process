@@ -267,7 +267,6 @@ CopyContextRelations(*) {
 
         content := BuildContextRelationsText()
         content := AppendNoModifyPromptIfNeeded(content)
-        content := AppendOpenMdPromptIfNeeded(content)
         content := AppendContextRelationTailIfNeeded(content)
         A_Clipboard := content
         LogActivity("复关系", content, Map("target", "上下文重建"))
