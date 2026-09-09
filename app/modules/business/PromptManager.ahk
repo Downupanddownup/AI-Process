@@ -63,7 +63,7 @@ AppendNoModifyPromptIfNeeded(content) {
         return content
     }
 
-    extraPrompt := Trim(LoadTemplate("no_modify_prompt.txt"), "`r`n `t")
+    extraPrompt := Trim(LoadTemplate("elements\no_modify_prompt.txt"), "`r`n `t")
     if (extraPrompt = "") {
         return content
     }
@@ -80,7 +80,7 @@ AppendOpenMdPromptIfNeeded(content) {
         return content
     }
 
-    template := LoadTemplate("open_md_prompt.txt")
+    template := LoadTemplate("elements\open_md_prompt.txt")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["OpenMdScriptPath"])
     template := StrReplace(template, "{{windowId}}", GetActiveWindowId())
 
@@ -95,7 +95,7 @@ AppendQuestionRulesIfNeeded(content) {
         return content
     }
 
-    rulesContent := Trim(LoadTemplate("question_rules.txt"), "`r`n `t")
+    rulesContent := Trim(LoadTemplate("elements\question_rules.txt"), "`r`n `t")
     if (rulesContent = "") {
         return content
     }
@@ -112,9 +112,9 @@ AppendQuestionTemplateIfNeeded(content) {
         return content
     }
 
-    EnsureTemplateExists("question_format.txt")
+    EnsureTemplateExists("elements\question_format.txt")
 
-    hint := "如需提问，请参照提问模板：" TemplateDir "\question_format.txt"
+    hint := "如需提问，请参照提问模板：" TemplateDir "\elements\question_format.txt"
     baseContent := RTrim(content, "`r`n")
     return baseContent "`r`n`r`n" hint
 }
@@ -127,7 +127,7 @@ AppendExecuteNotificationIfNeeded(content) {
 
     ; 其它策略：无条件追加（日志补全：完成时刻必须落日志）；
     ; "显示通知"开关关闭时以 -Silent 调用：日志照写、不弹窗
-    template := LoadTemplate("execute_notification_prompt.txt")
+    template := LoadTemplate("elements\execute_notification_prompt.txt")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
     template := StrReplace(template, "{{windowId}}", windowId)
     silentArg := GetSession(windowId, "ShowExecuteNotification") ? "" : " -Silent"
@@ -143,7 +143,7 @@ AppendContextRelationTailIfNeeded(content) {
     global AppConfig
     windowId := GetActiveWindowId()
 
-    template := LoadTemplate("context_relation_tail.txt")
+    template := LoadTemplate("elements\context_relation_tail.txt")
     template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
     template := StrReplace(template, "{{windowId}}", windowId)
     silentArg := GetSession(windowId, "ShowExecuteNotification") ? "" : " -Silent"
