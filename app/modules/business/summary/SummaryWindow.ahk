@@ -809,7 +809,7 @@ ViewThemeSummary(themePath) {
     summaryJson := themePath "\.aiprocess\Summary.json"
 
     if (FileExist(summaryMd)) {
-        OpenFileInTool(summaryMd)
+        EditorOpener.Open(summaryMd)
         return
     }
 
@@ -822,7 +822,7 @@ ViewThemeSummary(themePath) {
         RunWait(cmd, , "Hide")
         if (FileExist(summaryMd)) {
             FileDelete(errFile)
-            OpenFileInTool(summaryMd)
+            EditorOpener.Open(summaryMd)
         } else {
             errMsg := ""
             if (FileExist(errFile)) {

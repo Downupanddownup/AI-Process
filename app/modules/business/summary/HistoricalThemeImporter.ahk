@@ -53,7 +53,7 @@ FindThemeCandidateDirs(rootDir) {
         if (!FileExist(dirPath "\需求.txt")) {
             continue
         }
-        if (IsResultIssueDir(dirPath)) {
+        if (DomainConventions.IsResultIssueDir(dirPath)) {
             continue
         }
         result.Push(dirPath)

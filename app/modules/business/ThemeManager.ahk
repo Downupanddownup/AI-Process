@@ -6,22 +6,21 @@ global NewThemeDialog := ""
 global NewThemeDialogEdit := ""
 global NewThemeDialogErrorText := ""
 
-global ResultIssueRootName := "结果微调"
 global ResultIssueStateMark := "↳"
 
 
 CreateNewTheme(*) {
-    if !EnsureCurrentDirectory() {
+    if !ActionGuard.EnsureCurrentDirectory() {
         return
     }
 
     currentDir := GetCurrentDir()
-    if IsResultIssueDir(currentDir) {
+    if DomainConventions.IsResultIssueDir(currentDir) {
         parentDir := ""
         SplitPath(currentDir,, &parentDir)
         issueRoot := parentDir
         DirCreate(issueRoot)
-        nextIssueDirName := GetNextIssueDirName(issueRoot)
+        nextIssueDirName := DomainConventions.GetNextIssueDirName(issueRoot)
         newDir := issueRoot "\" nextIssueDirName
         DirCreate(newDir)
         SwitchToNewTheme(newDir)
@@ -143,20 +142,19 @@ CloseNewThemeDialog(*) {
 
 
 CreateAndEnterIssueDir(*) {
-    global ResultIssueRootName
-    if !EnsureCurrentDirectory() {
+    if !ActionGuard.EnsureCurrentDirectory() {
         return
     }
 
     currentDir := GetCurrentDir()
-    if IsResultIssueDir(currentDir) {
+    if DomainConventions.IsResultIssueDir(currentDir) {
         ShowFeedback("请先返回主题目录", true)
         return
     }
 
-    issueRoot := GetResultIssueRoot(currentDir)
+    issueRoot := DomainConventions.GetResultIssueRoot(currentDir)
     DirCreate(issueRoot)
-    nextIssueDirName := GetNextIssueDirName(issueRoot)
+    nextIssueDirName := DomainConventions.GetNextIssueDirName(issueRoot)
     nextIssueDirPath := issueRoot "\" nextIssueDirName
     DirCreate(nextIssueDirPath)
 

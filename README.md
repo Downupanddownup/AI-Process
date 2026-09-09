@@ -115,9 +115,9 @@ AI-Process/
 ├── app/
 │   ├── AIProcess.ahk        # 主程序入口
 │   ├── config/              # settings.ini / filetools.json（编辑器列表）
-│   ├── modules/             # 分层模块：core / session / ui / business
+│   ├── modules/             # 分层模块：core / session / ui / business（business 内含 behaviors/ 六领域行为与 services/ 公共服务）
 │   ├── powershell/          # markdown 打开、窗口通知、总结、报告脚本
-│   ├── templates/           # 提示词模板（含 execute/ 执行策略模板）
+│   ├── templates/           # 提示词模板（含 elements/ 可复用元素、execute/ 执行策略模板）
 │   ├── logs/                # 每日运行日志
 │   └── history/             # 活动记录、仓库与主题索引
 ├── script/                  # install / uninstall（bat + ps1）

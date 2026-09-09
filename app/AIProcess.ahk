@@ -19,9 +19,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\session\Session.ahk
 #Include %A_ScriptDir%\modules\ui\TrayManager.ahk
 #Include %A_ScriptDir%\modules\business\FileToolManager.ahk
-#Include %A_ScriptDir%\modules\business\FileManager.ahk
 #Include %A_ScriptDir%\modules\business\QuestionCollector.ahk
-#Include %A_ScriptDir%\modules\business\PromptManager.ahk
 #Include %A_ScriptDir%\modules\business\DirectoryManager.ahk
 #Include %A_ScriptDir%\modules\business\ThemeManager.ahk
 #Include %A_ScriptDir%\modules\business\RepositoryManager.ahk

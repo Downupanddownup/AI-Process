@@ -34,7 +34,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
     }
 
     if (GetSession(GetActiveWindowId(), "OpenWithIdea")) {
-        OpenFileInTool(filePath)
+        EditorOpener.Open(filePath)
     }
 }
 
@@ -156,46 +156,6 @@ UpdateCurrentPathDisplay() {
 }
 
 
-
-IsResultIssueDir(dirPath) {
-    global ResultIssueRootName
-    if (dirPath = "" || !DirExist(dirPath)) {
-        return false
-    }
-
-    SplitPath(dirPath, &dirName, &parentDir)
-    if !RegExMatch(dirName, "^\d{2}$") {
-        return false
-    }
-
-    SplitPath(parentDir, &parentName)
-    return parentName = ResultIssueRootName
-}
-
-
-
-GetResultIssueRoot(themeDirPath) {
-    global ResultIssueRootName
-    return themeDirPath "\" ResultIssueRootName
-}
-
-
-
-GetNextIssueDirName(issueRootPath) {
-    latest := 0
-    Loop Files, issueRootPath "\*", "D" {
-        dirName := A_LoopFileName
-        if RegExMatch(dirName, "^\d{2}$") {
-            version := dirName + 0
-            if (version > latest) {
-                latest := version
-            }
-        }
-    }
-    return Format("{:02}", latest + 1)
-}
-
-
 ShowFullPath(*) {
     currentDir := GetCurrentDir()
     if currentDir = "" {
@@ -225,7 +185,7 @@ RefreshDirectoryStateUI() {
         return
     }
 
-    isIssueDir := IsResultIssueDir(currentDir)
+    isIssueDir := DomainConventions.IsResultIssueDir(currentDir)
     SetDirectoryButton.Visible := !isIssueDir
     ReturnParentButton.Visible := isIssueDir
     CreateIssueButton.Visible := !isIssueDir
@@ -235,29 +195,19 @@ RefreshDirectoryStateUI() {
 
 
 ReturnToThemeDir(*) {
-    if !EnsureCurrentDirectory() {
+    if !ActionGuard.EnsureCurrentDirectory() {
         return
     }
 
     currentDir := GetCurrentDir()
-    if !IsResultIssueDir(currentDir) {
+    if !DomainConventions.IsResultIssueDir(currentDir) {
         ShowFeedback("当前不在问题子目录", true)
         return
     }
 
-    SetCurrentDir(GetThemeRootFromIssueDir(currentDir))
+    SetCurrentDir(DomainConventions.GetThemeRootFromIssueDir(currentDir))
     SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     ShowFeedback("已返回主题目录")
-}
-
-GetThemeRootFromIssueDir(dirPath) {
-    fileName := ""
-    parentName := ""
-    parentDir := ""
-    themeDir := ""
-    SplitPath(dirPath, &fileName, &parentDir)
-    SplitPath(parentDir, &parentName, &themeDir)
-    return themeDir
 }

@@ -28,7 +28,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ExecuteStrategies, MdActivationModeDropdown
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, MdActivationModeDropdown
     global QuestionRulesCheckbox
     actionButtonWidth := 60
     actionButtonHeight := 24
@@ -118,13 +118,13 @@ CreateMainGui() {
     CopyExecuteButton.OnEvent("Click", AgentActions.CopyExecute)
     ApplyButtonStyle(CopyExecuteButton)
 
-    executeStrategyOptions := BuildExecuteStrategyOptions()
+    executeStrategyOptions := ExecuteStrategyRegistry.BuildOptions()
     ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", executeStrategyOptions)
     ExecuteStrategyDropdown.OnEvent("Change", OnExecuteStrategyChange)
     windowId := GetActiveWindowId()
     strategyKey := GetSession(windowId, "ExecuteStrategy")
     initialIndex := 1
-    for index, strategy in ExecuteStrategies {
+    for index, strategy in ExecuteStrategyRegistry.Strategies {
         if (strategy["key"] = strategyKey) {
             initialIndex := index
             break
@@ -221,12 +221,12 @@ OpenPendingMarkdownIfAny(windowId) {
         SafeIniWrite("", SettingsFile, "PendingMd", key)
         return
     }
-    OpenFileInTool(pendingPath)
+    EditorOpener.Open(pendingPath)
     SafeIniWrite("", SettingsFile, "PendingMd", key)
 }
 
 RefreshMainWindow() {
-    global MainGui, ReplyImplementationTailCheckbox, ExecuteStrategyDropdown, ExecuteStrategies
+    global MainGui, ReplyImplementationTailCheckbox, ExecuteStrategyDropdown
 
     if (!MainGui) {
         return
@@ -252,7 +252,7 @@ RefreshMainWindow() {
     ; 同步执行策略下拉框
     if (ExecuteStrategyDropdown) {
         strategyKey := GetSession(windowId, "ExecuteStrategy")
-        for index, strategy in ExecuteStrategies {
+        for index, strategy in ExecuteStrategyRegistry.Strategies {
             if (strategy["key"] = strategyKey) {
                 ExecuteStrategyDropdown.Choose(index)
                 break
@@ -368,10 +368,9 @@ OnQuestionRulesToggle(ctrl, *) {
 }
 
 OnExecuteStrategyChange(ctrl, *) {
-    global ExecuteStrategies
     selectedIndex := ctrl.Value
-    if (selectedIndex >= 1 && selectedIndex <= ExecuteStrategies.Length) {
-        SetSession(GetActiveWindowId(), "ExecuteStrategy", ExecuteStrategies[selectedIndex]["key"])
+    if (selectedIndex >= 1 && selectedIndex <= ExecuteStrategyRegistry.Strategies.Length) {
+        SetSession(GetActiveWindowId(), "ExecuteStrategy", ExecuteStrategyRegistry.Strategies[selectedIndex]["key"])
         SaveWindowSession(GetActiveWindowId())
     }
 }

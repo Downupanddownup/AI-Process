@@ -5,7 +5,7 @@
 
 LogThemeIndex(themePath, source) {
     ; 结果微调子目录（如 主题/结果微调/01）不是独立主题，不写入索引
-    if (IsResultIssueDir(themePath)) {
+    if (DomainConventions.IsResultIssueDir(themePath)) {
         return
     }
 
