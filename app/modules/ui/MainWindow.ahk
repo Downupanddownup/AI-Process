@@ -89,33 +89,33 @@ CreateMainGui() {
     }
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
-    CreateRequirementButton.OnEvent("Click", CreateRequirementFile)
+    CreateRequirementButton.OnEvent("Click", AgentActions.CreateRequirement)
     ApplyButtonStyle(CreateRequirementButton)
 
     CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
-    CopyRequirementPromptButton.OnEvent("Click", CopyRequirementPrompt)
+    CopyRequirementPromptButton.OnEvent("Click", AgentActions.CopyRequirement)
     ApplyButtonStyle(CopyRequirementPromptButton)
 
     QuestionRulesCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "问")
     QuestionRulesCheckbox.OnEvent("Click", OnQuestionRulesToggle)
 
     CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
-    CreateReplyButton.OnEvent("Click", CreateReplyFile)
+    CreateReplyButton.OnEvent("Click", AgentActions.CreateReply)
     ApplyButtonStyle(CreateReplyButton)
 
     CopyReplyPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复回复")
-    CopyReplyPromptButton.OnEvent("Click", CopyReplyPrompt)
+    CopyReplyPromptButton.OnEvent("Click", AgentActions.CopyReply)
     ApplyButtonStyle(CopyReplyPromptButton)
 
     ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
     ReplyImplementationTailCheckbox.OnEvent("Click", OnImplementationTailToggle)
 
     CopyRelationsButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "复关系")
-    CopyRelationsButton.OnEvent("Click", CopyContextRelations)
+    CopyRelationsButton.OnEvent("Click", AgentActions.CopyRelations)
     ApplyButtonStyle(CopyRelationsButton)
 
     CopyExecuteButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复执行")
-    CopyExecuteButton.OnEvent("Click", CopyExecutePrompt)
+    CopyExecuteButton.OnEvent("Click", AgentActions.CopyExecute)
     ApplyButtonStyle(CopyExecuteButton)
 
     executeStrategyOptions := BuildExecuteStrategyOptions()

@@ -167,7 +167,7 @@ CreateAndEnterIssueDir(*) {
     ShowFeedback("已进入问题目录：" nextIssueDirName)
 
     LogActivity("建问题", "")
-    CreateRequirementFile()
+    AgentActions.CreateRequirement()
 }
 
 ShowNewThemeDialogError(message) {
@@ -187,7 +187,7 @@ SwitchToNewTheme(newDir) {
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     LogThemeIndex(newDir, "新主题")
-    CreateRequirementFile()
+    AgentActions.CreateRequirement()
 }
 
 IsValidDirName(name) {
