@@ -33,9 +33,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
         FileAppend("", filePath, "UTF-8")
     }
 
-    if (GetSession(GetActiveWindowId(), "OpenWithIdea")) {
-        EditorOpener.Open(filePath)
-    }
+    EditorOpener.Open(filePath)
 }
 
 

@@ -24,12 +24,10 @@ class CreateReply extends AgentActionBase {
         existed := FileExist(replyPath)
         if !existed {
             content := ""
-            if GetSession(GetActiveWindowId(), "AppendQuestionTemplate") {
-                mdPath := DomainConventions.VersionPath(currentDir, latestVersion)
-                questions := ExtractQuestionsFromMd(mdPath)
-                if (questions.Length > 0) {
-                    content := BuildReplyText(questions)
-                }
+            mdPath := DomainConventions.VersionPath(currentDir, latestVersion)
+            questions := ExtractQuestionsFromMd(mdPath)
+            if (questions.Length > 0) {
+                content := BuildReplyText(questions)
             }
             FileAppend(content, replyPath, "UTF-8")
             ShowFeedback("已创建：" ExtractFileName(replyPath))

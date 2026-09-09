@@ -11,7 +11,7 @@ class AgentActionBase {
     ; 异常兜底文案（对齐各旧函数 catch 原文；建X 旧函数无 catch，此处为骨架统一兜底）
     FailLogText := "操作失败"
     FailFeedbackText := "操作失败"
-    ; 前置校验未通过（如无 vN、步目无实施文档）时置 true：对齐旧函数提前 return 跳过 MaybeAutoHide 的行为
+    ; 前置校验未通过（如无 vN、步目无实施文档）时置 true：对齐旧函数提前 return 跳过 AutoHidePanel 的行为
     SkipAutoHide := false
 
     ; 模板方法骨架：守卫 → Execute → 自动隐藏
@@ -22,7 +22,7 @@ class AgentActionBase {
             }
             this.Execute()
             if !this.SkipAutoHide {
-                MaybeAutoHide()
+                AutoHidePanel()
             }
         } catch Error as err {
             LogError(this.FailLogText "：" err.Message)
@@ -64,10 +64,8 @@ class AgentActionBase {
         HandleAgentWindowAfterCopy()
     }
 
-    ; ---- 纯技术：用编辑器打开（受 OpenWithIdea 开关控制） ----
+    ; ---- 纯技术：用编辑器打开（恒备：创建类行为完成后固定打开） ----
     OpenInTool(filePath) {
-        if GetSession(GetActiveWindowId(), "OpenWithIdea") {
-            EditorOpener.Open(filePath)
-        }
+        EditorOpener.Open(filePath)
     }
 }

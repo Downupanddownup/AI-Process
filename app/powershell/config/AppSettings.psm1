@@ -25,19 +25,6 @@ function Get-WindowAgentName {
     return Read-IniValue -Path (Get-AppSettingsPath) -Section "Window$WindowId" -Key 'AgentName'
 }
 
-function Get-WindowShowExecuteNotification {
-    param([Parameter(Mandatory = $true)][string]$WindowId)
-    return Read-IniValue -Path (Get-AppSettingsPath) -Section "Window$WindowId" -Key 'ShowExecuteNotification'
-}
-
-# ---------- [Behavior] 全局行为 ----------
-function Get-MdActivationMode {
-    # 缺省/未配置一律按 activate（沿用各脚本原有回退语义）
-    $v = Read-IniValue -Path (Get-AppSettingsPath) -Section 'Behavior' -Key 'MdActivationMode'
-    if ([string]::IsNullOrWhiteSpace($v)) { return 'activate' }
-    return $v
-}
-
 # ---------- [FileTool] 编辑器 ----------
 function Get-FileToolPath {
     return Read-IniValue -Path (Get-AppSettingsPath) -Section 'FileTool' -Key 'FileToolPath'
@@ -61,5 +48,4 @@ function Set-PendingMd {
 }
 
 Export-ModuleMember -Function Get-AppSettingsPath, Get-WindowCurrentDir, Get-WindowAgentName,
-    Get-WindowShowExecuteNotification, Get-MdActivationMode, Get-FileToolPath,
-    Get-IdleThresholdMinutes, Set-PendingMd
+    Get-FileToolPath, Get-IdleThresholdMinutes, Set-PendingMd

@@ -6,7 +6,6 @@ global CurrentPathText := ""
 global CurrentPathHwnd := 0
 global CurrentDirStateMark := ""
 global ReplyImplementationTailCheckbox := ""
-global QuestionRulesCheckbox := ""
 global SetDirectoryButton := ""
 global ReturnParentButton := ""
 global CreateIssueButton := ""
@@ -20,7 +19,6 @@ global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
 global CopyExecuteButton := ""
 global ExecuteStrategyDropdown := ""
-global MdActivationModeDropdown := ""
 global MainGui := ""
 global HoverTooltipVisible := false
 
@@ -28,8 +26,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, MdActivationModeDropdown
-    global QuestionRulesCheckbox
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown
     actionButtonWidth := 60
     actionButtonHeight := 24
     actionGap := 6
@@ -60,15 +57,12 @@ CreateMainGui() {
     ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
     ApplyButtonStyle(ReturnParentButton)
 
-    OptionsButton := MainGui.AddButton("xm y+6 w54 h22", "选项")
-    OptionsButton.OnEvent("Click", ShowOptionsDialog)
-    ApplyButtonStyle(OptionsButton)
 
-    NewThemeButton := MainGui.AddButton("x+6 yp w54 h22", "新主题")
+    NewThemeButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "新主题")
     NewThemeButton.OnEvent("Click", CreateNewTheme)
     ApplyButtonStyle(NewThemeButton)
 
-    CreateIssueButton := MainGui.AddButton("x+6 yp w54 h22", "建问题")
+    CreateIssueButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "建问题")
     CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
     ApplyButtonStyle(CreateIssueButton)
 
@@ -80,14 +74,6 @@ CreateMainGui() {
     UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
     ApplyButtonStyle(UnbindAgentWindowButton)
 
-    MdActivationModeDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", ["MD激活", "MD后台"])
-    MdActivationModeDropdown.OnEvent("Change", OnMdActivationModeChange)
-    if (AppConfig["MdActivationMode"] = "background") {
-        MdActivationModeDropdown.Choose(2)
-    } else {
-        MdActivationModeDropdown.Choose(1)
-    }
-
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", AgentActions.CreateRequirement)
     ApplyButtonStyle(CreateRequirementButton)
@@ -95,9 +81,6 @@ CreateMainGui() {
     CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
     CopyRequirementPromptButton.OnEvent("Click", AgentActions.CopyRequirement)
     ApplyButtonStyle(CopyRequirementPromptButton)
-
-    QuestionRulesCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "问")
-    QuestionRulesCheckbox.OnEvent("Click", OnQuestionRulesToggle)
 
     CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
     CreateReplyButton.OnEvent("Click", AgentActions.CreateReply)
@@ -244,11 +227,6 @@ RefreshMainWindow() {
         ReplyImplementationTailCheckbox.Value := GetSession(windowId, "AppendImplementationTail") ? 1 : 0
     }
 
-    ; 同步"问" checkbox
-    if (QuestionRulesCheckbox) {
-        QuestionRulesCheckbox.Value := GetSession(windowId, "AppendQuestionRules") ? 1 : 0
-    }
-
     ; 同步执行策略下拉框
     if (ExecuteStrategyDropdown) {
         strategyKey := GetSession(windowId, "ExecuteStrategy")
@@ -257,15 +235,6 @@ RefreshMainWindow() {
                 ExecuteStrategyDropdown.Choose(index)
                 break
             }
-        }
-    }
-
-    ; 同步 MD 激活模式下拉框
-    if (MdActivationModeDropdown) {
-        if (AppConfig["MdActivationMode"] = "background") {
-            MdActivationModeDropdown.Choose(2)
-        } else {
-            MdActivationModeDropdown.Choose(1)
         }
     }
 }
@@ -302,14 +271,13 @@ HandleClose(*) {
 
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
-    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, QuestionRulesCheckbox, CreateIssueButton, ReturnParentButton
+    global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
     global NewThemeButton, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
     ReplyImplementationTailCheckbox.Enabled := enabled
-    QuestionRulesCheckbox.Enabled := enabled
     CopyRelationsButton.Enabled := enabled
     CopyExecuteButton.Enabled := enabled
     ExecuteStrategyDropdown.Enabled := enabled
@@ -351,19 +319,14 @@ OnWindowSize(wParam, lParam, msg, hwnd) {
 
 
 
-MaybeAutoHide() {
-    if (GetSession(GetActiveWindowId(), "AutoHideAfterCreate")) {
-        HideToTray()
-    }
+; 恒备业务行为：创建类行为（建需求/建回复）成功后自动隐藏主面板
+; 注意：行为提前返回（无 vN、无实施文档等守卫失败）时由基类 Run 跳过本调用，不隐藏
+AutoHidePanel() {
+    HideToTray()
 }
 
 OnImplementationTailToggle(ctrl, *) {
     SetSession(GetActiveWindowId(), "AppendImplementationTail", ctrl.Value = 1)
-    SaveWindowSession(GetActiveWindowId())
-}
-
-OnQuestionRulesToggle(ctrl, *) {
-    SetSession(GetActiveWindowId(), "AppendQuestionRules", ctrl.Value = 1)
     SaveWindowSession(GetActiveWindowId())
 }
 
@@ -373,13 +336,6 @@ OnExecuteStrategyChange(ctrl, *) {
         SetSession(GetActiveWindowId(), "ExecuteStrategy", ExecuteStrategyRegistry.Strategies[selectedIndex]["key"])
         SaveWindowSession(GetActiveWindowId())
     }
-}
-
-OnMdActivationModeChange(ctrl, *) {
-    global SettingsFile, AppConfig
-    mode := ctrl.Value = 2 ? "background" : "activate"
-    AppConfig["MdActivationMode"] := mode
-    SafeIniWrite(mode, SettingsFile, "Behavior", "MdActivationMode")
 }
 
 ShowFeedback(message, isError := false) {

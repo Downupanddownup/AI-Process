@@ -15,14 +15,8 @@ global WindowSessions := Map(
         "AgentHwnd", "",
         "AgentName", "",
         "AgentAfterCopyAction", 3,
-        "OpenWithIdea", true,
-        "OpenMdWithIdea", true,
-        "AppendNoModifyPrompt", true,
-        "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
-        "AppendQuestionTemplate", true,
-        "ExecuteStrategy", "tweak",
-        "ShowExecuteNotification", false
+        "ExecuteStrategy", "tweak"
     ),
     2, Map(
         "CurrentDir", "",
@@ -32,14 +26,8 @@ global WindowSessions := Map(
         "AgentHwnd", "",
         "AgentName", "",
         "AgentAfterCopyAction", 3,
-        "OpenWithIdea", true,
-        "OpenMdWithIdea", true,
-        "AppendNoModifyPrompt", true,
-        "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
-        "AppendQuestionTemplate", true,
-        "ExecuteStrategy", "tweak",
-        "ShowExecuteNotification", false
+        "ExecuteStrategy", "tweak"
     ),
     3, Map(
         "CurrentDir", "",
@@ -49,14 +37,8 @@ global WindowSessions := Map(
         "AgentHwnd", "",
         "AgentName", "",
         "AgentAfterCopyAction", 3,
-        "OpenWithIdea", true,
-        "OpenMdWithIdea", true,
-        "AppendNoModifyPrompt", true,
-        "AutoHideAfterCreate", false,
         "AppendImplementationTail", true,
-        "AppendQuestionTemplate", true,
-        "ExecuteStrategy", "tweak",
-        "ShowExecuteNotification", false
+        "ExecuteStrategy", "tweak"
     )
 )
 

@@ -49,9 +49,6 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Behavior", "MinimizeToTray", "") = "") {
         IniWrite("1", SettingsFile, "Behavior", "MinimizeToTray")
     }
-    if (IniRead(SettingsFile, "Behavior", "MdActivationMode", "") = "") {
-        IniWrite("activate", SettingsFile, "Behavior", "MdActivationMode")
-    }
 
     ; [PendingMd] 段：存储 MD 后台模式下待打开的 Markdown 文件路径
     if (IniRead(SettingsFile, "PendingMd", "Window1PendingMd", "__NOT_FOUND__") = "__NOT_FOUND__") {
@@ -118,32 +115,11 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window1", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window1", "AgentAfterCopyAction")
     }
-    if (IniRead(SettingsFile, "Window1", "OpenWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Window1", "OpenWithIdea")
-    }
-    if (IniRead(SettingsFile, "Window1", "OpenMdWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Window1", "OpenMdWithIdea")
-    }
-    if (IniRead(SettingsFile, "Window1", "AppendNoModifyPrompt", "") = "") {
-        IniWrite("1", SettingsFile, "Window1", "AppendNoModifyPrompt")
-    }
-    if (IniRead(SettingsFile, "Window1", "AutoHideAfterCreate", "") = "") {
-        IniWrite("0", SettingsFile, "Window1", "AutoHideAfterCreate")
-    }
     if (IniRead(SettingsFile, "Window1", "AppendImplementationTail", "") = "") {
         IniWrite("1", SettingsFile, "Window1", "AppendImplementationTail")
     }
-    if (IniRead(SettingsFile, "Window1", "AppendQuestionRules", "") = "") {
-        IniWrite("1", SettingsFile, "Window1", "AppendQuestionRules")
-    }
-    if (IniRead(SettingsFile, "Window1", "AppendQuestionTemplate", "") = "") {
-        IniWrite("1", SettingsFile, "Window1", "AppendQuestionTemplate")
-    }
     if (IniRead(SettingsFile, "Window1", "ExecuteStrategy", "") = "") {
         IniWrite("tweak", SettingsFile, "Window1", "ExecuteStrategy")
-    }
-    if (IniRead(SettingsFile, "Window1", "ShowExecuteNotification", "") = "") {
-        IniWrite("0", SettingsFile, "Window1", "ShowExecuteNotification")
     }
 
     ; [Window2] 段
@@ -168,32 +144,11 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window2", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window2", "AgentAfterCopyAction")
     }
-    if (IniRead(SettingsFile, "Window2", "OpenWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Window2", "OpenWithIdea")
-    }
-    if (IniRead(SettingsFile, "Window2", "OpenMdWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Window2", "OpenMdWithIdea")
-    }
-    if (IniRead(SettingsFile, "Window2", "AppendNoModifyPrompt", "") = "") {
-        IniWrite("1", SettingsFile, "Window2", "AppendNoModifyPrompt")
-    }
-    if (IniRead(SettingsFile, "Window2", "AutoHideAfterCreate", "") = "") {
-        IniWrite("0", SettingsFile, "Window2", "AutoHideAfterCreate")
-    }
     if (IniRead(SettingsFile, "Window2", "AppendImplementationTail", "") = "") {
         IniWrite("1", SettingsFile, "Window2", "AppendImplementationTail")
     }
-    if (IniRead(SettingsFile, "Window2", "AppendQuestionRules", "") = "") {
-        IniWrite("1", SettingsFile, "Window2", "AppendQuestionRules")
-    }
-    if (IniRead(SettingsFile, "Window2", "AppendQuestionTemplate", "") = "") {
-        IniWrite("1", SettingsFile, "Window2", "AppendQuestionTemplate")
-    }
     if (IniRead(SettingsFile, "Window2", "ExecuteStrategy", "") = "") {
         IniWrite("tweak", SettingsFile, "Window2", "ExecuteStrategy")
-    }
-    if (IniRead(SettingsFile, "Window2", "ShowExecuteNotification", "") = "") {
-        IniWrite("0", SettingsFile, "Window2", "ShowExecuteNotification")
     }
 
     ; [Window3] 段
@@ -218,32 +173,11 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window3", "AgentAfterCopyAction", "") = "") {
         IniWrite("3", SettingsFile, "Window3", "AgentAfterCopyAction")
     }
-    if (IniRead(SettingsFile, "Window3", "OpenWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Window3", "OpenWithIdea")
-    }
-    if (IniRead(SettingsFile, "Window3", "OpenMdWithIdea", "") = "") {
-        IniWrite("1", SettingsFile, "Window3", "OpenMdWithIdea")
-    }
-    if (IniRead(SettingsFile, "Window3", "AppendNoModifyPrompt", "") = "") {
-        IniWrite("1", SettingsFile, "Window3", "AppendNoModifyPrompt")
-    }
-    if (IniRead(SettingsFile, "Window3", "AutoHideAfterCreate", "") = "") {
-        IniWrite("0", SettingsFile, "Window3", "AutoHideAfterCreate")
-    }
     if (IniRead(SettingsFile, "Window3", "AppendImplementationTail", "") = "") {
         IniWrite("1", SettingsFile, "Window3", "AppendImplementationTail")
     }
-    if (IniRead(SettingsFile, "Window3", "AppendQuestionRules", "") = "") {
-        IniWrite("1", SettingsFile, "Window3", "AppendQuestionRules")
-    }
-    if (IniRead(SettingsFile, "Window3", "AppendQuestionTemplate", "") = "") {
-        IniWrite("1", SettingsFile, "Window3", "AppendQuestionTemplate")
-    }
     if (IniRead(SettingsFile, "Window3", "ExecuteStrategy", "") = "") {
         IniWrite("tweak", SettingsFile, "Window3", "ExecuteStrategy")
-    }
-    if (IniRead(SettingsFile, "Window3", "ShowExecuteNotification", "") = "") {
-        IniWrite("0", SettingsFile, "Window3", "ShowExecuteNotification")
     }
 
     ; [SummaryAgent] 段：经验总结窗口专用 Agent 绑定配置
@@ -279,7 +213,6 @@ LoadConfig() {
     AppConfig["MinimizeToTray"] := IniRead(SettingsFile, "Behavior", "MinimizeToTray", "1") = "1"
     AppConfig["OpenMdScriptPath"] := AppRoot "\powershell\markdown\OpenMarkdown.ps1"
     AppConfig["NotificationScriptPath"] := AppRoot "\powershell\notification\ShowCenterNotification.ps1"
-    AppConfig["MdActivationMode"] := IniRead(SettingsFile, "Behavior", "MdActivationMode", "activate")
     AppConfig["FileToolPath"] := IniRead(SettingsFile, "FileTool", "FileToolPath", "")
     AppConfig["IdleThresholdMinutes"] := IniRead(SettingsFile, "Report", "IdleThresholdMinutes", "60") + 0
 }
@@ -306,15 +239,8 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AgentHwnd"] := IniRead(SettingsFile, section, "AgentHwnd", "")
         WindowSessions[windowId]["AgentName"] := IniRead(SettingsFile, section, "AgentName", "")
         WindowSessions[windowId]["AgentAfterCopyAction"] := IniRead(SettingsFile, section, "AgentAfterCopyAction", "3") + 0
-        WindowSessions[windowId]["OpenWithIdea"] := IniRead(SettingsFile, section, "OpenWithIdea", "1") = "1"
-        WindowSessions[windowId]["OpenMdWithIdea"] := IniRead(SettingsFile, section, "OpenMdWithIdea", "1") = "1"
-        WindowSessions[windowId]["AppendNoModifyPrompt"] := IniRead(SettingsFile, section, "AppendNoModifyPrompt", "1") = "1"
-        WindowSessions[windowId]["AutoHideAfterCreate"] := IniRead(SettingsFile, section, "AutoHideAfterCreate", "0") = "1"
         WindowSessions[windowId]["AppendImplementationTail"] := IniRead(SettingsFile, section, "AppendImplementationTail", "1") = "1"
-        WindowSessions[windowId]["AppendQuestionRules"] := IniRead(SettingsFile, section, "AppendQuestionRules", "1") = "1"
-        WindowSessions[windowId]["AppendQuestionTemplate"] := IniRead(SettingsFile, section, "AppendQuestionTemplate", "1") = "1"
         WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "tweak")
-        WindowSessions[windowId]["ShowExecuteNotification"] := IniRead(SettingsFile, section, "ShowExecuteNotification", "0") = "1"
     }
 }
 
@@ -345,15 +271,8 @@ SaveWindowSession(windowId) {
     SafeIniWrite(WindowSessions[windowId]["AgentHwnd"], SettingsFile, section, "AgentHwnd")
     SafeIniWrite(WindowSessions[windowId]["AgentName"], SettingsFile, section, "AgentName")
     SafeIniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
-    SafeIniWrite(WindowSessions[windowId]["OpenWithIdea"] ? "1" : "0", SettingsFile, section, "OpenWithIdea")
-    SafeIniWrite(WindowSessions[windowId]["OpenMdWithIdea"] ? "1" : "0", SettingsFile, section, "OpenMdWithIdea")
-    SafeIniWrite(WindowSessions[windowId]["AppendNoModifyPrompt"] ? "1" : "0", SettingsFile, section, "AppendNoModifyPrompt")
-    SafeIniWrite(WindowSessions[windowId]["AutoHideAfterCreate"] ? "1" : "0", SettingsFile, section, "AutoHideAfterCreate")
     SafeIniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
-    SafeIniWrite(WindowSessions[windowId]["AppendQuestionRules"] ? "1" : "0", SettingsFile, section, "AppendQuestionRules")
-    SafeIniWrite(WindowSessions[windowId]["AppendQuestionTemplate"] ? "1" : "0", SettingsFile, section, "AppendQuestionTemplate")
     SafeIniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
-    SafeIniWrite(WindowSessions[windowId]["ShowExecuteNotification"] ? "1" : "0", SettingsFile, section, "ShowExecuteNotification")
 }
 
 ; 保存窗口位置到配置文件，并同步更新 AppConfig

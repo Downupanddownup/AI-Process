@@ -1,15 +1,17 @@
 ﻿<#
 .SYNOPSIS
-    Markdown 文件打开路由脚本。
+    Markdown 文件打开路由脚本（恒定后台模式）。
 
 .DESCRIPTION
-    读取 settings.ini 中的 MdActivationMode 配置，决定调用激活模式还是后台模式执行文件。
+    恒定走后台模式：将 Markdown 文件路径缓存到 [PendingMd] 段并弹通知，
+    由 AHK 在用户切换到对应窗口（F2/F3/F4）时用编辑器打开。
+    不再读取 MdActivationMode 配置、不再存在激活模式。
 
 .PARAMETER FilePath
     要打开的 Markdown 文件绝对路径。
 
 .PARAMETER WindowId
-    窗口编号，1 或 2。可选。
+    窗口编号，1、2 或 3。可选。
 #>
 
 param(
@@ -38,9 +40,6 @@ function Assert-PathExists {
 
 Assert-PathExists -Path $settingsPath -Description "settings.ini"
 
-$mode = Get-MdActivationMode
-
-$activateScript = Join-Path $scriptDirectory "OpenMarkdownActivate.ps1"
 $backgroundScript = Join-Path $scriptDirectory "OpenMarkdownBackground.ps1"
 
 # 写入 AI-AGENT 标识（独立业务脚本，作为子进程调用，失败不影响打开流程）
@@ -60,12 +59,7 @@ if ($WindowId -ne "") {
     $arguments += @("-WindowId", "`"$WindowId`"")
 }
 
-if ($mode -eq "background") {
-    $targetScript = $backgroundScript
-} else {
-    $targetScript = $activateScript
-}
+# 恒定后台模式：直接走 background 链路（写 PendingMd + 通知），无模式分支
+Assert-PathExists -Path $backgroundScript -Description "Target script"
 
-Assert-PathExists -Path $targetScript -Description "Target script"
-
-& powershell -ExecutionPolicy Bypass -File "`"$targetScript`"" @arguments
+& powershell -ExecutionPolicy Bypass -File "`"$backgroundScript`"" @arguments
