@@ -16,6 +16,7 @@ class CreateReply extends AgentActionBase {
         latestVersion := DomainConventions.GetLatestVersionNumber(currentDir)
         if (latestVersion = 0) {
             ShowFeedback("当前目录下未找到 vX.md 文件", true)
+            this.SkipAutoHide := true  ; 对齐旧函数提前 return：不触发自动隐藏
             return
         }
 

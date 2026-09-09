@@ -11,6 +11,8 @@ class AgentActionBase {
     ; 异常兜底文案（对齐各旧函数 catch 原文；建X 旧函数无 catch，此处为骨架统一兜底）
     FailLogText := "操作失败"
     FailFeedbackText := "操作失败"
+    ; 前置校验未通过（如无 vN、步目无实施文档）时置 true：对齐旧函数提前 return 跳过 MaybeAutoHide 的行为
+    SkipAutoHide := false
 
     ; 模板方法骨架：守卫 → Execute → 自动隐藏
     Run(*) {
@@ -19,7 +21,9 @@ class AgentActionBase {
                 return
             }
             this.Execute()
-            MaybeAutoHide()
+            if !this.SkipAutoHide {
+                MaybeAutoHide()
+            }
         } catch Error as err {
             LogError(this.FailLogText "：" err.Message)
             ShowFeedback(this.FailFeedbackText "：" err.Message, true)
@@ -40,6 +44,16 @@ class AgentActionBase {
             throw Error("模板文件不存在：" path)
         }
         return FileRead(path, "UTF-8")
+    }
+
+    ; ---- 纯技术：模板存在性检查（= 原 PromptManager.EnsureTemplateExists，只检查不读取） ----
+    EnsureTemplate(fileName) {
+        global TemplateDir
+        path := TemplateDir "\" fileName
+        if !FileExist(path) {
+            LogError("模板文件不存在：" path)
+            throw Error("模板文件不存在：" path)
+        }
     }
 
     ; ---- 纯技术：剪贴板 → 日志 → 反馈 → 发 Agent（保持旧调用顺序） ----
