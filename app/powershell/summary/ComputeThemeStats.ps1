@@ -146,8 +146,8 @@ foreach ($f in (Get-ChildItem -LiteralPath $ThemePath -File -ErrorAction Silentl
     }
 }
 
-# ---------- 轮次明细：遍历三类发送，按 target 拆候选逐文件配对 ----------
-$sendActions = @('复需求', '复回复', '复执行')
+# ---------- 轮次明细：遍历四类发送，按 target 拆候选逐文件配对 ----------
+$sendActions = @('复需求', '复回复', '复执行', '质检码')
 $discussion = 0; $execute = 0; $unknown = 0; $untyped = 0
 $executeByStrategy = [ordered]@{}
 $roundDetail = @()
@@ -196,12 +196,14 @@ foreach ($e in $entries) {
     if ($null -ne $human -and -not $human.humanUnknown -and $null -ne $human.humanStart) { $roundStart = $human.humanStart }
     $gapSec = Get-RoundGap -Entries $entries -RoundStart $roundStart
 
-    # 人文件字符数：讨论轮取 source 文件（复需求无 source 按 需求.txt）
+    # 人文件字符数：讨论轮取 source 文件（复需求无 source 按 需求.txt）；质检码无输入文件 → 0
     $srcChars = $null
     if (-not $isExecute) {
         $src = $e.source
         if ($e.action -eq '复需求' -and [string]::IsNullOrWhiteSpace($src)) { $src = '需求.txt' }
-        if (-not [string]::IsNullOrWhiteSpace($src)) {
+        if ($e.action -eq '质检码') {
+            $srcChars = 0
+        } elseif (-not [string]::IsNullOrWhiteSpace($src)) {
             $srcChars = Get-FileCharCount -Path (Join-Path $ThemePath $src)
         }
     }

@@ -8,7 +8,7 @@
       - Test-TargetMatch：target 匹配，支持 "|" 分隔的候选（如 "v5.md|实施文档.md"），精确匹配文件名。
       - Get-TargetRoundInfo：按 target/source 定位本轮；非轮次 md 返回 $null；配对失败返回 matched=$false。
       - Get-FirstTargetNotificationAfter：thisSend 之后第一条同 target 的完成通知。
-      - Get-HumanStartForSend：按发送动作的 source 定位人思考起点（建X）；复执行恒无（人耗时 0）。
+      - Get-HumanStartForSend：按发送动作的 source 定位人思考起点（建X）；复执行/质检码 恒无（人耗时 0）。
       - Get-RoundGap：轮间间隔 = 本轮起点 − 此前最近一条完成通知；首轮或无先例通知时为 0。
       - Get-RebuildRoundRows：重建轮（复关系 → 上下文重建完成通知）；人耗时/字数恒 0，轮间间隔照常。
 
@@ -80,8 +80,8 @@ function Get-HumanStartForSend {
         [array]$Entries,
         [object]$Send
     )
-    if ($Send.action -eq '复执行') {
-        # 执行类文件（改吧结果 / 已实施.md）：human 恒 0
+    if ($Send.action -eq '复执行' -or $Send.action -eq '质检码') {
+        # 执行类文件（改吧结果 / 已实施.md）与质检码（无输入文件）：human 恒 0
         return [PSCustomObject]@{ humanStart = $null; humanUnknown = $false }
     }
     # 讨论轮：source 定位人思考段（复需求无 source 时按 需求.txt）
@@ -116,7 +116,7 @@ function Get-TargetRoundInfo {
     # 找指向本文件的发送动作；同 target 多次 → 配最后一次（消歧）
     $send = $null
     foreach ($e in $Entries) {
-        if ($e.action -ne '复需求' -and $e.action -ne '复回复' -and $e.action -ne '复执行') { continue }
+        if ($e.action -ne '复需求' -and $e.action -ne '复回复' -and $e.action -ne '复执行' -and $e.action -ne '质检码') { continue }
         if (-not (Test-TargetMatch -TargetValue $e.target -FileName $FileName)) { continue }
         if ($null -eq $send -or $e.time -gt $send.time) { $send = $e }
     }

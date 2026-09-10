@@ -41,4 +41,10 @@ class AgentActions {
         global CopyRelations
         return (CopyRelations()).Run()
     }
+
+    ; 质检码（ai）
+    static QualityCheck(*) {
+        global QualityCheck
+        return (QualityCheck()).Run()
+    }
 }

@@ -14,6 +14,7 @@ global BindAgentWindowButton := ""
 global UnbindAgentWindowButton := ""
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
+global QualityCheckButton := ""
 global CreateReplyButton := ""
 global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
@@ -25,7 +26,7 @@ global HoverTooltipVisible := false
 CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
-    global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
+    global CreateRequirementButton, CopyRequirementPromptButton, QualityCheckButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown
     actionButtonWidth := 60
     actionButtonHeight := 24
@@ -81,6 +82,10 @@ CreateMainGui() {
     CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
     CopyRequirementPromptButton.OnEvent("Click", AgentActions.CopyRequirement)
     ApplyButtonStyle(CopyRequirementPromptButton)
+
+    QualityCheckButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "质检码")
+    QualityCheckButton.OnEvent("Click", AgentActions.QualityCheck)
+    ApplyButtonStyle(QualityCheckButton)
 
     CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
     CreateReplyButton.OnEvent("Click", AgentActions.CreateReply)
@@ -270,11 +275,12 @@ HandleClose(*) {
 
 
 SetControlsEnabled(enabled) {
-    global CreateRequirementButton, CopyRequirementPromptButton, CreateReplyButton
+    global CreateRequirementButton, CopyRequirementPromptButton, QualityCheckButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
     global NewThemeButton, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
+    QualityCheckButton.Enabled := enabled
     CreateReplyButton.Enabled := enabled
     CopyReplyPromptButton.Enabled := enabled
     ReplyImplementationTailCheckbox.Enabled := enabled

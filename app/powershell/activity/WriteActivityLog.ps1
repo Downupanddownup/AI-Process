@@ -108,8 +108,8 @@ try {
         $record["agent"] = $AgentName.Trim()
     }
     $record["action"] = $Action
-    # 轮次类型：三类发送动作携带 round-type（复执行=execute，复需求/复回复=discussion），供统计直读
-    if ($Action -eq '复执行' -or $Action -eq '复需求' -or $Action -eq '复回复') {
+    # 轮次类型：四类发送动作携带 round-type（复执行=execute，复需求/复回复/质检码=discussion），供统计直读
+    if ($Action -eq '复执行' -or $Action -eq '复需求' -or $Action -eq '复回复' -or $Action -eq '质检码') {
         $rt = 'discussion'
         if ($Action -eq '复执行') { $rt = 'execute' }
         if ($properties -is [System.Collections.IDictionary]) {

@@ -43,6 +43,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyReply.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyExecute.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRelations.ahk
+#Include %A_ScriptDir%\modules\business\behaviors\actions\QualityCheck.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActions.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryDataCollector.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryGenerator.ahk
