@@ -12,6 +12,8 @@ global CreateIssueButton := ""
 global NewThemeButton := ""
 global BindAgentWindowButton := ""
 global UnbindAgentWindowButton := ""
+global AgentNameText := ""
+global AgentNameTextHwnd := 0
 global CreateRequirementButton := ""
 global CopyRequirementPromptButton := ""
 global QualityCheckButton := ""
@@ -25,6 +27,7 @@ global HoverTooltipVisible := false
 
 CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
+    global AgentNameText, AgentNameTextHwnd
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global CreateRequirementButton, CopyRequirementPromptButton, QualityCheckButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown
@@ -74,6 +77,9 @@ CreateMainGui() {
     UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
     UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
     ApplyButtonStyle(UnbindAgentWindowButton)
+
+    AgentNameText := MainGui.AddText("x+" actionGap " yp+4 w62 h18", "")
+    AgentNameTextHwnd := AgentNameText.Hwnd
 
     CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", AgentActions.CreateRequirement)
@@ -297,11 +303,18 @@ SetControlsEnabled(enabled) {
 
 
 OnMouseMove(wParam, lParam, msg, hwnd) {
-    global CurrentPathHwnd, HoverTooltipVisible
+    global CurrentPathHwnd, AgentNameTextHwnd, HoverTooltipVisible
 
-    currentDir := GetCurrentDir()
-    if (hwnd = CurrentPathHwnd && currentDir != "") {
-        ToolTip(currentDir)
+    ; 悬停显示全名：一个控件一段文案，显隐统一走下面一处
+    tooltipText := ""
+    if (hwnd = CurrentPathHwnd) {
+        tooltipText := GetCurrentDir()
+    } else if (hwnd = AgentNameTextHwnd) {
+        tooltipText := GetSession(GetActiveWindowId(), "AgentName")
+    }
+
+    if (tooltipText != "") {
+        ToolTip(tooltipText)
         HoverTooltipVisible := true
         return
     }
@@ -311,6 +324,67 @@ OnMouseMove(wParam, lParam, msg, hwnd) {
         HoverTooltipVisible := false
     }
 }
+
+
+
+; 按控件当前字体量文本的像素宽度（中英文宽度差 3 倍以上，只能按像素算，不能按字数）
+MeasureTextWidth(text, sourceHwnd) {
+    hdc := DllCall("GetDC", "Ptr", sourceHwnd, "Ptr")
+    if (!hdc) {
+        return 0
+    }
+
+    hFont := DllCall("SendMessageW", "Ptr", sourceHwnd, "UInt", 0x0031, "Ptr", 0, "Ptr", 0, "Ptr")   ; WM_GETFONT
+    previousFont := 0
+    if (hFont) {
+        previousFont := DllCall("SelectObject", "Ptr", hdc, "Ptr", hFont, "Ptr")
+    }
+
+    size := Buffer(8, 0)
+    DllCall("GetTextExtentPoint32W", "Ptr", hdc, "Str", text, "Int", StrLen(text), "Ptr", size)
+    width := NumGet(size, 0, "Int")
+
+    if (previousFont) {
+        DllCall("SelectObject", "Ptr", hdc, "Ptr", previousFont)
+    }
+    DllCall("ReleaseDC", "Ptr", sourceHwnd, "Ptr", hdc)
+    return width
+}
+
+
+
+; 装得下原样返回；装不下从中间掐，补省略号（保留头尾比只留头更容易认出是哪个名字）
+; 可用宽度取 GetClientRect 的物理像素：高 DPI 下控件按缩放放大，拿布局的逻辑宽度去比会误截
+TruncateToWidth(text, sourceHwnd) {
+    if (text = "" || !sourceHwnd) {
+        return text
+    }
+
+    rect := Buffer(16, 0)
+    if (!DllCall("GetClientRect", "Ptr", sourceHwnd, "Ptr", rect)) {
+        return text
+    }
+    maxWidth := NumGet(rect, 8, "Int")
+    if (maxWidth <= 0 || MeasureTextWidth(text, sourceHwnd) <= maxWidth) {
+        return text
+    }
+
+    ellipsis := "..."
+    length := StrLen(text) - 1
+    while (length > 0) {
+        headLength := Ceil(length / 2)
+        tailLength := length - headLength
+        tail := tailLength > 0 ? SubStr(text, -tailLength) : ""
+        candidate := SubStr(text, 1, headLength) . ellipsis . tail
+        if (MeasureTextWidth(candidate, sourceHwnd) <= maxWidth) {
+            return candidate
+        }
+        length -= 1
+    }
+    return ellipsis
+}
+
+
 
 OnWindowSize(wParam, lParam, msg, hwnd) {
     global MainGui, AppConfig

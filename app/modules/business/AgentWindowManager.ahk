@@ -98,6 +98,23 @@ UpdateBindButtonState() {
         BindAgentWindowButton.Text := "绑窗口"
         UnbindAgentWindowButton.Visible := false
     }
+    UpdateAgentNameText()
+}
+
+
+
+; 主面板解绑右侧的 AGENT 名称：定宽槽位，装不下由 TruncateToWidth 掐中间、悬停给全名
+UpdateAgentNameText() {
+    global AgentNameText
+    if (!AgentNameText) {
+        return
+    }
+    name := GetSession(GetActiveWindowId(), "AgentName")
+    if (name = "") {
+        AgentNameText.Text := ""
+        return
+    }
+    AgentNameText.Text := TruncateToWidth(name, AgentNameText.Hwnd)
 }
 
 
