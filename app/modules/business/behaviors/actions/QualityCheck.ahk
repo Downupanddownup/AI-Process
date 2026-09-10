@@ -13,6 +13,11 @@ class QualityCheck extends AgentActionBase {
 
     Execute() {
         chain := VersionChain.Of(GetCurrentDir())
+        if (chain.LatestVersion = 0) {
+            ShowFeedback("当前目录下还没有任何 vN.md，质检需要先完成至少一轮沟通", true)
+            this.SkipAutoHide := true  ; 前置校验未通过：不触发自动隐藏（对齐复回复写法）
+            return
+        }
         nextVersionFile := "v" chain.NextVersion() ".md"   ; 裸文件名（对齐复回复口径）
         content := this.LoadTemplate("quality_check_prompt.txt")
         content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
