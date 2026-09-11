@@ -26,11 +26,13 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\RepositoryDialog.ahk
 #Include %A_ScriptDir%\modules\business\ArchiveManager.ahk
 #Include %A_ScriptDir%\modules\business\RepositoryWindow.ahk
+#Include %A_ScriptDir%\modules\business\DomainTreeWindow.ahk
 #Include %A_ScriptDir%\modules\business\HistoryIndexManager.ahk
 #Include %A_ScriptDir%\modules\business\ActivityLogger.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
 #Include %A_ScriptDir%\modules\business\AgentDispatcher.ahk
 #Include %A_ScriptDir%\modules\business\services\DomainConventions.ahk
+#Include %A_ScriptDir%\modules\business\services\DomainTree.ahk
 #Include %A_ScriptDir%\modules\business\services\VersionChain.ahk
 #Include %A_ScriptDir%\modules\business\services\PromptElements.ahk
 #Include %A_ScriptDir%\modules\business\services\EditorOpener.ahk

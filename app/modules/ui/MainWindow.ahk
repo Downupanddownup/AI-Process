@@ -9,6 +9,7 @@ global ReplyImplementationTailCheckbox := ""
 global SetDirectoryButton := ""
 global ReturnParentButton := ""
 global CreateIssueButton := ""
+global DomainTreeButton := ""
 global NewThemeButton := ""
 global BindAgentWindowButton := ""
 global UnbindAgentWindowButton := ""
@@ -29,6 +30,7 @@ CreateMainGui() {
     global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global AgentNameText, AgentNameTextHwnd
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
+    global DomainTreeButton
     global CreateRequirementButton, CopyRequirementPromptButton, QualityCheckButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown
     actionButtonWidth := 60
@@ -69,6 +71,10 @@ CreateMainGui() {
     CreateIssueButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "建问题")
     CreateIssueButton.OnEvent("Click", CreateAndEnterIssueDir)
     ApplyButtonStyle(CreateIssueButton)
+
+    DomainTreeButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "需求树")
+    DomainTreeButton.OnEvent("Click", ShowDomainTreeWindow)
+    ApplyButtonStyle(DomainTreeButton)
 
     BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
     BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)

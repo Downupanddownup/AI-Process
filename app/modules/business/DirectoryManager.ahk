@@ -181,12 +181,19 @@ ShowFullPath(*) {
 
 RefreshDirectoryStateUI() {
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton, CurrentDirStateMark
+    global DomainTreeButton
 
-    if !SetDirectoryButton || !ReturnParentButton || !CreateIssueButton || !NewThemeButton || !CurrentDirStateMark {
+    if !SetDirectoryButton || !ReturnParentButton || !CreateIssueButton || !NewThemeButton || !CurrentDirStateMark || !DomainTreeButton {
         return
     }
 
     currentDir := GetCurrentDir()
+
+    ; 需求树：向上能找到对话域才可用。这里独占它的 Enabled——
+    ; ShowMainWindow 是先 RefreshDirectoryStateUI、后 SetControlsEnabled(true)，
+    ; 若这条也写进 SetControlsEnabled，置灰会被随后的 true 覆盖掉
+    DomainTreeButton.Enabled := (currentDir != "" && DomainTree.FindRoot(currentDir) != "")
+
     if (currentDir = "") {
         SetDirectoryButton.Visible := true
         ReturnParentButton.Visible := false
@@ -221,4 +228,16 @@ ReturnToThemeDir(*) {
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
     ShowFeedback("已返回主题目录")
+}
+
+
+; 切当前目录并刷新面板：需求树双击用的最小链路。
+; 与「面板设目录」同语义——只切目录、不碰文件（不建 需求.txt）；source 只用于历史索引。
+SetCurrentDirAndRefresh(dirPath, source) {
+    SetCurrentDir(NormalizePath(dirPath))
+    SaveWindowSession(GetActiveWindowId())
+    UpdateCurrentPathDisplay()
+    SetControlsEnabled(true)
+    RefreshDirectoryStateUI()
+    LogThemeIndex(GetCurrentDir(), source)
 }

@@ -50,6 +50,22 @@ class DomainConventions {
         SplitPath(parentDir, &parentName)
         return parentName = DomainConventions.ResultIssueRoot
     }
+    ; 对话域：含 需求.txt，或位于 实施步骤 之下
+    ; （步骤目录由「步目」拆分时创建，不建 需求.txt，见 约定.md 三）
+    static IsDomainDir(dirPath) {
+        if (dirPath = "" || !DirExist(dirPath)) {
+            return false
+        }
+        if (DomainConventions.HasRequirement(dirPath)) {
+            return true
+        }
+        SplitPath(dirPath, , &parentDir)
+        return ExtractFileName(parentDir) = DomainConventions.StepsDir
+    }
+    ; 需求.txt 在不在，就是"已开工 / 未开工"的状态位
+    static HasRequirement(dirPath) {
+        return FileExist(DomainConventions.RequirementPath(dirPath)) ? true : false
+    }
 
     ; ==== 派生路径 ====
     static GetResultIssueRoot(themeDirPath) {
@@ -194,6 +210,18 @@ class DomainConventions {
             result.Push(path)
         }
         return result
+    }
+
+    ; 直接子目录：按约定排序，跳过 .aiprocess（同 GetNextIssueDirName 的路子：读盘 + 按约定挑）
+    static GetSubdirsByConvention(dirPath) {
+        subdirs := []
+        Loop Files, dirPath "\*", "D" {
+            if (A_LoopFileName = DomainConventions.DataDir) {
+                continue
+            }
+            subdirs.Push(A_LoopFileFullPath)
+        }
+        return DomainConventions.SortSubdirsByConvention(subdirs)
     }
 
     ; 递归遍历：按约定排序，跳过 .aiprocess（= 原 FileManager.GetAllFilesRecursive）
