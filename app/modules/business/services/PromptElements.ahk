@@ -4,7 +4,7 @@
 ; 收编自 PromptManager 的六个 AppendXxxIfNeeded，恒化后语义：
 ; - 元素均为必选（原开关判定已删除，不再读取会话开关）
 ; - 不修改/提问规则：模板内容 Trim 首尾空白，空内容不追加
-; - 执行通知/完成通知：无条件追加，恒定非静默（-Silent 已随开关移除）
+; - 完成通知（上下文重建）：无条件追加，恒定非静默（-Silent 已随开关移除）
 ; - 拼接规则：RTrim(已有内容) + 一个空行 + 段落
 
 class PromptElements {
@@ -41,16 +41,6 @@ class PromptElements {
         template := PromptElements._LoadTemplate("elements\open_md_prompt.txt")
         template := StrReplace(template, "{{scriptPath}}", AppConfig["OpenMdScriptPath"])
         template := StrReplace(template, "{{windowId}}", GetActiveWindowId())
-        return PromptElements._Append(content, template)
-    }
-
-    ; 业务元素：执行完成通知（无条件追加，恒定非静默）
-    static ExecuteNotification(content) {
-        global AppConfig
-        windowId := GetActiveWindowId()
-        template := PromptElements._LoadTemplate("elements\execute_notification_prompt.txt")
-        template := StrReplace(template, "{{scriptPath}}", AppConfig["NotificationScriptPath"])
-        template := StrReplace(template, "{{windowId}}", windowId)
         return PromptElements._Append(content, template)
     }
 
