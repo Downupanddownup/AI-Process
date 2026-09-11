@@ -139,17 +139,30 @@ CloseDirectoryDialog(*) {
 
 
 UpdateCurrentPathDisplay() {
-    global CurrentPathText, CurrentDirStateMark
+    global CurrentPathText, CurrentDirStateMark, CurrentPathHwnd
     currentDir := GetCurrentDir()
     if currentDir = "" {
-        CurrentPathText.Text := "当前：未设置"
+        CurrentPathText.Text := "未设置"
         CurrentDirStateMark.Text := ""
         return
     }
 
-    split := StrSplit(currentDir, "\")
-    dirName := split.Length ? split[split.Length] : currentDir
-    CurrentPathText.Text := "当前：" dirName
+    dirName := ExtractFileName(currentDir)
+    if (dirName = "") {
+        dirName := currentDir
+    }
+
+    label := dirName
+    keepTail := ""
+    if DomainConventions.IsResultIssueDir(currentDir) {
+        themeName := ExtractFileName(DomainConventions.GetThemeRootFromIssueDir(currentDir))
+        if (themeName != "") {
+            label := themeName
+            keepTail := "/" dirName
+        }
+    }
+
+    CurrentPathText.Text := TruncateKeepTail(label, keepTail, CurrentPathHwnd)
     CurrentDirStateMark.Text := ""
 }
 

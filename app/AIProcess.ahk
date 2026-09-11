@@ -54,6 +54,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\report\ReportGenerator.ahk
 #Include %A_ScriptDir%\modules\business\report\ReportWindow.ahk
 #Include %A_ScriptDir%\modules\ui\StyleManager.ahk
+#Include %A_ScriptDir%\modules\ui\TextFit.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk
 #Include %A_ScriptDir%\modules\ui\ConfigDialog.ahk
 #Include %A_ScriptDir%\modules\ui\HotkeyManager.ahk

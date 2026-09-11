@@ -327,65 +327,6 @@ OnMouseMove(wParam, lParam, msg, hwnd) {
 
 
 
-; 按控件当前字体量文本的像素宽度（中英文宽度差 3 倍以上，只能按像素算，不能按字数）
-MeasureTextWidth(text, sourceHwnd) {
-    hdc := DllCall("GetDC", "Ptr", sourceHwnd, "Ptr")
-    if (!hdc) {
-        return 0
-    }
-
-    hFont := DllCall("SendMessageW", "Ptr", sourceHwnd, "UInt", 0x0031, "Ptr", 0, "Ptr", 0, "Ptr")   ; WM_GETFONT
-    previousFont := 0
-    if (hFont) {
-        previousFont := DllCall("SelectObject", "Ptr", hdc, "Ptr", hFont, "Ptr")
-    }
-
-    size := Buffer(8, 0)
-    DllCall("GetTextExtentPoint32W", "Ptr", hdc, "Str", text, "Int", StrLen(text), "Ptr", size)
-    width := NumGet(size, 0, "Int")
-
-    if (previousFont) {
-        DllCall("SelectObject", "Ptr", hdc, "Ptr", previousFont)
-    }
-    DllCall("ReleaseDC", "Ptr", sourceHwnd, "Ptr", hdc)
-    return width
-}
-
-
-
-; 装得下原样返回；装不下从中间掐，补省略号（保留头尾比只留头更容易认出是哪个名字）
-; 可用宽度取 GetClientRect 的物理像素：高 DPI 下控件按缩放放大，拿布局的逻辑宽度去比会误截
-TruncateToWidth(text, sourceHwnd) {
-    if (text = "" || !sourceHwnd) {
-        return text
-    }
-
-    rect := Buffer(16, 0)
-    if (!DllCall("GetClientRect", "Ptr", sourceHwnd, "Ptr", rect)) {
-        return text
-    }
-    maxWidth := NumGet(rect, 8, "Int")
-    if (maxWidth <= 0 || MeasureTextWidth(text, sourceHwnd) <= maxWidth) {
-        return text
-    }
-
-    ellipsis := "..."
-    length := StrLen(text) - 1
-    while (length > 0) {
-        headLength := Ceil(length / 2)
-        tailLength := length - headLength
-        tail := tailLength > 0 ? SubStr(text, -tailLength) : ""
-        candidate := SubStr(text, 1, headLength) . ellipsis . tail
-        if (MeasureTextWidth(candidate, sourceHwnd) <= maxWidth) {
-            return candidate
-        }
-        length -= 1
-    }
-    return ellipsis
-}
-
-
-
 OnWindowSize(wParam, lParam, msg, hwnd) {
     global MainGui, AppConfig
     if !MainGui || hwnd != MainGui.Hwnd {
