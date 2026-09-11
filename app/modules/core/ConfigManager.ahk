@@ -180,15 +180,6 @@ EnsureDefaultFiles() {
         IniWrite("tweak", SettingsFile, "Window3", "ExecuteStrategy")
     }
 
-    ; [SummaryAgent] 段：经验总结窗口专用 Agent 绑定配置
-    if (IniRead(SettingsFile, "SummaryAgent", "AgentTitleContains", "__NOT_FOUND__") = "__NOT_FOUND__") {
-        IniWrite("", SettingsFile, "SummaryAgent", "AgentTitleContains")
-        IniWrite("", SettingsFile, "SummaryAgent", "AgentProcessName")
-        IniWrite("", SettingsFile, "SummaryAgent", "AgentClassName")
-        IniWrite("", SettingsFile, "SummaryAgent", "AgentHwnd")
-        IniWrite("4", SettingsFile, "SummaryAgent", "AgentAfterCopyAction")
-    }
-
 }
 
 ; 加载配置
@@ -214,7 +205,6 @@ LoadConfig() {
     AppConfig["OpenMdScriptPath"] := AppRoot "\powershell\markdown\OpenMarkdown.ps1"
     AppConfig["NotificationScriptPath"] := AppRoot "\powershell\notification\ShowCenterNotification.ps1"
     AppConfig["FileToolPath"] := IniRead(SettingsFile, "FileTool", "FileToolPath", "")
-    AppConfig["IdleThresholdMinutes"] := IniRead(SettingsFile, "Report", "IdleThresholdMinutes", "60") + 0
 }
 
 ; 加载热键配置

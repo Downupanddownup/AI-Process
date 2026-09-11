@@ -115,7 +115,7 @@ for s in list
 自己拼一份"全模块校验"脚本时：
 
 - **顺序照抄 `AIProcess.ahk`**。别按目录递归排——例如 `AgentActions.ahk:35` 的 `global CopyExecute` 必须排在 `actions/CopyExecute.ahk:7` 的类声明**之后**；顺序反了会报"类声明与已有全局冲突"，看着像项目 bug，其实是自己排错了；
-- **自己补启动器全局量**：`AppRoot`／`ConfigDir`／`TemplateDir`／`ModulesDir`／`DataDir`／`LibDir`。`ConfigManager.ahk:6`、`FileToolManager.ahk:10`、`AgentDispatcher.ahk:7` 在**加载期**就用 `ConfigDir` 拼路径，少一个脚本会在中途静默停住（"没输出也没标记"，极易误判成项目坏了）。
+- **自己补启动器全局量**：`AppRoot`／`ConfigDir`／`TemplateDir`／`ModulesDir`／`DataDir`／`LibDir`。`ConfigManager.ahk:6`、`FileToolManager.ahk:10` 在**加载期**就用 `ConfigDir` 拼路径，少一个脚本会在中途静默停住（"没输出也没标记"，极易误判成项目坏了）。
 
 ## 三、验证方法论
 

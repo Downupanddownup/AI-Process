@@ -68,11 +68,10 @@
 - 编辑器列表由 `app/config/filetools.json` 数据驱动（内置 Zed / IDEA / Trae / VSCode / Sublime / ai-process-editor），默认编辑器可配，新增编辑器只改 json。
 - 创建文件、生成 md 后自动用编辑器打开，前台/后台激活方式可配。
 
-### 总结与报告
+### 经验总结
 
 - 活动记录（jsonl）+ 每日运行日志，全程可观测。
-- 经验总结：主题时长统计、历史主题导入、内置 HTTP 查看器（`summary-viewer/`）。
-- 独立报告管理窗口（`reports/`）。
+- 经验总结：主题时长统计（`stats.json` / `统计.md`，脚本每轮自动生成）、历史主题导入、按时间与路径筛选主题。
 
 ### 安装与维护
 
@@ -118,13 +117,11 @@ AI-Process/
 │   ├── AIProcess.ahk        # 主程序入口
 │   ├── config/              # settings.ini / filetools.json（编辑器列表）
 │   ├── modules/             # 分层模块：core / session / ui / business（business 内含 behaviors/ 七领域行为与 services/ 公共服务）
-│   ├── powershell/          # markdown 打开、窗口通知、总结、报告脚本
+│   ├── powershell/          # markdown 打开、窗口通知、统计脚本
 │   ├── templates/           # 提示词模板（含 elements/ 可复用元素、execute/ 执行策略模板）
 │   ├── logs/                # 每日运行日志
 │   └── history/             # 活动记录、仓库与主题索引
 ├── script/                  # install / uninstall（bat + ps1）
-├── summary-viewer/          # 总结查看器
-├── reports/                 # 报告输出
 ├── history/                 # 历史数据
 ├── 需求/                     # 需求讨论、版本沟通、实施设计、结果微调
 ├── 测试/                     # 测试记录

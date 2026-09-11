@@ -30,7 +30,6 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\HistoryIndexManager.ahk
 #Include %A_ScriptDir%\modules\business\ActivityLogger.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
-#Include %A_ScriptDir%\modules\business\AgentDispatcher.ahk
 #Include %A_ScriptDir%\modules\business\services\DomainConventions.ahk
 #Include %A_ScriptDir%\modules\business\services\DomainTree.ahk
 #Include %A_ScriptDir%\modules\business\services\VersionChain.ahk
@@ -47,14 +46,9 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRelations.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\QualityCheck.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActions.ahk
-#Include %A_ScriptDir%\modules\business\summary\SummaryDataCollector.ahk
-#Include %A_ScriptDir%\modules\business\summary\SummaryGenerator.ahk
 #Include %A_ScriptDir%\modules\business\summary\HistoricalThemeImporter.ahk
 #Include %A_ScriptDir%\modules\business\summary\ThemePathUtils.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryWindow.ahk
-#Include %A_ScriptDir%\modules\business\report\ThemeDurationCalculator.ahk
-#Include %A_ScriptDir%\modules\business\report\ReportGenerator.ahk
-#Include %A_ScriptDir%\modules\business\report\ReportWindow.ahk
 #Include %A_ScriptDir%\modules\ui\StyleManager.ahk
 #Include %A_ScriptDir%\modules\ui\TextFit.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk

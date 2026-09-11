@@ -5,18 +5,11 @@
 
 global SummaryGui := ""
 global SummaryListView := ""
-global SummaryAgentStatusText := ""
 global SummaryTotalCountText := ""
-global SummaryBindButton := ""
-global SummaryActivateButton := ""
-global SummaryRebindButton := ""
-global SummaryUnbindButton := ""
 global SummaryRefreshButton := ""
 global SummaryImportHistoryButton := ""
 global SummaryFilterButtons := ""
 global SummaryDateRangeText := ""
-global SummaryReportFilter := ""
-global SummaryReportFilterValue := "全部"
 global SummaryCurrentFilter := "今天"
 global SummaryCustomStartDate := ""
 global SummaryCustomEndDate := ""
@@ -26,25 +19,16 @@ global SummaryFilterAreaHeight := 0
 global SummaryRowPathMap := Map()
 global SummaryPathFilterEdit := ""
 global SummaryPathFilterValue := ""
-global SummaryGenerateReportBtn := ""
-global SummaryOpenReportBtn := ""
-global SummaryViewerStatusText := ""
-global SummaryViewerToggleButton := ""
-global SummaryViewerHtmlButton := ""
-global SummaryViewerRefreshButton := ""
-global SummaryViewerHttpServerPid := 0
-global SummaryViewerStatusPending := false
-global SummaryViewerLastRunning := false
 
 ; 筛选选项
 FILTER_DEFINITIONS := [
-    {name: "今天", reportType: "日报"},
-    {name: "本周", reportType: "周报"},
-    {name: "上周", reportType: "周报"},
-    {name: "本月", reportType: "月报"},
-    {name: "上月", reportType: "月报"},
-    {name: "本季", reportType: "季报"},
-    {name: "本年", reportType: "年报"}
+    {name: "今天"},
+    {name: "本周"},
+    {name: "上周"},
+    {name: "本月"},
+    {name: "上月"},
+    {name: "本季"},
+    {name: "本年"}
 ]
 
 ShowSummaryWindow(*) {
@@ -54,21 +38,16 @@ ShowSummaryWindow(*) {
         SummaryGui.Show()
         WinActivate("经验总结")
         RefreshSummaryWindow()
-        UpdateSummaryViewerStatus()
         return
     }
 
     CreateSummaryGui()
     RefreshSummaryWindow()
-    UpdateSummaryViewerStatus()
 }
 
 CreateSummaryGui() {
-    global SummaryGui, SummaryListView, SummaryAgentStatusText, SummaryTotalCountText
-    global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
-    global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText, SummaryReportFilter
-    global SummaryGenerateReportBtn, SummaryOpenReportBtn
-    global SummaryViewerStatusText, SummaryViewerToggleButton, SummaryViewerHtmlButton, SummaryViewerRefreshButton
+    global SummaryGui, SummaryListView, SummaryTotalCountText
+    global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText
 
     SummaryGui := Gui("+Resize +MinSize920x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
@@ -106,54 +85,20 @@ CreateSummaryGui() {
     SummaryRefreshButton := SummaryGui.Add("Button", "x" xPos " ym w50 h22", "刷新")
     SummaryRefreshButton.OnEvent("Click", SummaryRefreshClick)
 
-    ; 第二行：报告状态 + Agent 绑定
-    SummaryGui.Add("Text", "xm y+8 w60 h18", "报告状态：")
-    SummaryReportFilter := SummaryGui.Add("DropDownList", "x+4 yp w80 Choose1", ["全部", "已生成", "未生成"])
-    SummaryReportFilter.OnEvent("Change", SummaryReportFilterChange)
-
-    SummaryGui.Add("Text", "x+20 yp w80 h18", "Agent 绑定：")
-    SummaryAgentStatusText := SummaryGui.Add("Text", "x+4 yp w100 h18", "未绑定")
-    SummaryBindButton := SummaryGui.Add("Button", "x+4 yp w60 h24", "绑定窗口")
-    SummaryBindButton.OnEvent("Click", SummaryBindAgentClick)
-    SummaryActivateButton := SummaryGui.Add("Button", "x+4 yp w60 h24 Hidden", "激活窗口")
-    SummaryActivateButton.OnEvent("Click", SummaryActivateAgentClick)
-    SummaryRebindButton := SummaryGui.Add("Button", "x+4 yp w60 h24 Hidden", "重绑")
-    SummaryRebindButton.OnEvent("Click", SummaryRebindAgentClick)
-    SummaryUnbindButton := SummaryGui.Add("Button", "x+4 yp w60 h24 Hidden", "解绑")
-    SummaryUnbindButton.OnEvent("Click", SummaryUnbindAgentClick)
-
-    SummaryTotalCountText := SummaryGui.Add("Text", "x+10 yp w80 h18", "")
-
     ; 路径筛选
     SummaryGui.Add("Text", "xm y+8 w60 h18", "路径筛选：")
     SummaryPathFilterEdit := SummaryGui.Add("Edit", "x+4 yp w180 h22")
     SummaryPathFilterEdit.OnEvent("Change", OnPathFilterChange)
 
-    SummaryGenerateReportBtn := SummaryGui.Add("Button", "x+8 yp w80 h22", "生成报告")
-    SummaryGenerateReportBtn.OnEvent("Click", OnGenerateReportClick)
-
-    SummaryOpenReportBtn := SummaryGui.Add("Button", "x+8 yp w80 h22", "报告窗口")
-    SummaryOpenReportBtn.OnEvent("Click", OnOpenReportWindowClick)
-
-    SummaryViewerHtmlButton := SummaryGui.Add("Button", "x+8 yp w90 h22", "可视化总结")
-    SummaryViewerHtmlButton.OnEvent("Click", SummaryViewerHtmlClick)
-
-    SummaryViewerStatusText := SummaryGui.Add("Text", "x+20 yp w140 h22 +0x200", "HTTP 服务：未启动")
-    SummaryViewerStatusText.SetFont("c808080")
-    SummaryViewerToggleButton := SummaryGui.Add("Button", "x+4 yp w70 h22", "启动服务")
-    SummaryViewerToggleButton.OnEvent("Click", SummaryViewerToggleClick)
-
-    SummaryViewerRefreshButton := SummaryGui.Add("Button", "x+4 yp w80 h22", "刷新状态")
-    SummaryViewerRefreshButton.OnEvent("Click", SummaryViewerRefreshClick)
+    SummaryTotalCountText := SummaryGui.Add("Text", "x+12 yp w80 h18", "")
 
     ; ListView
-    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "总结状态", "目录状态"])
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "目录状态"])
     SummaryListView.ModifyCol(1, 40)   ; 序号
     SummaryListView.ModifyCol(2, 180)  ; 主题名称
     SummaryListView.ModifyCol(3, 140)  ; 归属项目
     SummaryListView.ModifyCol(4, 140)  ; 最后访问时间
-    SummaryListView.ModifyCol(5, 70)   ; 总结状态
-    SummaryListView.ModifyCol(6, 70)   ; 目录状态
+    SummaryListView.ModifyCol(5, 70)   ; 目录状态
     SummaryListView.OnEvent("Click", SummaryListViewClick)
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
@@ -187,7 +132,7 @@ SummaryGuiSize(gui, minMax, width, height) {
         return
     }
 
-    topReserved := 100     ; 筛选条件区高度 + 边距（三行）
+    topReserved := 70     ; 筛选条件区高度 + 边距（两行）
     bottomReserved := 20   ; 底部边距
     minListHeight := 200
 
@@ -251,12 +196,6 @@ SummaryImportHistoryClick(*) {
 
     count := ImportHistoricalThemes(selectedDir)
     MsgBox("已导入 " count " 个历史主题", "AIProcess", "Iconi")
-    RefreshSummaryWindow()
-}
-
-SummaryReportFilterChange(ctrl, *) {
-    global SummaryReportFilterValue
-    SummaryReportFilterValue := ctrl.Text
     RefreshSummaryWindow()
 }
 
@@ -331,7 +270,6 @@ ApplyCustomDate(dialog, startCtrl, endCtrl, nowCtrl) {
 RefreshSummaryWindow() {
     UpdateDateRangeText()
     RenderThemeList()
-    RefreshAgentStatusUI()
 }
 
 UpdateDateRangeText() {
@@ -359,7 +297,7 @@ FormatDateRangeText(dateRange) {
 RenderThemeList() {
     global SummaryListView, SummaryTotalCountText, SummaryCurrentFilter
     global SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow
-    global SummaryRowPathMap, SummarySelectedThemePath, SummaryReportFilterValue
+    global SummaryRowPathMap, SummarySelectedThemePath
 
     SummaryListView.Delete()
     SummaryRowPathMap.Clear()
@@ -367,18 +305,7 @@ RenderThemeList() {
     dateRange := GetFilterDateRange(SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
     themes := LoadThemes(dateRange)
 
-    ; 应用报告状态过滤
-    filteredThemes := []
-    for theme in themes {
-        summaryExists := FileExist(theme.path "\.aiprocess\Summary.md") || FileExist(theme.path "\.aiprocess\Summary.json")
-        if (SummaryReportFilterValue = "已生成" && !summaryExists) {
-            continue
-        }
-        if (SummaryReportFilterValue = "未生成" && summaryExists) {
-            continue
-        }
-        filteredThemes.Push(theme)
-    }
+    filteredThemes := themes
 
     ; 应用路径筛选
     if (SummaryPathFilterValue != "") {
@@ -393,7 +320,7 @@ RenderThemeList() {
 
     for index, theme in filteredThemes {
         projectName := ExtractProjectName(theme.path)
-        rowIndex := SummaryListView.Add(, index, theme.name, projectName, theme.lastAccessTime, theme.summaryStatus, theme.dirStatus)
+        rowIndex := SummaryListView.Add(, index, theme.name, projectName, theme.lastAccessTime, theme.dirStatus)
         SummaryRowPathMap[rowIndex] := theme.path
     }
 
@@ -461,8 +388,6 @@ LoadThemes(dateRange) {
     themes := []
     for themeDir, lastTime in themeMap {
         SplitPath(themeDir, &themeName)
-        summaryFile := themeDir "\.aiprocess\Summary.md"
-        summaryStatus := FileExist(summaryFile) ? "已总结" : "未总结"
         exists := DirExist(themeDir)
         isArchived := IsArchivedTheme(themeDir)
         if (exists && isArchived) {
@@ -479,7 +404,6 @@ LoadThemes(dateRange) {
             path: themeDir,
             name: themeName,
             lastAccessTime: lastTime,
-            summaryStatus: summaryStatus,
             dirStatus: dirStatus
         })
     }
@@ -660,10 +584,7 @@ ShowThemeDetailDialog(path) {
     }
 
     SplitPath(path, &themeName)
-    summaryMd := path "\.aiprocess\Summary.md"
-    summaryJson := path "\.aiprocess\Summary.json"
     dirExists := DirExist(path)
-    summaryExists := FileExist(summaryMd) || FileExist(summaryJson)
 
     dialog := Gui("+Owner" SummaryGui.Hwnd " +ToolWindow", "主题详情")
     dialog.SetFont("s9", "Microsoft YaHei UI")
@@ -676,9 +597,6 @@ ShowThemeDetailDialog(path) {
     dialog.Add("Text", "xm y+8 w80 h18", "路径：")
     dialog.Add("Edit", "x+4 yp w400 h22 ReadOnly", path)
 
-    dialog.Add("Text", "xm y+8 w80 h18", "总结状态：")
-    dialog.Add("Text", "x+4 yp w100 h18", summaryExists ? "已总结" : "未总结")
-
     dialog.Add("Text", "xm y+8 w80 h18", "目录状态：")
     dialog.Add("Text", "x+4 yp w100 h18", dirExists ? "存在" : "不存在")
 
@@ -690,101 +608,10 @@ ShowThemeDetailDialog(path) {
     openDirButton.OnEvent("Click", (*) => OpenThemeDir(path))
     openDirButton.Enabled := dirExists
 
-    viewSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "查看总结")
-    viewSummaryButton.OnEvent("Click", (*) => ViewThemeSummary(path))
-    viewSummaryButton.Enabled := true
-
-    viewHtmlButton := dialog.Add("Button", "x+8 yp w90 h24", "可视化总结")
-    viewHtmlButton.OnEvent("Click", (*) => ViewThemeHtmlSummary(path))
-    viewHtmlButton.Enabled := true
-
-    generateSummaryButton := dialog.Add("Button", "x+8 yp w80 h24", "生成总结")
-    generateSummaryButton.OnEvent("Click", (ctrl, *) => GenerateThemeSummary(path, ctrl))
-    generateSummaryButton.Enabled := dirExists
-
-    closeButton := dialog.Add("Button", "xm y+16 w80 h24 Default", "关闭")
+    closeButton := dialog.Add("Button", "x+8 yp w80 h24 Default", "关闭")
     closeButton.OnEvent("Click", (*) => dialog.Destroy())
 
     dialog.Show()
-}
-
-; ============================================================
-; Agent 绑定区
-; ============================================================
-
-RefreshAgentStatusUI() {
-    global SummaryAgentStatusText
-    global SummaryBindButton, SummaryActivateButton, SummaryRebindButton, SummaryUnbindButton
-
-    status := AgentDispatcherGetStatus("SummaryAgent")
-
-    if (!status["IsBound"]) {
-        SummaryAgentStatusText.Text := "未绑定"
-        SummaryBindButton.Visible := true
-        SummaryActivateButton.Visible := false
-        SummaryRebindButton.Visible := false
-        SummaryUnbindButton.Visible := false
-    } else {
-        displayText := "已绑定"
-        if (status["TitleContains"] != "") {
-            displayText .= " " status["TitleContains"]
-        }
-        if (status["ProcessName"] != "") {
-            displayText .= " (" status["ProcessName"] ")"
-        }
-        if (status["Hwnd"] != "") {
-            displayText .= " HWND: " status["Hwnd"]
-        }
-        if (!status["IsOnline"]) {
-            displayText .= " [未找到]"
-        }
-        SummaryAgentStatusText.Text := displayText
-
-        SummaryBindButton.Visible := false
-        SummaryActivateButton.Visible := true
-        SummaryRebindButton.Visible := true
-        SummaryUnbindButton.Visible := true
-    }
-}
-
-SummaryBindAgentClick(*) {
-    global SummaryGui
-    if (SummaryGui) {
-        SummaryGui.Hide()
-    }
-    SetTimer(DoSummaryBindAgent, -500)
-}
-
-DoSummaryBindAgent() {
-    global SummaryGui
-    result := AgentDispatcherBind("SummaryAgent")
-    if (SummaryGui) {
-        SummaryGui.Show()
-        WinActivate("经验总结")
-    }
-    if (result["Success"]) {
-        RefreshAgentStatusUI()
-        MsgBox("绑定成功：" result["Title"], "AIProcess", "Iconi")
-    } else {
-        MsgBox("绑定失败：" result["Message"], "AIProcess", "Iconx")
-    }
-}
-
-SummaryActivateAgentClick(*) {
-    if (AgentDispatcherActivate("SummaryAgent")) {
-        ; 激活成功，不提示
-    } else {
-        MsgBox("未找到绑定的 Agent 窗口", "AIProcess", "Iconx")
-    }
-}
-
-SummaryRebindAgentClick(*) {
-    SummaryBindAgentClick()
-}
-
-SummaryUnbindAgentClick(*) {
-    AgentDispatcherUnbind("SummaryAgent")
-    RefreshAgentStatusUI()
 }
 
 OpenThemeDir(themePath) {
@@ -792,401 +619,5 @@ OpenThemeDir(themePath) {
         return
     }
     Run('explorer.exe "' themePath '"')
-}
-
-ViewThemeSummary(themePath) {
-    if (themePath = "") {
-        MsgBox("当前主题路径为空", "AIProcess", "Iconx")
-        return
-    }
-
-    if (!DirExist(themePath)) {
-        MsgBox("当前主题目录不存在：" themePath, "AIProcess", "Iconx")
-        return
-    }
-
-    summaryMd := themePath "\.aiprocess\Summary.md"
-    summaryJson := themePath "\.aiprocess\Summary.json"
-
-    if (FileExist(summaryMd)) {
-        EditorOpener.Open(summaryMd)
-        return
-    }
-
-    if (FileExist(summaryJson)) {
-        global AppRoot
-        psScript := AppRoot "\powershell\summary\ConvertSummaryToMarkdown.ps1"
-        errFile := themePath "\.aiprocess\_tmp\convert_error.txt"
-        DirCreate(themePath "\.aiprocess\_tmp")
-        cmd := Format('powershell -ExecutionPolicy Bypass -File "{}" -JsonPath "{}" > "{}" 2>&1', psScript, summaryJson, errFile)
-        RunWait(cmd, , "Hide")
-        if (FileExist(summaryMd)) {
-            FileDelete(errFile)
-            EditorOpener.Open(summaryMd)
-        } else {
-            errMsg := ""
-            if (FileExist(errFile)) {
-                errMsg := FileRead(errFile, "UTF-8")
-                FileDelete(errFile)
-            }
-            if (errMsg = "") {
-                errMsg := "未知错误"
-            }
-            MsgBox("Markdown 生成失败：" errMsg, "AIProcess", "Iconx")
-        }
-        return
-    }
-
-    MsgBox("当前主题尚未生成总结。", "AIProcess", "Iconi")
-}
-
-SummaryRefreshMessageHandler(wParam, lParam, msg, hwnd) {
-    RefreshSummaryWindow()
-    return true
-}
-
-; 注册自定义窗口消息，供结束脚本刷新列表
-OnMessage(0x8000, SummaryRefreshMessageHandler)
-
-GenerateThemeSummary(themePath, buttonCtrl := "") {
-    if (themePath = "" || !DirExist(themePath)) {
-        return
-    }
-
-    if (IsObject(buttonCtrl)) {
-        buttonCtrl.Enabled := false
-    }
-
-    if (!GenerateSummary(themePath)) {
-        if (IsObject(buttonCtrl)) {
-            buttonCtrl.Enabled := true
-        }
-    }
-}
-
-; ============================================================
-; 报告类型映射
-; ============================================================
-
-GetReportType(filterName) {
-    global FILTER_DEFINITIONS
-    if (filterName = "自定义") {
-        return "自定义"
-    }
-    for def in FILTER_DEFINITIONS {
-        if (def.name = filterName) {
-            return def.reportType
-        }
-    }
-    return ""
-}
-
-GetReportFileName(filterName, dateRange) {
-    reportType := GetReportType(filterName)
-    startDate := dateRange["startDate"]
-    endDate := dateRange["endDate"]
-
-    if (reportType = "日报") {
-        return "日报_" startDate
-    }
-    if (reportType = "周报") {
-        return "周报_" startDate "_" endDate
-    }
-    if (reportType = "月报") {
-        return "月报_" SubStr(startDate, 1, 7)
-    }
-    if (reportType = "季报") {
-        m := Integer(SubStr(startDate, 6, 2))
-        q := Ceil(m / 3)
-        return "季报_" SubStr(startDate, 1, 4) "_Q" q
-    }
-    if (reportType = "年报") {
-        return "年报_" SubStr(startDate, 1, 4)
-    }
-    ; 自定义
-    return "自定义_" startDate "_" endDate
-}
-
-; ============================================================
-; 报告生成
-; ============================================================
-
-OnGenerateReportClick(ctrl, *) {
-    global SummaryCurrentFilter, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow, AppRoot
-
-    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
-    filterName := SummaryCurrentFilter
-    dateRange := GetFilterDateRange(filterName, SummaryCustomStartDate, SummaryCustomEndDate, SummaryCustomEndIsNow)
-    fileName := GetReportFileName(filterName, dateRange)
-    reportPath := projectRoot "\reports\" fileName ".md"
-
-    DirCreate(projectRoot "\reports")
-
-    promptPath := BuildReportPrompt(filterName, dateRange, reportPath)
-    if (promptPath = "") {
-        MsgBox("当前时间范围内没有匹配的主题", "AIProcess", "Iconi")
-        return
-    }
-
-    shortMsg := "请根据临时文件 " promptPath " 生成报告"
-    result := AgentDispatcherSend("SummaryAgent", shortMsg)
-    if (!result["Success"]) {
-        MsgBox("Agent 发送失败：" result["Message"], "AIProcess", "Iconx")
-        FileDelete(promptPath)
-        return
-    }
-}
-
-OnOpenReportWindowClick(*) {
-    ShowReportWindow()
-}
-
-; ============================================================
-; HTML 可视化总结
-; ============================================================
-
-SummaryViewerRefreshClick(*) {
-    SummaryViewerRefreshButton.Text := "检测中…"
-    UpdateSummaryViewerStatus()
-}
-
-SummaryViewerToggleClick(*) {
-    btnText := SummaryViewerToggleButton.Text
-    if (btnText = "关闭服务") {
-        SummaryViewerToggleButton.Text := "正在关闭…"
-        StopHttpServer()
-    } else if (btnText = "启动服务") {
-        SummaryViewerToggleButton.Text := "正在启动…"
-        StartHttpServer(GetSummaryViewerPort())
-    }
-}
-
-SummaryViewerHtmlClick(*) {
-    global SummarySelectedThemePath
-
-    if (SummarySelectedThemePath = "") {
-        MsgBox("请先选择一个主题。", "AIProcess", "Iconi")
-        return
-    }
-
-    SummaryViewerHtmlButton.Text := "正在打开…"
-    SetTimer(() => OpenHtmlSummary(SummarySelectedThemePath), -50)
-}
-
-OpenHtmlSummary(themePath) {
-    port := GetSummaryViewerPort()
-    if (!IsHttpServerRunning(port)) {
-        SummaryViewerHtmlButton.Text := "可视化总结"
-        MsgBox("请先点击「启动服务」启动 HTTP 服务。", "AIProcess", "Iconi")
-        return
-    }
-    ViewThemeHtmlSummary(themePath)
-    SummaryViewerHtmlButton.Text := "可视化总结"
-}
-
-GetSummaryViewerPort() {
-    global AppRoot
-    return IniRead(AppRoot "\config\settings.ini", "SummaryViewer", "Port", "9800")
-}
-
-IsHttpServerRunning(port) {
-    global AppRoot, SummaryViewerHttpServerPid
-
-    LogInfo("HTTP: IsHttpServerRunning called, port=" port ", pid=" SummaryViewerHttpServerPid)
-
-    if (SummaryViewerHttpServerPid != 0 && ProcessExist(SummaryViewerHttpServerPid)) {
-        LogInfo("HTTP: cached PID still exists, returning true")
-        return true
-    }
-
-    psScript := AppRoot "\powershell\summary\Test-HttpServerPort.ps1"
-    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -Port {}', psScript, port)
-    LogInfo("HTTP: running port test command: " cmd)
-    exitCode := RunWait(cmd, , "Hide")
-    LogInfo("HTTP: Test-HttpServerPort exitCode=" exitCode)
-    return (exitCode = 0)
-}
-
-StartHttpServer(port) {
-    global AppRoot, SummaryViewerHttpServerPid
-
-    LogInfo("HTTP: StartHttpServer called, port=" port)
-
-    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
-    if (projectRoot = "") {
-        projectRoot := AppRoot
-    }
-
-    psScript := AppRoot "\powershell\summary\Start-HttpServer.ps1"
-    logFile := AppRoot "\logs\SummaryHttp_" FormatTime(, "yyyy-MM-dd") ".log"
-    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -Port {} -Root "{}" -LogFile "{}"',
-                  psScript, port, projectRoot, logFile)
-    LogInfo("HTTP: starting server command: " cmd)
-
-    pid := 0
-    Run(cmd, , "Hide", &pid)
-    if (pid = 0) {
-        LogError("HTTP: Run failed, pid=" pid)
-        MsgBox("HTTP 服务启动失败", "AIProcess", "Iconx")
-        return
-    }
-
-    SummaryViewerHttpServerPid := pid
-    LogInfo("HTTP: server process PID=" pid)
-
-    ; 等待服务就绪
-    Loop 20 {
-        Sleep(100)
-        if (IsHttpServerRunning(port)) {
-            LogInfo("HTTP: server is running, updating UI")
-            UpdateSummaryViewerStatus()
-            return
-        }
-    }
-
-    LogError("HTTP: server start timed out")
-    MsgBox("HTTP 服务启动超时，请检查端口是否被占用。", "AIProcess", "Iconx")
-}
-
-StopHttpServer() {
-    global AppRoot, SummaryViewerHttpServerPid
-
-    port := GetSummaryViewerPort()
-    LogInfo("HTTP: StopHttpServer called, port=" port ", pid=" SummaryViewerHttpServerPid)
-
-    psScript := AppRoot "\powershell\summary\Stop-HttpServer.ps1"
-    logFile := AppRoot "\logs\SummaryHttp_" FormatTime(, "yyyy-MM-dd") ".log"
-    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
-    if (projectRoot = "") {
-        projectRoot := AppRoot
-    }
-    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -Port {} -Root "{}" -LogFile "{}"',
-                  psScript, port, projectRoot, logFile)
-    LogInfo("HTTP: running stop command: " cmd)
-    exitCode := RunWait(cmd, , "Hide")
-    LogInfo("HTTP: Stop-HttpServer exitCode=" exitCode)
-    SummaryViewerHttpServerPid := 0
-
-    if (exitCode != 0) {
-        LogError("HTTP: Stop-HttpServer failed")
-        MsgBox("关闭 HTTP 服务失败。", "AIProcess", "Iconx")
-    }
-
-    SetTimer(WaitForServerStopped, -100)
-}
-
-WaitForServerStopped() {
-    port := GetSummaryViewerPort()
-    LogInfo("HTTP: WaitForServerStopped started")
-    Loop 30 {
-        if (!IsHttpServerRunning(port)) {
-            LogInfo("HTTP: server confirmed stopped")
-            UpdateSummaryViewerStatusUI(false, port)
-            return
-        }
-        Sleep(100)
-    }
-    LogWarn("HTTP: WaitForServerStopped timed out, forcing UI to stopped")
-    UpdateSummaryViewerStatusUI(false, port)
-}
-
-UpdateSummaryViewerStatus() {
-    global SummaryViewerStatusPending
-    if (SummaryViewerStatusPending) {
-        return
-    }
-    SummaryViewerStatusPending := true
-    SetTimer(CheckHttpServerStatus, -50)
-}
-
-CheckHttpServerStatus() {
-    global SummaryViewerStatusPending
-    port := GetSummaryViewerPort()
-    running := IsHttpServerRunning(port)
-    UpdateSummaryViewerStatusUI(running, port)
-    SummaryViewerStatusPending := false
-}
-
-UpdateSummaryViewerStatusUI(running, port, force := false) {
-    global SummaryViewerStatusText, SummaryViewerToggleButton, SummaryViewerRefreshButton, SummaryViewerLastRunning
-
-    if (!force && running == SummaryViewerLastRunning) {
-        SummaryViewerRefreshButton.Text := "刷新状态"
-        return
-    }
-    SummaryViewerLastRunning := running
-
-    if (running) {
-        SummaryViewerStatusText.Text := "● 运行中 :" port
-        SummaryViewerStatusText.SetFont("c008000")
-        SummaryViewerToggleButton.Text := "关闭服务"
-    } else {
-        SummaryViewerStatusText.Text := "HTTP 服务：未启动"
-        SummaryViewerStatusText.SetFont("c808080")
-        SummaryViewerToggleButton.Text := "启动服务"
-    }
-    SummaryViewerRefreshButton.Text := "刷新状态"
-}
-
-ViewThemeHtmlSummary(themePath) {
-    global AppRoot
-
-    LogInfo("HTTP: ViewThemeHtmlSummary called, themePath=" themePath)
-
-    if (themePath = "") {
-        MsgBox("当前主题路径为空", "AIProcess", "Iconx")
-        return
-    }
-
-    if (!DirExist(themePath)) {
-        MsgBox("当前主题目录不存在：" themePath, "AIProcess", "Iconx")
-        return
-    }
-
-    summaryJson := themePath "\.aiprocess\Summary.json"
-    if (!FileExist(summaryJson)) {
-        MsgBox("当前主题尚未生成 Summary.json。", "AIProcess", "Iconi")
-        return
-    }
-
-    port := GetSummaryViewerPort()
-    if (!IsHttpServerRunning(port)) {
-        MsgBox("请先点击「启动服务」启动 HTTP 服务。", "AIProcess", "Iconi")
-        return
-    }
-
-    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
-    if (projectRoot = "") {
-        projectRoot := AppRoot
-    }
-
-    psScript := AppRoot "\powershell\summary\Get-SummaryViewerUrl.ps1"
-    tempFile := A_Temp "\aiprocess_url_" A_TickCount ".txt"
-    logFile := AppRoot "\logs\SummaryHttp_" FormatTime(, "yyyy-MM-dd") ".log"
-    cmd := Format('powershell -NoProfile -ExecutionPolicy Bypass -File "{}" -ThemePath "{}" -ProjectRoot "{}" -Port {} -OutputFile "{}" -LogFile "{}"',
-                  psScript, themePath, projectRoot, port, tempFile, logFile)
-    LogInfo("HTTP: running URL build command: " cmd)
-
-    url := ""
-    try {
-        exitCode := RunWait(cmd, , "Hide")
-        if (FileExist(tempFile)) {
-            url := Trim(FileRead(tempFile, "UTF-8"), "`r`n")
-        }
-        LogInfo("HTTP: Get-SummaryViewerUrl exitCode=" exitCode ", url=" url)
-        if (exitCode != 0 || url = "") {
-            LogError("HTTP: Get-SummaryViewerUrl failed or returned empty")
-            MsgBox("构造可视化总结 URL 失败。", "AIProcess", "Iconx")
-            return
-        }
-        Run(url)
-    } catch as err {
-        LogError("HTTP: ViewThemeHtmlSummary exception: " err.Message)
-        MsgBox("构造可视化总结 URL 时出错。", "AIProcess", "Iconx")
-    } finally {
-        if (FileExist(tempFile)) {
-            FileDelete(tempFile)
-        }
-    }
 }
 
