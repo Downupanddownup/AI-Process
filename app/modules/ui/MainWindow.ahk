@@ -49,7 +49,7 @@ CreateMainGui() {
     MainGui.OnEvent("Escape", HideToTray)
     RegisterWindowPositionTracking(MainGui.Hwnd)
 
-    CurrentPathText := MainGui.AddText("xm ym+2 w126 h18 +0x200", "当前：未设置")
+    CurrentPathText := MainGui.AddText("xm ym+2 w126 h18 +0x200", "未设置")
     CurrentPathText.OnEvent("Click", ShowThemeSelectDialog)
     CurrentPathHwnd := CurrentPathText.Hwnd
     CurrentDirStateMark := MainGui.AddText("x+0 yp w0 h18 Hidden", "")
