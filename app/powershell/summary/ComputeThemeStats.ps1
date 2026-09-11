@@ -69,6 +69,7 @@ $logFile = Join-Path $aiProcessDir "log.jsonl"
 # ---------- 读取阈值（领域层 AppSettings.psm1，默认 60 唯一收编） ----------
 
 # ---------- 字符数友好显示：<1万 原样+千分位；>=1万 按万/亿缩写（3 位有效数字）；stats.json 恒为精确整数 ----------
+# ⚠ AHK 侧 app/modules/business/services/ThemeStats.ahk 有等价换算（列表显示用），改口径时两边一起改。
 function Format-FriendlyCount {
     param([object]$Number)
     if ($null -eq $Number) { return '未知' }

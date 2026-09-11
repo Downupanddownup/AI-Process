@@ -37,6 +37,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\services\EditorOpener.ahk
 #Include %A_ScriptDir%\modules\business\services\ExecuteStrategyRegistry.ahk
 #Include %A_ScriptDir%\modules\business\services\ActionGuard.ahk
+#Include %A_ScriptDir%\modules\business\services\ThemeStats.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActionBase.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CreateRequirement.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRequirement.ahk

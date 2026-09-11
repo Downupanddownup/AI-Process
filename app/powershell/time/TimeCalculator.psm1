@@ -71,6 +71,7 @@ function Format-FriendlyDuration {
     <#
     .SYNOPSIS
         把秒数转换为友好字符串，自动缩放单位并精确到秒。
+        ⚠ AHK 侧 app/modules/business/services/ThemeStats.ahk 有等价换算（列表显示用），改口径时两边一起改。
     .PARAMETER Seconds
         秒数，负数按 0 处理。
     .PARAMETER Ignored

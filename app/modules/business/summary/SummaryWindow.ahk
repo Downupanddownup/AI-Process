@@ -49,7 +49,7 @@ CreateSummaryGui() {
     global SummaryGui, SummaryListView, SummaryTotalCountText
     global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText
 
-    SummaryGui := Gui("+Resize +MinSize920x600", "经验总结")
+    SummaryGui := Gui("+Resize +MinSize1200x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
     SummaryGui.OnEvent("Close", SummaryGuiClose)
     SummaryGui.OnEvent("Size", SummaryGuiSize)
@@ -93,18 +93,23 @@ CreateSummaryGui() {
     SummaryTotalCountText := SummaryGui.Add("Text", "x+12 yp w80 h18", "")
 
     ; ListView
-    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w820 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "目录状态"])
-    SummaryListView.ModifyCol(1, 40)   ; 序号
-    SummaryListView.ModifyCol(2, 180)  ; 主题名称
-    SummaryListView.ModifyCol(3, 140)  ; 归属项目
-    SummaryListView.ModifyCol(4, 140)  ; 最后访问时间
-    SummaryListView.ModifyCol(5, 70)   ; 目录状态
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w1160 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "目录状态", "活跃(自身)", "人 / AI(自身)", "轮次(自身)", "人产出(自身)", "AI 产出(自身)"])
+    SummaryListView.ModifyCol(1, "40 Integer Right")     ; 序号
+    SummaryListView.ModifyCol(2, 180)                    ; 主题名称
+    SummaryListView.ModifyCol(3, 200)                    ; 归属项目（容下最长仓库名）
+    SummaryListView.ModifyCol(4, 140)                    ; 最后访问时间
+    SummaryListView.ModifyCol(5, 70)                     ; 目录状态
+    SummaryListView.ModifyCol(6, "90 Logical Right")     ; 活跃(自身)
+    SummaryListView.ModifyCol(7, "110 Logical Right")    ; 人 / AI(自身)，排序键为人时长
+    SummaryListView.ModifyCol(8, "100 Logical")          ; 轮次(自身)，排序键为讨论轮数
+    SummaryListView.ModifyCol(9, "90 Logical Right")     ; 人产出(自身)
+    SummaryListView.ModifyCol(10, "90 Logical Right")    ; AI 产出(自身)
     SummaryListView.OnEvent("Click", SummaryListViewClick)
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
 
-    ; 计算窗口尺寸：固定 920×680，主屏幕居中
-    width := 920
+    ; 计算窗口尺寸：固定 1200×680，主屏幕居中
+    width := 1200
     height := 680
     x := Integer((A_ScreenWidth - width) / 2)
     y := Integer((A_ScreenHeight - height) / 2)
@@ -320,7 +325,13 @@ RenderThemeList() {
 
     for index, theme in filteredThemes {
         projectName := ExtractProjectName(theme.path)
-        rowIndex := SummaryListView.Add(, index, theme.name, projectName, theme.lastAccessTime, theme.dirStatus)
+        stats := LoadThemeStats(theme.path)   ; 每行一次：只读通过筛选的主题
+        rowIndex := SummaryListView.Add(, index, theme.name, projectName, theme.lastAccessTime, theme.dirStatus
+            , FormatStatDuration(stats, "activeSec")
+            , FormatStatHumanAi(stats)
+            , FormatStatRounds(stats)
+            , FormatStatCount(stats, "humanChars")
+            , FormatStatCount(stats, "aiChars"))
         SummaryRowPathMap[rowIndex] := theme.path
     }
 
@@ -585,6 +596,7 @@ ShowThemeDetailDialog(path) {
 
     SplitPath(path, &themeName)
     dirExists := DirExist(path)
+    statsExists := FileExist(path "\.aiprocess\统计.md")
 
     dialog := Gui("+Owner" SummaryGui.Hwnd " +ToolWindow", "主题详情")
     dialog.SetFont("s9", "Microsoft YaHei UI")
@@ -607,6 +619,10 @@ ShowThemeDetailDialog(path) {
     openDirButton := dialog.Add("Button", "x+8 yp w80 h24", "打开目录")
     openDirButton.OnEvent("Click", (*) => OpenThemeDir(path))
     openDirButton.Enabled := dirExists
+
+    viewStatsButton := dialog.Add("Button", "x+8 yp w90 h24", "查看统计")
+    viewStatsButton.OnEvent("Click", (*) => EditorOpener.Open(path "\.aiprocess\统计.md"))
+    viewStatsButton.Enabled := statsExists
 
     closeButton := dialog.Add("Button", "x+8 yp w80 h24 Default", "关闭")
     closeButton.OnEvent("Click", (*) => dialog.Destroy())
