@@ -158,6 +158,23 @@ for s in list
 曾收到反馈"标签和按钮没左对齐，差几个像素"。逐像素量完：两者在**同一列**（都是 `MarginX` = 8 逻辑像素），可见差异 ≤1 物理像素，来自**字形左侧边距 + 按钮边框内缩**。结论是"不改"——加 -1 逻辑像素的补偿反而会随字体／缩放跑偏。
 **做法**：视觉差**先量再改**；量完可能发现它根本不是布局问题。
 
+### 3.7 生成产物回归：一条命令做"快照 / 对照"
+
+`test\Verify-Output.ps1`（tracked 工具）：**同一批输入跑两遍、比对产物差异**。改前存快照、改完对照，两次之间只差你改的那部分。
+
+```powershell
+# 改动前存基线
+powershell -File test\Verify-Output.ps1 -Case Stats -Snapshot before
+# 改完对照：无差异会明确打印；有差异列出变动行并返回退出码 1
+powershell -File test\Verify-Output.ps1 -Case Stats -Compare before
+```
+
+- 预设：`-Case Stats`（`ComputeThemeStats` → `stats.json` / `统计.md`）、`-Case Tag`（`SetMarkdownTimeTag` → 轮次 md）；也可 `-Script` / `-Inputs` / `-Artifacts` 自由指定。
+- 语料：默认**代表集**（覆盖"重建轮／质检轮／执行轮／老日志缺 agent"各一支 + 最近的几个），并**自动排除活动主题**（它的日志正在被写，输入天然漂移）；`-Full` 跑全量。
+- **三处易变内容必须先抹掉**（工具已内置）：`stats.json` 的 `computedAt` 与 `theme.path`（绝对路径，JSON 里是 `\\`）、`统计.md` 的"计算时间"整行。抹掉后同一输入跑两遍 **0 差异**。
+- 四条铁律：**副本上跑**（生成脚本原地写产物）／**子进程调用**（脚本里有 `exit`）／**先删副本里的旧产物**（否则旧文件会被误当本次产出；Tag 例外——md 是原地改写，删了就没得打标）／**输入指纹入清单**（输入本身变了会明确警告）。
+- 实测数字：代表集 7 个主题，Stats 约 **6 秒**、Tag 约 **17 秒**；快照落在 `%TEMP%\AIProcess-VerifyOutput\<标签>`。
+
 ## 四、可直接抄的两段骨架
 
 ### 4.1 临时调试脚本
@@ -228,6 +245,7 @@ foreach ($line in $main) {
 ## 五、交活前自查清单
 
 - [ ] 整树校验通过（末行 `PARSED OK`）
+- [ ] 统计/打标这类"生成产物"的改动，跑过 `test\Verify-Output.ps1` 的 Snapshot → Compare（结果无差异）
 - [ ] `grep` 确认被搬走／改名的函数没有引用残留
 - [ ] 改动文件的**行尾与编码**逐文件核对过（`CR == LF == 行数`、无 BOM）
 - [ ] 边界四件套跑过（空串／0 句柄／退化输入／超长）
