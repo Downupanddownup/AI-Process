@@ -6,7 +6,7 @@
 
 ; ⚠ 显示口径与 PowerShell 侧必须同源，改口径时两边一起改：
 ;   时长 → app/powershell/time/TimeCalculator.psm1       Format-FriendlyDuration
-;   字符 → app/powershell/summary/ComputeThemeStats.ps1  Format-FriendlyCount
+;   字符 → app/powershell/summary/RenderStatsMarkdown.psm1  Format-FriendlyCount
 
 ; 读统计文件。返回 Map：
 ;   HasData     是否真正读到（文件不存在 / 解析失败 / 目录缺失 时为 false）

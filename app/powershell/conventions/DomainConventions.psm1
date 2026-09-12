@@ -23,6 +23,13 @@
 
     未定义的动作：各查询函数分别返回 $false / $null / ''，即"不在集合里、没有类型"——
     本模块不替没定义的动作编性格；各处按自己原来的兜底逻辑走。
+
+    对话域判据（领域标准，登记在案）：
+      标准 = 同时含 需求.txt 与 .aiprocess 两个标记；只有一个不算标准对话域。
+      统计聚合侧（ThemeAggregation.Get-ChildThemes）现用的是单条"含 .aiprocess"判据，
+      全库实测与上述标准等价（唯一差异目录无任何统计产出）。另一处差异：AHK 侧 IsDomainDir 用
+      "含 需求.txt，或 父目录名 = 实施步骤"识别需求树里的"已实施 / 未实施"。三处收口留待独立需求，
+      本文件只登记标准与常量，不在此实现判据函数（避免无人调用的死代码）。
 #>
 
 # ---------- 文件名 / 目录名常量（先于动作表定义：表里要引用它） ----------
@@ -31,10 +38,13 @@ $script:ImplDocFile        = '实施文档.md'
 $script:ExecutedFile       = '已实施.md'
 $script:ContextRebuildName = '上下文重建'
 $script:DataDirName        = '.aiprocess'
+$script:ResultIssueRootName = '结果微调'
+$script:StepsDirName       = '实施步骤'
 
 # ---------- 命名规则（正则） ----------
 $script:VersionFilePattern = '^v\d+\.md$'
 $script:ReplyFilePattern   = '^对v\d+的回复\.txt$'
+$script:IssueDirPattern    = '^\d{2}$'
 
 # ---------- 动作表（全项目唯一一处） ----------
 $script:Actions = @(
@@ -129,8 +139,12 @@ function Get-ContextRebuildName { return $script:ContextRebuildName }
 function Get-DataDirName { return $script:DataDirName }
 function Get-VersionFilePattern { return $script:VersionFilePattern }
 function Get-ReplyFilePattern { return $script:ReplyFilePattern }
+function Get-ResultIssueRootName { return $script:ResultIssueRootName }
+function Get-StepsDirName { return $script:StepsDirName }
+function Get-IssueDirPattern { return $script:IssueDirPattern }
 
 Export-ModuleMember -Function Get-MainRoundActionNames, Test-IsMainRoundAction, Test-IsRebuildPathAction, Get-BuildActionFor,
     Get-RoundType, Test-HasNoHumanTime, Test-HasNoInputFile, Get-DefaultSourceFor,
     Get-RequirementFileName, Get-ImplDocFileName, Get-ExecutedFileName, Get-ContextRebuildName,
-    Get-DataDirName, Get-VersionFilePattern, Get-ReplyFilePattern
+    Get-DataDirName, Get-VersionFilePattern, Get-ReplyFilePattern,
+    Get-ResultIssueRootName, Get-StepsDirName, Get-IssueDirPattern

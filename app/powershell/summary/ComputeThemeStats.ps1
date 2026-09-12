@@ -1,18 +1,12 @@
 ﻿<#
 .SYNOPSIS
-    主题总体统计：基于 .aiprocess/log.jsonl + 文件系统全量重算，产出 stats.json 与 统计.md。
+    主题统计编排入口：取配置 → 调内核算 → 写 stats.json → 调展示层写 统计.md → 级联向上。
 
 .DESCRIPTION
-    纯脚本计算（无 AI 参与），幂等全量覆盖：
-      - 轮次配对复用 RoundResolver.psm1（与单文档打标同一口径）；
-      - 活跃时长复用 ActiveDurationCalculator.ps1（剔除超阈值空闲段）；
-      - 友好时长复用 TimeCalculator.psm1 Format-FriendlyDuration；
-      - 产出：{ThemePath}/.aiprocess/stats.json（机器可读）+ 统计.md（人类友好），均 UTF-8 无 BOM；
-      - 父子聚合：stats.json 恒带 aggregate（自身+全部后代汇总）与 children（直接子摘要）；
-        父.aggregate = 父自身 + Σ 直接子.aggregate（孙已含在子内，不穿透）；
-      - 级联联动：算完自己后若存在父主题则自调用触发父重算（只触发不写父文件，深度保护 10 层）；
-      - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程；
-      - .aiprocess 目录不存在时直接跳过（不主动创建）。
+    本脚本只做编排，不含任何计算与排版逻辑：
+      - 数值一律由 ThemeStatsCore.psm1（内核）产出；
+      - 文本一律由 RenderStatsMarkdown.psm1（展示层）产出；
+      - 本身负责：读阈值配置、全量覆盖落盘、以及"算完自己触发父重算"的级联。
 
     口径要点（实施文档 §三 + 测试/对整体统计的测试 v4 定稿）：
       - 人思考时长：仅讨论轮（建X→复X）；执行轮恒 0；
@@ -20,6 +14,14 @@
       - 复关系（上下文重建）：计为重建轮（与讨论/执行并列），人耗时/字数恒 0，其完成通知参与轮间间隔锚点；
       - 老日志无 agent 字段记空串；配不上对的轮次时长记 null，不编造；
       - 轮次总耗时（人+AI）= 各轮 humanSec+aiSec 合计；轮间间隔 = 本轮起点（建X，无则复X）− 上一轮完成通知，首轮恒 0。
+
+    成功路径与失败路径的约定：
+      - 幂等全量覆盖；产出 {ThemePath}/.aiprocess/stats.json（机器可读）+ 统计.md（人类友好），均 UTF-8 无 BOM；
+      - 级联联动：算完自己后若存在父主题则自调用触发父重算（只触发不写父文件，深度保护 10 层）；
+      - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程；
+      - .aiprocess 目录不存在时直接跳过（不主动创建）。
+
+    ⚠ 本脚本的路径是调用契约（完成通知与 test\Verify-Output.ps1 都指向它），勿改名或挪目录。
 
 .PARAMETER ThemePath
     主题目录绝对路径。
@@ -43,23 +45,19 @@ trap {
 }
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
-$timeModulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
-$resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
-$activeCalcPath = Join-Path $scriptDirectory "ActiveDurationCalculator.ps1"
-$aggModulePath = Join-Path $scriptDirectory "ThemeAggregation.psm1"
+$corePath = Join-Path $scriptDirectory "ThemeStatsCore.psm1"
+$renderPath = Join-Path $scriptDirectory "RenderStatsMarkdown.psm1"
 $appSettingsPath = Join-Path $scriptDirectory "..\config\AppSettings.psm1"
 $conventionsPath = Join-Path $scriptDirectory "..\conventions\DomainConventions.psm1"   # 名字与动作性格单源
 
-foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath, $aggModulePath, $appSettingsPath, $conventionsPath)) {
+foreach ($p in @($corePath, $renderPath, $appSettingsPath, $conventionsPath)) {
     if (-not (Test-Path -LiteralPath $p)) { exit 0 }
 }
 try {
-    Import-Module $timeModulePath -ErrorAction Stop
-    Import-Module $resolverPath -ErrorAction Stop
-    Import-Module $aggModulePath -ErrorAction Stop
+    Import-Module $corePath -ErrorAction Stop
+    Import-Module $renderPath -ErrorAction Stop
     Import-Module $appSettingsPath -ErrorAction Stop
     Import-Module $conventionsPath -ErrorAction Stop
-    . $activeCalcPath
 } catch {
     exit 0
 }
@@ -67,510 +65,24 @@ try {
 $aiProcessDir = Join-Path $ThemePath (Get-DataDirName)
 if (-not (Test-Path -LiteralPath $aiProcessDir)) { exit 0 }
 
-$logFile = Join-Path $aiProcessDir "log.jsonl"
-
-# ---------- 读取阈值（领域层 AppSettings.psm1，默认 60 唯一收编） ----------
-
-# ---------- 字符数友好显示：<1万 原样+千分位；>=1万 按万/亿缩写（3 位有效数字）；stats.json 恒为精确整数 ----------
-# ⚠ AHK 侧 app/modules/business/services/ThemeStats.ahk 有等价换算（列表显示用），改口径时两边一起改。
-function Format-FriendlyCount {
-    param([object]$Number)
-    if ($null -eq $Number) { return '未知' }
-    $v = [double]$Number
-    if ($v -lt 10000) { return ([int64]$v).ToString('N0') }
-    if ($v -lt 100000000) {
-        $w = $v / 10000
-        if ($w -lt 10) { return $w.ToString('0.00') + '万' }
-        if ($w -lt 100) { return $w.ToString('0.0') + '万' }
-        return ([int64][Math]::Round($w)).ToString('N0') + '万'
-    }
-    $y = $v / 100000000
-    if ($y -lt 10) { return $y.ToString('0.00') + '亿' }
-    if ($y -lt 100) { return $y.ToString('0.0') + '亿' }
-    return ([int64][Math]::Round($y)).ToString('N0') + '亿'
-}
-
-# ---------- 字符数：isAiBody=$true 时剥离 front matter（首行 --- 起 50 行内闭合 --- 的块，与打标同一判定） ----------
-function Get-FileCharCount {
-    param(
-        [string]$Path,
-        [bool]$AiBody = $false
-    )
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    try {
-        $content = [System.IO.File]::ReadAllText($Path)
-        if (-not $AiBody) { return $content.Length }
-        $lines = @($content -split "`r`n|`n", -1)
-        $closingIndex = -1
-        if ($lines.Length -ge 2 -and $lines[0].Trim() -eq "---") {
-            $limit = [Math]::Min($lines.Length - 1, 50)
-            for ($i = 1; $i -le $limit; $i++) {
-                if ($lines[$i].Trim() -eq "---") { $closingIndex = $i; break }
-            }
-        }
-        if ($closingIndex -gt 0) {
-            $body = [string]::Join("`n", $lines[($closingIndex + 1)..($lines.Length - 1)])
-            return $body.Length
-        }
-        return $content.Length
-    } catch {
-        return $null
-    }
-}
-
-# ---------- 文件分类 ----------
-function Test-HumanFile {
-    param([string]$Name)
-    return ($Name -eq (Get-RequirementFileName) -or $Name -match (Get-ReplyFilePattern))
-}
-function Test-AiFile {
-    param([string]$Name)
-    return ($Name -match (Get-VersionFilePattern) -or $Name -eq (Get-ImplDocFileName) -or $Name -eq (Get-ExecutedFileName))
-}
-
-# ============ main ============
-
+# ---------- 算（阈值是配置，由编排层读、以参数下发给内核） ----------
 $threshold = Get-IdleThresholdMinutes
-$entries = @(Get-LogEntries -LogFile $logFile)
-$now = Get-Date
+$result = Get-ThemeStats -ThemePath $ThemePath -ThresholdMinutes $threshold -Now (Get-Date)
 
-# ---------- 文件系统扫描（仅主题根目录顶层文件；排除 .aiprocess 子目录与隐藏文件；子主题独立统计不进本主题） ----------
-$fileTotal = 0; $humanFiles = 0; $aiFiles = 0; $humanCharsTotal = 0; $aiCharsTotal = 0
-foreach ($f in (Get-ChildItem -LiteralPath $ThemePath -File -ErrorAction SilentlyContinue)) {
-    if ($f.Attributes -band [System.IO.FileAttributes]::Hidden) { continue }
-    $fileTotal++
-    if (Test-HumanFile -Name $f.Name) {
-        $humanFiles++
-        $c = Get-FileCharCount -Path $f.FullName
-        if ($null -ne $c) { $humanCharsTotal += $c }
-    } elseif (Test-AiFile -Name $f.Name) {
-        $aiFiles++
-        $c = Get-FileCharCount -Path $f.FullName -AiBody $true
-        if ($null -ne $c) { $aiCharsTotal += $c }
-    }
-}
-
-# ---------- 轮次明细：遍历主循环动作，按 target 拆候选逐文件配对 ----------
-$sendActions = Get-MainRoundActionNames
-$discussion = 0; $execute = 0; $unknown = 0; $untyped = 0
-$executeByStrategy = [ordered]@{}
-$roundDetail = @()
-# 重复发送去重：同 target 且配对同一完成通知 → 合并为一轮（取首次发送数值）；$pairedNotifKeyByTarget 登记 target→通知键，$dupSendCountByTarget 记重复次数供统计.md 标注
-$pairedNotifKeyByTarget = @{}
-$dupSendCountByTarget = @{}
-
-foreach ($e in $entries) {
-    if ($sendActions -notcontains $e.action) { continue }
-
-    # 去重判定（仅单 target 发送参与；多 target 含 '|' 的维持逐文件配对现状）
-    $targetParts = @($e.target -split '\|' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
-    if ($targetParts.Count -eq 1) {
-        $dupCheckEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $targetParts[0] -After $e.time
-        if ($null -ne $dupCheckEnd) {
-            $notifKey = $dupCheckEnd.ToString('yyyyMMddHHmmss')
-            if ($pairedNotifKeyByTarget.ContainsKey($targetParts[0]) -and $pairedNotifKeyByTarget[$targetParts[0]] -eq $notifKey) {
-                $dupSendCountByTarget[$targetParts[0]]++
-                continue
-            }
-            $pairedNotifKeyByTarget[$targetParts[0]] = $notifKey
-        }
-    }
-
-    # 轮次类型直读日志 round-type 字段；老日志缺字段 → 计“未标注”，不报错
-    $roundType = '未标注'
-    if (-not [string]::IsNullOrWhiteSpace($e.roundType)) { $roundType = $e.roundType }
-    if ($roundType -eq 'execute') {
-        $execute++
-        $strategyKey = if ([string]::IsNullOrWhiteSpace($e.strategy)) { '未标注' } else { $e.strategy }
-        if (-not $executeByStrategy.Contains($strategyKey)) { $executeByStrategy[$strategyKey] = 0 }
-        $executeByStrategy[$strategyKey]++
-    } elseif ($roundType -eq 'discussion') {
-        $discussion++
-    } else {
-        $untyped++
-    }
-    if ([string]::IsNullOrWhiteSpace($e.target)) { $unknown++; continue }
-
-    $isExecute = ($roundType -eq 'execute')
-    $human = $null
-    if (-not $isExecute) { $human = Get-HumanStartForSend -Entries $entries -Send $e }
-
-    # 轮间间隔：本轮起点（建X，配不上则复X）− 此前最近一条完成通知；首轮恒 0（与打标同调 RoundResolver.Get-RoundGap）
-    $roundStart = $e.time
-    if ($null -ne $human -and -not $human.humanUnknown -and $null -ne $human.humanStart) { $roundStart = $human.humanStart }
-    $gapSec = Get-RoundGap -Entries $entries -RoundStart $roundStart
-
-    # 人文件字符数：讨论轮取 source 文件（无 source 时按动作表给的兜底）；无输入文件的动作 → 0
-    $srcChars = $null
-    if (-not $isExecute) {
-        $src = $e.source
-        $defaultSrc = Get-DefaultSourceFor $e.action
-        if ($defaultSrc -ne '' -and [string]::IsNullOrWhiteSpace($src)) { $src = $defaultSrc }
-        if (Test-HasNoInputFile $e.action) {
-            $srcChars = 0
-        } elseif (-not [string]::IsNullOrWhiteSpace($src)) {
-            $srcChars = Get-FileCharCount -Path (Join-Path $ThemePath $src)
-        }
-    }
-
-    # 多 target 逐文件配对：先判定各 target 是否有效（文件存在或有完成通知）；
-    # 虚空 target（文件不存在且无通知）剔除——统计只反映实际产出；全虚空时保留首个记"未闭环"（人的时间不丢账）；
-    # 人耗时/轮间间隔只归属第一个有效行，其余有效行记 0（一条发送只有一份）；AI耗时/字数仍逐文件独立
-    $partInfos = @()
-    foreach ($part in ($e.target -split '\|')) {
-        $fileName = $part.Trim()
-        if ($fileName -eq '') { continue }
-        $partEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $e.time
-        $partInfos += [PSCustomObject]@{
-            fileName   = $fileName
-            aiEnd      = $partEnd
-            fileExists = (Test-Path -LiteralPath (Join-Path $ThemePath $fileName))
-        }
-    }
-    $kept = @($partInfos | Where-Object { $_.fileExists -or $null -ne $_.aiEnd })
-    if ($kept.Count -eq 0 -and $partInfos.Count -gt 0) { $kept = @($partInfos[0]) }
-    $isFirstKept = $true
-    foreach ($pi in $kept) {
-        $fileName = $pi.fileName
-        $aiEnd = $pi.aiEnd
-        $aiEndKnown = ($null -ne $aiEnd)
-        # 无完成通知 = 该轮未闭环：aiSec 记 null 不编造（统计脚本在完成通知后触发，缺通知即真未完成）；人耗时段不受影响照常计算
-        $humanStart = if ($null -ne $human) { $human.humanStart } else { $null }
-        $breakdown = Get-RoundBreakdown -HumanStart $humanStart -ThisSend $e.time -AiEnd $aiEnd -ThresholdMinutes $threshold
-        $aiSec = $null
-        if ($aiEndKnown) { $aiSec = $breakdown.aiSeconds }
-        $humanSec = $null
-        if (-not $isFirstKept) { $humanSec = 0 }
-        elseif ($isExecute) { $humanSec = 0 }
-        elseif (-not $human.humanUnknown) { $humanSec = $breakdown.humanSeconds }
-        $rowGapSec = if ($isFirstKept) { $gapSec } else { 0 }
-        $rowHumanChars = 0
-        if ($isFirstKept -and -not $isExecute) { $rowHumanChars = $srcChars }
-        $aiChars = Get-FileCharCount -Path (Join-Path $ThemePath $fileName) -AiBody $true
-        $totalSec = $null
-        if ($null -ne $humanSec -or $null -ne $aiSec) {
-            $totalSec = 0
-            if ($null -ne $humanSec) { $totalSec += $humanSec }
-            if ($null -ne $aiSec) { $totalSec += $aiSec }
-        }
-        $isFirstKept = $false
-
-        $roundDetail += [PSCustomObject][ordered]@{
-            file       = $fileName
-            type       = $roundType
-            agent      = $e.agent
-            sendTime   = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
-            humanSec   = $humanSec
-            aiSec      = $aiSec
-            totalSec   = $totalSec
-            gapSec     = $rowGapSec
-            humanChars = $rowHumanChars
-            aiChars    = $aiChars
-            known      = ($aiEndKnown -and ($isExecute -or -not $human.humanUnknown))
-        }
-    }
-}
-
-# ---------- 重建轮：复关系 → 上下文重建完成通知；人耗时/字数恒 0；按发送时间并入明细 ----------
-$rebuildRows = @(Get-RebuildRoundRows -Entries $entries)
-$rebuild = $rebuildRows.Count
-$rebuildAiSecTotal = 0
-foreach ($r in $rebuildRows) { if ($null -ne $r.aiSec) { $rebuildAiSecTotal += $r.aiSec } }
-$roundDetail = @($roundDetail + $rebuildRows | Sort-Object sendTime)
-
-# ---------- 时长类 ----------
-$activeSec = 0; $wallClockSec = 0; $idleIgnoredSec = 0; $idleIgnoredCount = 0
-$createdAt = $null; $lastAt = $null
-if ($entries.Count -gt 0) {
-    $sorted = @($entries | Sort-Object time)
-    $first = $sorted[0].time
-    $last = $sorted[$sorted.Count - 1].time
-    $createdAt = $first.ToString('yyyy-MM-dd HH:mm:ss')
-    $lastAt = $last.ToString('yyyy-MM-dd HH:mm:ss')
-    if ($last -gt $first) {
-        $wallClockSec = [int][Math]::Round(($last - $first).TotalSeconds)
-        $logTimes = @($sorted | ForEach-Object { $_.time })
-        $activeSec = [int][Math]::Round((Get-ActiveDuration -Start $first -End $last -LogTimes $logTimes -ThresholdMinutes $threshold).TotalSeconds)
-        $idleIgnoredSec = $wallClockSec - $activeSec
-        # 忽略段数：相邻日志点间隔超阈值的次数（按秒去重后）
-        $uniqueMap = @{}
-        foreach ($t in $logTimes) { $k = $t.ToString('yyyyMMddHHmmss'); if (-not $uniqueMap.ContainsKey($k)) { $uniqueMap[$k] = $t } }
-        $deduped = @($uniqueMap.Values | Sort-Object)
-        $thresholdSec = $threshold * 60
-        for ($i = 0; $i -lt $deduped.Count - 1; $i++) {
-            if (($deduped[$i + 1] - $deduped[$i]).TotalSeconds -gt $thresholdSec) { $idleIgnoredCount++ }
-        }
-    }
-}
-
-# ---------- 人/AI 时长合计（raw 秒数求和；null 不计） ----------
-$humanSecTotal = 0; $aiSecTotal = 0
-foreach ($r in $roundDetail) {
-    if ($null -ne $r.humanSec) { $humanSecTotal += $r.humanSec }
-    if ($null -ne $r.aiSec) { $aiSecTotal += $r.aiSec }
-}
-$roundTotalSec = $humanSecTotal + $aiSecTotal
-$gapTotalSec = 0; $detailHumanChars = 0; $detailAiChars = 0
-foreach ($r in $roundDetail) {
-    if ($null -ne $r.gapSec) { $gapTotalSec += $r.gapSec }
-    if ($null -ne $r.humanChars) { $detailHumanChars += $r.humanChars }
-    if ($null -ne $r.aiChars) { $detailAiChars += $r.aiChars }
-}
-
-# ---------- 派生 ----------
-$avgHumanSec = 0; $avgAiSec = 0
-$discussionKnown = @($roundDetail | Where-Object { $_.type -eq 'discussion' -and $null -ne $_.humanSec })
-if ($discussionKnown.Count -gt 0) {
-    $avgHumanSec = [int][Math]::Round(($discussionKnown | Measure-Object humanSec -Sum).Sum / $discussionKnown.Count)
-}
-$aiKnown = @($roundDetail | Where-Object { $null -ne $_.aiSec })
-if ($aiKnown.Count -gt 0) {
-    $avgAiSec = [int][Math]::Round(($aiKnown | Measure-Object aiSec -Sum).Sum / $aiKnown.Count)
-}
-$longestFile = ''; $longestSec = 0
-foreach ($r in $roundDetail) {
-    $sum = 0
-    if ($null -ne $r.humanSec) { $sum += $r.humanSec }
-    if ($null -ne $r.aiSec) { $sum += $r.aiSec }
-    if ($sum -gt $longestSec) { $longestSec = $sum; $longestFile = $r.file }
-}
-
-$agents = @($entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.agent) } | ForEach-Object { $_.agent } | Select-Object -Unique)
-
-# ---------- 父子聚合：父.aggregate = 自身 + Σ 直接子.aggregate（子的发布数据，不翻子的日志） ----------
-$selfAgg = [PSCustomObject][ordered]@{
-    humanSec      = $humanSecTotal
-    aiSec         = $aiSecTotal
-    roundTotalSec = $roundTotalSec
-    gapTotalSec   = $gapTotalSec
-    activeSec     = $activeSec
-    files         = $fileTotal
-    humanFiles    = $humanFiles
-    aiFiles       = $aiFiles
-    humanChars    = $humanCharsTotal
-    aiChars       = $aiCharsTotal
-    discussion    = $discussion
-    execute       = $execute
-    unknown       = $unknown
-    rebuild       = $rebuild
-    createdAt     = $createdAt
-    lastActiveAt  = $lastAt
-}
-$children = @()
-$childAggs = @()
-foreach ($childPath in @(Get-ChildThemes -Dir $ThemePath)) {
-    $pub = Get-ChildAggregate -ChildPath $childPath
-    if ($null -eq $pub) { continue }   # 子未就绪：跳过，其下次轮次级联补齐
-    $childAggs += $pub.aggregate
-    $children += [PSCustomObject][ordered]@{
-        name       = Split-Path -Leaf $childPath
-        relPath    = $childPath.Substring($ThemePath.Length).TrimStart('\', '/')
-        aggregate  = $pub.aggregate
-        computedAt = $pub.computedAt
-    }
-}
-$aggregate = Merge-Aggregate -Self $selfAgg -ChildAggs $childAggs
-
-# ---------- stats.json ----------
-$stats = [PSCustomObject][ordered]@{
-    version    = 1
-    computedAt = $now.ToString('yyyy-MM-dd HH:mm:ss')
-    theme      = [PSCustomObject][ordered]@{ path = $ThemePath; name = (Split-Path -Leaf $ThemePath) }
-    agents     = $agents
-    time       = [PSCustomObject][ordered]@{
-        roundTotalSec    = $roundTotalSec
-        gapTotalSec      = $gapTotalSec
-        activeSec        = $activeSec
-        wallClockSec     = $wallClockSec
-        humanSec         = $humanSecTotal
-        aiSec            = $aiSecTotal
-        idleIgnoredSec   = $idleIgnoredSec
-        idleIgnoredCount = $idleIgnoredCount
-        createdAt        = $createdAt
-        lastActiveAt     = $lastAt
-    }
-    files      = [PSCustomObject][ordered]@{
-        total      = $fileTotal
-        humanFiles = $humanFiles
-        aiFiles    = $aiFiles
-        humanChars = $humanCharsTotal
-        aiChars    = $aiCharsTotal
-    }
-    rounds     = [PSCustomObject][ordered]@{
-        discussion        = $discussion
-        execute           = $execute
-        rebuild           = $rebuild
-        executeByStrategy = $executeByStrategy
-        unknown           = $unknown
-    }
-    derived    = [PSCustomObject][ordered]@{
-        avgHumanSec  = $avgHumanSec
-        avgAiSec     = $avgAiSec
-        longestRound = [PSCustomObject][ordered]@{ file = $longestFile; sec = $longestSec }
-    }
-    roundDetail = $roundDetail
-    aggregate   = $aggregate
-    children    = $children
-}
-
-$json = ConvertTo-Json $stats -Depth 6 -Compress
+# ---------- 落 stats.json ----------
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$json = ConvertTo-Json $result.Stats -Depth 6 -Compress
 [System.IO.File]::WriteAllText((Join-Path $aiProcessDir "stats.json"), $json, $utf8NoBom)
 
-# ---------- 统计.md ----------
-function Format-Stat {
-    param([object]$Seconds)
-    if ($null -eq $Seconds) { return '未知' }
-    return Format-FriendlyDuration -Seconds ([int]$Seconds)
+# ---------- 渲染并落 统计.md ----------
+$markdown = ConvertTo-StatsMarkdown -Stats $result.Stats -Context @{
+    ThresholdMinutes     = $threshold
+    DupSendCountByTarget = $result.DupSendCountByTarget
 }
-
-# 百分比：友好时长后追加（xx.x%）；值为 null 显'未知'，分母 null/<=0 时不追加（除零保护）；SuppressZero 时 0 值不挂百分比。仅展示层现算，不落 stats.json
-function Format-WithPercent {
-    param([object]$Seconds, [object]$BaseSec, [bool]$SuppressZero = $false)
-    if ($null -eq $Seconds) { return '未知' }
-    $text = Format-FriendlyDuration -Seconds ([int]$Seconds)
-    if ($SuppressZero -and [double]$Seconds -eq 0) { return $text }
-    if ($null -eq $BaseSec -or [double]$BaseSec -le 0) { return $text }
-    $pct = [double]$Seconds / [double]$BaseSec * 100
-    return "$text（$($pct.ToString('0.0'))%）"
-}
-
-$themeName = Split-Path -Leaf $ThemePath
-$sb = New-Object System.Text.StringBuilder
-[void]$sb.AppendLine("# $themeName — 总体统计")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("> 本文件由 ComputeThemeStats.ps1 脚本自动生成，每次重算全量覆盖，请勿手改。")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("## 总览")
-[void]$sb.AppendLine("")
-# 三列对照（自身 | 子主题 | 总）：行定义数组驱动，加指标=加一行；子值=aggregate−自身，有子无子同一套
-$childRound = $aggregate.roundTotalSec - $roundTotalSec
-$childHuman = $aggregate.humanSec - $humanSecTotal
-$childAi = $aggregate.aiSec - $aiSecTotal
-$childDisc = $aggregate.discussion - $discussion
-$childExec = $aggregate.execute - $execute
-$childRebuild = $aggregate.rebuild - $rebuild
-$childFiles = $aggregate.files - $fileTotal
-$childHChars = $aggregate.humanChars - $humanCharsTotal
-$childAChars = $aggregate.aiChars - $aiCharsTotal
-$spanText = '未知'
-$spanSec = $null
-if ($aggregate.createdAt -and $aggregate.lastActiveAt) {
-    $spanD0 = [datetime]::ParseExact($aggregate.createdAt, 'yyyy-MM-dd HH:mm:ss', $null)
-    $spanD1 = [datetime]::ParseExact($aggregate.lastActiveAt, 'yyyy-MM-dd HH:mm:ss', $null)
-    $spanSec = [int][Math]::Round(($spanD1 - $spanD0).TotalSeconds)
-    $spanText = "$($aggregate.createdAt) → $($aggregate.lastActiveAt)"
-}
-# 墙钟子主题列：全部子主题的首末跨度（不求和、取极值）
-$childSpanSec = $null
-if ($children.Count -gt 0) {
-    $cCreated = @($children | ForEach-Object { $_.aggregate.createdAt } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object)
-    $cLast = @($children | ForEach-Object { $_.aggregate.lastActiveAt } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object)
-    if ($cCreated.Count -gt 0 -and $cLast.Count -gt 0) {
-        $cD0 = [datetime]::ParseExact($cCreated[0], 'yyyy-MM-dd HH:mm:ss', $null)
-        $cD1 = [datetime]::ParseExact($cLast[-1], 'yyyy-MM-dd HH:mm:ss', $null)
-        $childSpanSec = [int][Math]::Round(($cD1 - $cD0).TotalSeconds)
-    }
-}
-$childSpanText = if ($children.Count -eq 0) { '—' } else { Format-Stat $childSpanSec }
-# 总览三列统一分母 = 总跨度（$spanSec，三列中最大）：横向可比、自身+子主题可相加出总列；0 值不挂百分比
-$overviewRows = @(
-    @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $spanSec $true); C = (Format-WithPercent $childRound $spanSec $true); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec $true) }
-    @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $spanSec $true) / $(Format-WithPercent $aiSecTotal $spanSec $true)"; C = "$(Format-WithPercent $childHuman $spanSec $true) / $(Format-WithPercent $childAi $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec $true) / $(Format-WithPercent $aggregate.aiSec $spanSec $true)" }
-    @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $spanSec $true); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $spanSec $true); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec $true) }
-    @{ Label = '活跃时长（剔除空闲段）'; S = (Format-WithPercent $activeSec $spanSec $true); C = (Format-WithPercent ($aggregate.activeSec - $activeSec) $spanSec $true); T = (Format-WithPercent $aggregate.activeSec $spanSec $true) }
-    @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
-    @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
-    @{ Label = '轮次（讨论 / 执行 / 重建）'; S = "$discussion / $execute / $rebuild"; C = "$childDisc / $childExec / $childRebuild"; T = "$($aggregate.discussion) / $($aggregate.execute) / $($aggregate.rebuild)" }
-    @{ Label = '文件数'; S = "$fileTotal"; C = "$childFiles"; T = "$($aggregate.files)" }
-    @{ Label = '字符数（人 / AI）'; S = "$(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal)"; C = "$(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars)"; T = "$(Format-FriendlyCount $aggregate.humanChars) / $(Format-FriendlyCount $aggregate.aiChars)" }
-)
-[void]$sb.AppendLine("| 指标 | 自身 | 子主题 | 总（含子主题） |")
-[void]$sb.AppendLine("|---|---|---|---|")
-foreach ($row in $overviewRows) {
-    [void]$sb.AppendLine("| $($row.Label) | $($row.S) | $($row.C) | $($row.T) |")
-}
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("## 自身统计")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("| 指标 | 值 |")
-[void]$sb.AppendLine("|---|---|")
-[void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-WithPercent $roundTotalSec $wallClockSec) |")
-[void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-WithPercent $humanSecTotal $wallClockSec) |")
-[void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-WithPercent $aiSecTotal $wallClockSec) |")
-[void]$sb.AppendLine("| 轮间间隔合计 | $(Format-WithPercent $gapTotalSec $wallClockSec) |")
-[void]$sb.AppendLine("| 总时长（活跃，剔除 >${threshold}min 空闲段） | $(Format-WithPercent $activeSec $wallClockSec) |")
-[void]$sb.AppendLine("| 墙钟时长（首末日志原始跨度） | $(Format-Stat $wallClockSec) |")
-[void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-WithPercent $idleIgnoredSec $wallClockSec) / $idleIgnoredCount 段 |")
-$strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
-if ($strategyText -eq '') { $strategyText = '无' }
-[void]$sb.AppendLine("| 讨论轮 / 执行轮 / 重建轮 | $discussion / $execute / $rebuild（$strategyText） |")
-[void]$sb.AppendLine("| 文件数（总 / 人 / AI） | $fileTotal / $humanFiles / $aiFiles |")
-[void]$sb.AppendLine("| 字符数（人 / AI） | $(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal) 字符 |")
-[void]$sb.AppendLine("| 未知轮数（老日志配不上对） | $unknown |")
-[void]$sb.AppendLine("| 平均每轮耗时（人 / AI） | $(Format-Stat $avgHumanSec) / $(Format-Stat $avgAiSec) |")
-$longestText = if ($longestFile -eq '') { '无' } else { "$longestFile（$(Format-Stat $longestSec)）" }
-[void]$sb.AppendLine("| 最长轮次 | $longestText |")
-[void]$sb.AppendLine("| 重建轮（复关系） | $rebuild 次 / AI 耗时 $(Format-Stat $rebuildAiSecTotal) |")
-$agentsText = if ($agents.Count -gt 0) { $agents -join '、' } else { '未知' }
-[void]$sb.AppendLine("| 参与 Agent | $agentsText |")
-[void]$sb.AppendLine("| 主题创建 / 最后活动 | $(if ($createdAt) { $createdAt } else { '未知' }) / $(if ($lastAt) { $lastAt } else { '未知' }) |")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("## 轮次明细")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 人字数 | AI字数 | Agent |")
-[void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|")
-foreach ($r in $roundDetail) {
-    $typeText = if ($r.type -eq 'execute') { '执行' } elseif ($r.type -eq 'rebuild') { '重建' } else { '讨论' }
-    $hc = Format-FriendlyCount $r.humanChars
-    $ac = Format-FriendlyCount $r.aiChars
-    $ag = if ([string]::IsNullOrWhiteSpace($r.agent)) { '' } else { $r.agent }
-    $fileText = $r.file
-    if ($dupSendCountByTarget.ContainsKey($r.file) -and $dupSendCountByTarget[$r.file] -gt 0) {
-        $fileText = "$($r.file)（重复发送 $($dupSendCountByTarget[$r.file] + 1) 次已合并）"
-    }
-    [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $hc | $ac | $ag |")
-}
-if ($roundDetail.Count -gt 0) {
-    [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
-}
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("## 子主题汇总")
-[void]$sb.AppendLine("")
-if ($children.Count -gt 0) {
-    [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执/建) | 总投入 | 人 / AI | 文件数 | 字符数(人/AI) | 最后活动 |")
-    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|")
-    foreach ($ch in $children) {
-        $ca = $ch.aggregate
-        $lastText = if ($ca.lastActiveAt) { $ca.lastActiveAt } else { '未知' }
-        [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) / $($ca.rebuild) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
-    }
-    # 合计行：与"总览"的"子主题"列数值一致，可互查
-    [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec / $childRebuild | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
-} else {
-    [void]$sb.AppendLine("无子主题。")
-}
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("---")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("**口径说明**")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("- 轮次总耗时（人+AI）= 各轮 人耗时+AI耗时 合计；轮间间隔 = 本轮起点 − 上一轮完成通知（首轮为 0）")
-[void]$sb.AppendLine("- 人思考=建X→复X（仅讨论轮，执行轮恒 0）；AI执行=复X→同 target 完成通知（无通知记未知，不编造）")
-[void]$sb.AppendLine("- 总时长（活跃）= 首末日志剔除 >${threshold}min 空闲段；墙钟=首末日志原始跨度")
-[void]$sb.AppendLine("- 人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）")
-[void]$sb.AppendLine("- 字符数 >=1万 按量级缩写（如 2.05万），精确值见 stats.json")
-[void]$sb.AppendLine("- 重复发送去重：同 target 且配对同一完成通知的重复发送合并为一轮，取首次发送数值（明细文件列标注已合并）")
-[void]$sb.AppendLine("- 多 target 发送：人耗时/轮间间隔只计入第一个有效文件行，其余记 0；文件不存在且无通知的虚空行不列入明细（全虚空时保留首行记未闭环）")
-[void]$sb.AppendLine("- 百分比分母：总览三列统一为总跨度（可跨列相加：自身+子主题≈总）；自身统计与轮次明细为自身墙钟；无发送记录的孤儿时段不计轮，故百分比合计可能不足 100%")
-[void]$sb.AppendLine("- 重建轮=复关系发送→上下文重建完成通知（人耗时/字数恒 0，轮间间隔照常，其完成通知参与轮间锚点）；未知轮数=三类发送中无 target 的计数
-- 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；活跃/墙钟类仅自身不求和，总跨度取最早创建→最晚活动
-- 子主题识别：后代目录含 .aiprocess 即子主题（结果微调为容器），只聚合直接子")
-[void]$sb.AppendLine("- 计算时间：$($now.ToString('yyyy-MM-dd HH:mm:ss'))（脚本自动生成，每次重算全量覆盖）")
-
-[System.IO.File]::WriteAllText((Join-Path $aiProcessDir "统计.md"), $sb.ToString(), $utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $aiProcessDir "统计.md"), $markdown, $utf8NoBom)
 
 # ---------- 级联向上：子算完触发父重算（父自身数据幂等不变，仅重新聚合）；子只触发不写父文件 ----------
+# 必须在写完自己的 stats.json 之后——父主题读子的 stats.json 取 aggregate，写晚了父就读到旧值
 # 父主题定位：父目录为"结果微调"等容器时上跳；第一个含 .aiprocess 的祖先即父主题。目录树无环 + 深度保护双保险
 $parentDir = Split-Path -Parent $ThemePath
 while ($parentDir -and -not (Test-Path -LiteralPath (Join-Path $parentDir '.aiprocess'))) {
