@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 
 ; 提示词元素库：可复用业务元素，每个元素自包含"内容 + 生效条件"
-; 收编自 PromptManager 的六个 AppendXxxIfNeeded，恒化后语义：
-; - 元素均为必选（原开关判定已删除，不再读取会话开关）
+; 逐行等价迁出（旧件已删）；恒化后语义：
+; - 元素均为必选（开关判定已删除，不再读取会话开关）
 ; - 不修改/提问规则：模板内容 Trim 首尾空白，空内容不追加
 ; - 完成通知（上下文重建）：无条件追加，恒定非静默（-Silent 已随开关移除）
 ; - 拼接规则：RTrim(已有内容) + 一个空行 + 段落
@@ -56,12 +56,12 @@ class PromptElements {
 
     ; ---- 私有技术方法 ----
 
-    ; 拼接：已有内容去尾换行 + 一个空行 + 段落（对齐旧各 Append 函数）
+    ; 拼接：已有内容去尾换行 + 一个空行 + 段落
     static _Append(content, extra) {
         return RTrim(content, "`r`n") "`r`n`r`n" extra
     }
 
-    ; 模板读取（= 原 LoadTemplate，私有副本，避免跨层耦合）
+    ; 模板读取（私有副本，避免跨层耦合）
     static _LoadTemplate(fileName) {
         global TemplateDir
         path := TemplateDir "\" fileName
@@ -72,7 +72,7 @@ class PromptElements {
         return FileRead(path, "UTF-8")
     }
 
-    ; 模板存在性检查（= 原 EnsureTemplateExists）
+    ; 模板存在性检查
     static _EnsureTemplate(fileName) {
         global TemplateDir
         path := TemplateDir "\" fileName

@@ -1,12 +1,11 @@
 #Requires AutoHotkey v2.0
 
 ; 复执行（AI 型）：复制执行指令并发送 AI（改吧/步目 两策略分支）
-; 迁移自 PromptManager.CopyExecutePrompt（:285），逐行等价
+; 逐行等价迁出（旧件已删）
 ; 分支语义：改吧 = 不校验前置；步目 = 须实施文档存在；两条策略都由模板自带"打开结果文档"的结束指令，不再追加尾部
 
 class CopyExecute extends AgentActionBase {
     ActionKey := "复执行"
-    LogTag := "复执行"
     Type := "ai"
     FailLogText := "执行提示词复制失败"
     FailFeedbackText := "执行提示词复制失败"
@@ -31,7 +30,7 @@ class CopyExecute extends AgentActionBase {
             implementationPath := chain.ImplDocPath()
             if !FileExist(implementationPath) {
                 ShowFeedback("当前目录下未找到 实施文档.md", true)
-                this.SkipAutoHide := true  ; 对齐旧函数提前 return：不触发自动隐藏
+                this.SkipAutoHide := true  ; 前置校验未通过：不触发自动隐藏
                 return
             }
             content := this.LoadTemplate(strategyMeta["template"])

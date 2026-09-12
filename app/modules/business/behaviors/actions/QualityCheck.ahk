@@ -6,7 +6,6 @@
 
 class QualityCheck extends AgentActionBase {
     ActionKey := "质检码"
-    LogTag := "质检码"
     Type := "ai"
     FailLogText := "质检提示词复制失败"
     FailFeedbackText := "提示词复制失败"

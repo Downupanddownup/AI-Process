@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 
-; 编辑器打开服务：用配置的编辑器打开文件（= 原 FileManager.OpenFileInTool，逐行等价）
+; 编辑器打开服务：用配置的编辑器打开文件
 
 class EditorOpener {
 

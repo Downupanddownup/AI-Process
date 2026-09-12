@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 
 ; 领域约定单源：版本链 / 目录命名 / 约定排序（对应 约定.md 第二章）
-; 收编自 FileManager / DirectoryManager / ThemeManager / PromptManager 散落的约定实现，逐行等价
+; 逐行等价迁出（旧件已删）：实现形状照旧，勿按新写法重写
 
 class DomainConventions {
 
@@ -38,7 +38,7 @@ class DomainConventions {
     static IsExecutedFile(name) {
         return name = DomainConventions.ExecutedFile
     }
-    ; 结果微调子议题目录（= 原 DirectoryManager.IsResultIssueDir，ResultIssueRootName 全局变量常量化）
+    ; 结果微调子议题目录
     static IsResultIssueDir(dirPath) {
         if (dirPath = "" || !DirExist(dirPath)) {
             return false
@@ -83,7 +83,7 @@ class DomainConventions {
     static ImplDocPath(dirPath) {
         return dirPath "\" DomainConventions.ImplDocFile
     }
-    ; 结果微调子议题目录 → 主题目录（= 原 DirectoryManager.GetThemeRootFromIssueDir）
+    ; 结果微调子议题目录 → 主题目录
     static GetThemeRootFromIssueDir(dirPath) {
         fileName := ""
         parentName := ""
@@ -224,7 +224,7 @@ class DomainConventions {
         return DomainConventions.SortSubdirsByConvention(subdirs)
     }
 
-    ; 递归遍历：按约定排序，跳过 .aiprocess（= 原 FileManager.GetAllFilesRecursive）
+    ; 递归遍历：按约定排序，跳过 .aiprocess
     static GetAllFilesRecursive(dirPath) {
         result := []
         files := []
@@ -257,7 +257,7 @@ class DomainConventions {
         return result
     }
 
-    ; 私有：整数数组排序（= 原 FileManager.SortIntegers）
+    ; 私有：整数数组排序
     static _SortIntegers(arr) {
         if (arr.Length <= 1) {
             return

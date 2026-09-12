@@ -1,12 +1,11 @@
 #Requires AutoHotkey v2.0
 
 ; 复关系（AI 型）：复制上下文重建说明并发送 AI
-; 迁移自 PromptManager.CopyContextRelations（:262）+ BuildContextRelationsText（:158），逐行等价
+; 逐行等价迁出（旧件已删）
 ; 组成 = 上下文文本（目录头+通用解读+文件清单）+ 不修改 → 完成通知
 
 class CopyRelations extends AgentActionBase {
     ActionKey := "复关系"
-    LogTag := "复关系"
     Type := "ai"
     FailLogText := "文件关系说明复制失败"
     FailFeedbackText := "文件关系说明复制失败"

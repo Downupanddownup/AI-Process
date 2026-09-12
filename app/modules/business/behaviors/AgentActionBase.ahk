@@ -6,12 +6,12 @@
 class AgentActionBase {
 
     ActionKey := ""
-    LogTag := ""
+    LogTag => this.ActionKey   ; 日志标签 = 动作键：名字只写一遍（子类只写 ActionKey）
     Type := "ai"
-    ; 异常兜底文案（对齐各旧函数 catch 原文；建X 旧函数无 catch，此处为骨架统一兜底）
+    ; 异常兜底文案（各行为未覆盖时用这一对）
     FailLogText := "操作失败"
     FailFeedbackText := "操作失败"
-    ; 前置校验未通过（如无 vN、步目无实施文档）时置 true：对齐旧函数提前 return 跳过 AutoHidePanel 的行为
+    ; 前置校验未通过（如无 vN、步目无实施文档）时置 true：跳过 AutoHidePanel
     SkipAutoHide := false
 
     ; 模板方法骨架：守卫 → Execute → 自动隐藏
@@ -35,7 +35,7 @@ class AgentActionBase {
         throw Error("Execute 必须由子类实现")
     }
 
-    ; ---- 纯技术：模板加载（= 原 PromptManager.LoadTemplate） ----
+    ; ---- 纯技术：模板加载 ----
     LoadTemplate(fileName) {
         global TemplateDir
         path := TemplateDir "\" fileName
@@ -46,7 +46,7 @@ class AgentActionBase {
         return FileRead(path, "UTF-8")
     }
 
-    ; ---- 纯技术：模板存在性检查（= 原 PromptManager.EnsureTemplateExists，只检查不读取） ----
+    ; ---- 纯技术：模板存在性检查（只检查不读取） ----
     EnsureTemplate(fileName) {
         global TemplateDir
         path := TemplateDir "\" fileName

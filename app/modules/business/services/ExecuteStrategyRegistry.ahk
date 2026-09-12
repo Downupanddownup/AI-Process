@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 
 ; 执行策略注册表：改吧/步目 策略清单与选择
-; 收编自 PromptManager 的 ExecuteStrategies 全局数据与三个函数，逐行等价
-; 命名说明：不叫 ExecuteStrategies，因 PromptManager 已有同名全局变量（并行期冲突，步骤 08 删旧后不回收该名）
+; 逐行等价迁出（旧件已删）
+; 命名说明：类名不用 ExecuteStrategies，避开历史重名（旧实现已删，此处仅留名）
 
 class ExecuteStrategyRegistry {
 
@@ -11,7 +11,7 @@ class ExecuteStrategyRegistry {
         Map("key", "steps_dir", "label", "步目", "template", "execute\steps_dir.txt", "feedback", "步目提示词已复制")
     ]
 
-    ; = 原 BuildExecuteStrategyOptions
+    ; 选项清单（下拉框用）
     static BuildOptions() {
         options := []
         for strategy in ExecuteStrategyRegistry.Strategies {
@@ -20,18 +20,20 @@ class ExecuteStrategyRegistry {
         return options
     }
 
-    ; = 原 GetSelectedExecuteStrategy
+    ; 当前窗口选中的策略 key
     static GetSelected() {
         return GetSession(GetActiveWindowId(), "ExecuteStrategy")
     }
 
-    ; = 原 GetExecuteStrategyMeta
+    ; 按 key 取策略元数据；key 不认识时记一条日志再回退（不静默）
     static GetMeta(strategyKey) {
         for strategy in ExecuteStrategyRegistry.Strategies {
             if (strategy["key"] = strategyKey) {
                 return strategy
             }
         }
-        return ExecuteStrategyRegistry.Strategies[1]
+        fallback := ExecuteStrategyRegistry.Strategies[1]
+        LogError("执行策略 key 不认识：" strategyKey "（回退到 " fallback["label"] "）")
+        return fallback
     }
 }

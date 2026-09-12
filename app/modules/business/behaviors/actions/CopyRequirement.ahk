@@ -1,12 +1,11 @@
 #Requires AutoHotkey v2.0
 
 ; 复需求（AI 型）：复制需求提示词并发送 AI
-; 迁移自 PromptManager.CopyRequirementPrompt（:180），逐行等价
+; 逐行等价迁出（旧件已删）
 ; 组成 = requirement_prompt + 不修改 → 提问规则 → 提问模板 → 打开md（顺序即业务）
 
 class CopyRequirement extends AgentActionBase {
     ActionKey := "复需求"
-    LogTag := "复需求"
     Type := "ai"
     FailLogText := "复需求提示词复制失败"
     FailFeedbackText := "提示词复制失败"
@@ -19,6 +18,6 @@ class CopyRequirement extends AgentActionBase {
         content := PromptElements.QuestionRules(content)
         content := PromptElements.QuestionTemplate(content)
         content := PromptElements.OpenMd(content)
-        this.Dispatch(content, Map("target", "v1.md", "source", "需求.txt"), "需求提示词已复制")
+        this.Dispatch(content, Map("target", "v1.md", "source", DomainConventions.RequirementFile), "需求提示词已复制")
     }
 }
