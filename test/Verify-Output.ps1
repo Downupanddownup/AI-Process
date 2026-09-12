@@ -199,6 +199,7 @@ function Invoke-Run([string]$destRoot, [string]$tag) {
     $manifestInputs = New-Object System.Collections.ArrayList
     $artifactCount = 0
     $started = Get-Date
+    $scriptHashAtStart = Get-FileHashText $genScript   # 快照期间若生成脚本被改，快照就不可信
 
     try {
         foreach ($src in $script:corpus) {
@@ -207,10 +208,17 @@ function Invoke-Run([string]$destRoot, [string]$tag) {
             $copy = Join-Path $work $key
             Copy-Item -LiteralPath $src -Destination $copy -Recurse -Force
 
-            # 输入指纹：生成脚本真正读的文件（Stats → log.jsonl；Tag → 轮次 md）
-            $readFiles = @{}
-            if ($Case -eq 'Stats') { $readFiles[".aiprocess\log.jsonl"] = Get-FileHashText (Join-Path $copy ".aiprocess\log.jsonl") }
-            else { foreach ($md in (Get-RoundMdFiles $copy)) { $readFiles[$md.Name] = Get-FileHashText $md.FullName } }
+        # 输入指纹：生成脚本真正读的文件 —— Stats 要连"子主题的日志"一起算，
+        # 因为父主题的统计含子主题聚合：子主题日志一涨，父主题产物就变（不是回归，是漂移）
+        $readFiles = @{}
+        if ($Case -eq 'Stats') {
+            foreach ($lg in @(Get-ChildItem -LiteralPath $copy -Recurse -File -Filter "log.jsonl" -ErrorAction SilentlyContinue |
+                    Where-Object { $_.DirectoryName -like '*\.aiprocess' })) {
+                $relLog = $lg.FullName.Substring($copy.Length).TrimStart("\")
+                $readFiles[$relLog] = Get-FileHashText $lg.FullName
+            }
+        }
+        else { foreach ($md in (Get-RoundMdFiles $copy)) { $readFiles[$md.Name] = Get-FileHashText $md.FullName } }
             [void]$manifestInputs.Add(@{ key = $key; name = $name; source = $src; readFiles = $readFiles })
 
             # 新生成类产物：先删掉副本里的旧产物，这样"有产物"= "本次生成的"（Tag 是原地改写，不删）
@@ -243,6 +251,8 @@ function Invoke-Run([string]$destRoot, [string]$tag) {
             case       = $Case
             script     = $genScript
             scriptHash = (Get-FileHashText $genScript)
+            scriptStable = ($scriptHashAtStart -eq (Get-FileHashText $genScript))
+            fingerprint  = $(if ($Case -eq 'Stats') { 'nested-logs' } else { 'round-md' })   # 指纹口径；与快照不一致就不能比
             full       = [bool]$Full
             inputs     = $manifestInputs
             artifacts  = $artifactCount
@@ -299,11 +309,19 @@ try {
         try { $d = Get-WindowCurrentDir -WindowId $id; if ($d) { $activeSet[$d.TrimEnd('\')] = $true } } catch { }
     }
     if ($activeSet.Count -gt 0) {
+        # 活动主题的**祖先**也要排除：父主题的统计包含子主题聚合，子主题在长，父主题产物就会变
+        foreach ($k in @($activeSet.Keys)) {
+            $p = $k
+            while ($p -and ($p.Length -gt $repoRoot.Length)) {
+                $p = Split-Path -Parent $p
+                if ($p -and ($p.Length -ge $repoRoot.Length)) { $activeSet[$p.TrimEnd('\')] = $true }
+            }
+        }
         $before = @($script:corpus).Count
         $removed = @($script:corpus | Where-Object { $activeSet.ContainsKey($_.TrimEnd('\')) })
         $script:corpus = @($script:corpus | Where-Object { -not $activeSet.ContainsKey($_.TrimEnd('\')) })
         if ($removed.Count -gt 0) {
-            Write-Host ("已排除活动主题 {0} 个（日志正在被写、输入会漂移）：" -f $removed.Count) -ForegroundColor Yellow
+            Write-Host ("已排除活动主题（含其祖先）{0} 个——它们的日志正在被写、输入会漂移：" -f $removed.Count) -ForegroundColor Yellow
             foreach ($r in $removed) { Write-Host ("  - " + $r) }
         }
     }
@@ -324,6 +342,10 @@ if ($Snapshot -ne "") {
     Write-Host ""
     Write-Host ("快照已存：{0}" -f $dest) -ForegroundColor Green
     Write-Host ("输入 {0} 个 / 产物 {1} 个 / 耗时 {2} 秒" -f $stat.Inputs, $stat.Artifacts, $stat.Seconds)
+    $m = Get-Content -LiteralPath (Join-Path $dest "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $m.scriptStable) {
+        Write-Host "警告：生成脚本在本次快照期间被改过——这份快照不可信，请重做" -ForegroundColor Red
+    }
     if ($script:genFail -gt 0) {
         Write-Host ("注意：生成脚本有 {0} 次非零退出（产物可能因此缺失）" -f $script:genFail) -ForegroundColor Yellow
         foreach ($g in ($script:genOutput | Select-Object -First 3)) { Write-Host ("  " + $g) }
@@ -343,6 +365,11 @@ $baseManifest = Get-Content -LiteralPath (Join-Path $base "manifest.json") -Raw 
 $curManifest = Get-Content -LiteralPath (Join-Path $cmpDir "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 
 $changedInputs = @()
+$fpNow = $(if ($Case -eq 'Stats') { 'nested-logs' } else { 'round-md' })
+if ($baseManifest.fingerprint -ne $fpNow) {
+    Write-Host ("快照的指纹口径（{0}）与本次（{1}）不同——旧版工具存的快照不可比，请重存快照。" -f $baseManifest.fingerprint, $fpNow) -ForegroundColor Red
+    exit 2
+}
 foreach ($cur in $curManifest.inputs) {
     $old = @($baseManifest.inputs | Where-Object { $_.key -eq $cur.key })[0]
     if ($null -eq $old) { $changedInputs += ($cur.name + "（快照里没有）"); continue }

@@ -47,6 +47,7 @@ $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $modulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
 $resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
 $appSettingsPath = Join-Path $scriptDirectory "..\config\AppSettings.psm1"
+$conventionsPath = Join-Path $scriptDirectory "..\conventions\DomainConventions.psm1"   # 名字与动作性格单源
 
 if (-not (Test-Path -LiteralPath $FilePath)) {
     exit 0
@@ -60,17 +61,21 @@ if (-not (Test-Path -LiteralPath $resolverPath)) {
 if (-not (Test-Path -LiteralPath $appSettingsPath)) {
     exit 0
 }
+if (-not (Test-Path -LiteralPath $conventionsPath)) {
+    exit 0
+}
 try {
     Import-Module $modulePath -ErrorAction Stop
     Import-Module $resolverPath -ErrorAction Stop
     Import-Module $appSettingsPath -ErrorAction Stop
+    Import-Module $conventionsPath -ErrorAction Stop
 } catch {
     exit 0
 }
 
 $themeDir = Split-Path -Parent $FilePath
 $fileName = Split-Path -Leaf $FilePath
-$logFile = Join-Path (Join-Path $themeDir ".aiprocess") "log.jsonl"
+$logFile = Join-Path (Join-Path $themeDir (Get-DataDirName)) "log.jsonl"
 
 # ---------- 轮次配对逻辑已抽取至 app/powershell/time/RoundResolver.psm1（顶部导入） ----------
 
@@ -157,13 +162,14 @@ if ($null -eq $round) {
     exit 0
 }
 
-# 轮次类型：配对成功按发送动作派生；配对失败仅文件名可确定的（实施文档/已实施）才写，vN.md 不编造
+# 轮次类型：配对成功按动作表派生；配对失败仅文件名可确定的（实施文档/已实施）才写，vN.md 不编造
 $roundTypeValue = ""
 if ($round.matched) {
-    if ($round.sendAction -eq '复执行') { $roundTypeValue = 'execute' } else { $roundTypeValue = 'discussion' }
+    $rt = Get-RoundType $round.sendAction
+    if ($null -ne $rt) { $roundTypeValue = $rt }
 } else {
-    if ($fileName -eq '已实施.md') { $roundTypeValue = 'execute' }
-    elseif ($fileName -eq '实施文档.md') { $roundTypeValue = 'discussion' }
+    if ($fileName -eq (Get-ExecutedFileName)) { $roundTypeValue = 'execute' }
+    elseif ($fileName -eq (Get-ImplDocFileName)) { $roundTypeValue = 'discussion' }
 }
 
 # 配对失败（日志无 target，如首轮直建实施文档.md）：写"未知"四键，不编造数字

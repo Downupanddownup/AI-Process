@@ -15,6 +15,9 @@
     兼容 Windows PowerShell 5.1。保持单向依赖：本模块不引用任何调用方/业务模块。
 #>
 
+# ---------- 依赖：名字与动作性格单源（PS 侧） ----------
+Import-Module (Join-Path $PSScriptRoot "..\conventions\DomainConventions.psm1") -ErrorAction Stop
+
 # ---------- 读取操作日志（含归属标识 target/source 与 agent；损坏行静默跳过） ----------
 function Get-LogEntries {
     param([string]$LogFile)
@@ -80,17 +83,18 @@ function Get-HumanStartForSend {
         [array]$Entries,
         [object]$Send
     )
-    if ($Send.action -eq '复执行' -or $Send.action -eq '质检码') {
+    if (Test-HasNoHumanTime $Send.action) {
         # 执行类文件（改吧结果 / 已实施.md）与质检码（无输入文件）：human 恒 0
         return [PSCustomObject]@{ humanStart = $null; humanUnknown = $false }
     }
-    # 讨论轮：source 定位人思考段（复需求无 source 时按 需求.txt）
+    # 讨论轮：source 定位人思考段（无 source 时按动作表给的兜底）
     $src = $Send.source
-    if ($Send.action -eq '复需求' -and [string]::IsNullOrWhiteSpace($src)) { $src = '需求.txt' }
+    $defaultSrc = Get-DefaultSourceFor $Send.action
+    if ($defaultSrc -ne '' -and [string]::IsNullOrWhiteSpace($src)) { $src = $defaultSrc }
     if ([string]::IsNullOrWhiteSpace($src)) {
         return [PSCustomObject]@{ humanStart = $null; humanUnknown = $true }
     }
-    $buildAction = if ($src -eq '需求.txt') { '建需求' } else { '建回复' }
+    $buildAction = Get-BuildActionFor $src
     $humanStart = $null
     foreach ($e in $Entries) {
         if ($e.action -ne $buildAction) { continue }
@@ -109,14 +113,14 @@ function Get-TargetRoundInfo {
         [string]$FileName
     )
     # 仅处理轮次 md
-    if ($FileName -notmatch '^v\d+\.md$' -and $FileName -ne '实施文档.md' -and $FileName -ne '已实施.md') {
+    if ($FileName -notmatch (Get-VersionFilePattern) -and $FileName -ne (Get-ImplDocFileName) -and $FileName -ne (Get-ExecutedFileName)) {
         return $null
     }
 
     # 找指向本文件的发送动作；同 target 多次 → 配最后一次（消歧）
     $send = $null
     foreach ($e in $Entries) {
-        if ($e.action -ne '复需求' -and $e.action -ne '复回复' -and $e.action -ne '复执行' -and $e.action -ne '质检码') { continue }
+        if (-not (Test-IsMainRoundAction $e.action)) { continue }
         if (-not (Test-TargetMatch -TargetValue $e.target -FileName $FileName)) { continue }
         if ($null -eq $send -or $e.time -gt $send.time) { $send = $e }
     }
@@ -158,7 +162,7 @@ function Test-RoundFileTarget {
     if ([string]::IsNullOrWhiteSpace($TargetValue)) { return $false }
     foreach ($part in ($TargetValue -split '\|')) {
         $p = $part.Trim()
-        if ($p -match '^v\d+\.md$' -or $p -eq '实施文档.md' -or $p -eq '已实施.md' -or $p -eq '上下文重建') { return $true }
+        if ($p -match (Get-VersionFilePattern) -or $p -eq (Get-ImplDocFileName) -or $p -eq (Get-ExecutedFileName) -or $p -eq (Get-ContextRebuildName)) { return $true }
     }
     return $false
 }
@@ -185,8 +189,8 @@ function Get-RebuildRoundRows {
     $rows = @()
     $pairedNotifKey = $null
     foreach ($e in $Entries) {
-        if ($e.action -ne '复关系') { continue }
-        $aiEnd = Get-FirstTargetNotificationAfter -Entries $Entries -FileName '上下文重建' -After $e.time
+        if (-not (Test-IsRebuildPathAction $e.action)) { continue }
+        $aiEnd = Get-FirstTargetNotificationAfter -Entries $Entries -FileName (Get-ContextRebuildName) -After $e.time
         if ($null -ne $aiEnd) {
             $notifKey = $aiEnd.ToString('yyyyMMddHHmmss')
             if ($notifKey -eq $pairedNotifKey) { continue }
@@ -195,7 +199,7 @@ function Get-RebuildRoundRows {
         $aiSec = $null
         if ($null -ne $aiEnd) { $aiSec = [int][Math]::Round(($aiEnd - $e.time).TotalSeconds) }
         $rows += [PSCustomObject][ordered]@{
-            file       = '上下文重建'
+            file       = (Get-ContextRebuildName)
             type       = 'rebuild'
             agent      = $e.agent
             sendTime   = $e.time.ToString('yyyy-MM-dd HH:mm:ss')

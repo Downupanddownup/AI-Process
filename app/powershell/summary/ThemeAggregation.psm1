@@ -10,13 +10,16 @@
         （子的下次轮次会级联触发父重算自动补齐；不做任何老格式合成/迁移）。
 #>
 
+# ---------- 依赖：名字单源（PS 侧） ----------
+Import-Module (Join-Path $PSScriptRoot "..\conventions\DomainConventions.psm1") -ErrorAction Stop
+
 # ---------- 子主题发现：递归下探，每支遇到第一个含 .aiprocess 的目录即收录并停止下探 ----------
 function Get-ChildThemes {
     param([Parameter(Mandatory = $true)][string]$Dir)
     $result = @()
     foreach ($sub in (Get-ChildItem -LiteralPath $Dir -Directory -ErrorAction SilentlyContinue)) {
         if ($sub.Attributes -band [System.IO.FileAttributes]::Hidden) { continue }
-        if (Test-Path -LiteralPath (Join-Path $sub.FullName '.aiprocess')) {
+        if (Test-Path -LiteralPath (Join-Path $sub.FullName (Get-DataDirName))) {
             $result += $sub.FullName
             continue
         }
@@ -28,7 +31,7 @@ function Get-ChildThemes {
 # ---------- 子的发布数据：读 stats.json 取 aggregate；未就绪返回 $null ----------
 function Get-ChildAggregate {
     param([Parameter(Mandatory = $true)][string]$ChildPath)
-    $statsFile = Join-Path (Join-Path $ChildPath '.aiprocess') 'stats.json'
+    $statsFile = Join-Path (Join-Path $ChildPath (Get-DataDirName)) 'stats.json'
     if (-not (Test-Path -LiteralPath $statsFile)) { return $null }
     try {
         $data = [System.IO.File]::ReadAllText($statsFile) | ConvertFrom-Json

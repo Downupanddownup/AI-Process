@@ -16,7 +16,7 @@
 
     口径要点（实施文档 §三 + 测试/对整体统计的测试 v4 定稿）：
       - 人思考时长：仅讨论轮（建X→复X）；执行轮恒 0；
-      - 未知轮数：仅 复需求/复回复/复执行 三类发送中无 target 的计数；
+      - 未知轮数：仅发送类动作中无 target 的计数；
       - 复关系（上下文重建）：计为重建轮（与讨论/执行并列），人耗时/字数恒 0，其完成通知参与轮间间隔锚点；
       - 老日志无 agent 字段记空串；配不上对的轮次时长记 null，不编造；
       - 轮次总耗时（人+AI）= 各轮 humanSec+aiSec 合计；轮间间隔 = 本轮起点（建X，无则复X）− 上一轮完成通知，首轮恒 0。
@@ -48,10 +48,9 @@ $resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
 $activeCalcPath = Join-Path $scriptDirectory "ActiveDurationCalculator.ps1"
 $aggModulePath = Join-Path $scriptDirectory "ThemeAggregation.psm1"
 $appSettingsPath = Join-Path $scriptDirectory "..\config\AppSettings.psm1"
+$conventionsPath = Join-Path $scriptDirectory "..\conventions\DomainConventions.psm1"   # 名字与动作性格单源
 
-$aiProcessDir = Join-Path $ThemePath ".aiprocess"
-if (-not (Test-Path -LiteralPath $aiProcessDir)) { exit 0 }
-foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath, $aggModulePath, $appSettingsPath)) {
+foreach ($p in @($timeModulePath, $resolverPath, $activeCalcPath, $aggModulePath, $appSettingsPath, $conventionsPath)) {
     if (-not (Test-Path -LiteralPath $p)) { exit 0 }
 }
 try {
@@ -59,10 +58,14 @@ try {
     Import-Module $resolverPath -ErrorAction Stop
     Import-Module $aggModulePath -ErrorAction Stop
     Import-Module $appSettingsPath -ErrorAction Stop
+    Import-Module $conventionsPath -ErrorAction Stop
     . $activeCalcPath
 } catch {
     exit 0
 }
+
+$aiProcessDir = Join-Path $ThemePath (Get-DataDirName)
+if (-not (Test-Path -LiteralPath $aiProcessDir)) { exit 0 }
 
 $logFile = Join-Path $aiProcessDir "log.jsonl"
 
@@ -118,11 +121,11 @@ function Get-FileCharCount {
 # ---------- 文件分类 ----------
 function Test-HumanFile {
     param([string]$Name)
-    return ($Name -eq '需求.txt' -or $Name -match '^对v\d+的回复\.txt$')
+    return ($Name -eq (Get-RequirementFileName) -or $Name -match (Get-ReplyFilePattern))
 }
 function Test-AiFile {
     param([string]$Name)
-    return ($Name -match '^v\d+\.md$' -or $Name -eq '实施文档.md' -or $Name -eq '已实施.md')
+    return ($Name -match (Get-VersionFilePattern) -or $Name -eq (Get-ImplDocFileName) -or $Name -eq (Get-ExecutedFileName))
 }
 
 # ============ main ============
@@ -147,8 +150,8 @@ foreach ($f in (Get-ChildItem -LiteralPath $ThemePath -File -ErrorAction Silentl
     }
 }
 
-# ---------- 轮次明细：遍历四类发送，按 target 拆候选逐文件配对 ----------
-$sendActions = @('复需求', '复回复', '复执行', '质检码')
+# ---------- 轮次明细：遍历主循环动作，按 target 拆候选逐文件配对 ----------
+$sendActions = Get-MainRoundActionNames
 $discussion = 0; $execute = 0; $unknown = 0; $untyped = 0
 $executeByStrategy = [ordered]@{}
 $roundDetail = @()
@@ -197,12 +200,13 @@ foreach ($e in $entries) {
     if ($null -ne $human -and -not $human.humanUnknown -and $null -ne $human.humanStart) { $roundStart = $human.humanStart }
     $gapSec = Get-RoundGap -Entries $entries -RoundStart $roundStart
 
-    # 人文件字符数：讨论轮取 source 文件（复需求无 source 按 需求.txt）；质检码无输入文件 → 0
+    # 人文件字符数：讨论轮取 source 文件（无 source 时按动作表给的兜底）；无输入文件的动作 → 0
     $srcChars = $null
     if (-not $isExecute) {
         $src = $e.source
-        if ($e.action -eq '复需求' -and [string]::IsNullOrWhiteSpace($src)) { $src = '需求.txt' }
-        if ($e.action -eq '质检码') {
+        $defaultSrc = Get-DefaultSourceFor $e.action
+        if ($defaultSrc -ne '' -and [string]::IsNullOrWhiteSpace($src)) { $src = $defaultSrc }
+        if (Test-HasNoInputFile $e.action) {
             $srcChars = 0
         } elseif (-not [string]::IsNullOrWhiteSpace($src)) {
             $srcChars = Get-FileCharCount -Path (Join-Path $ThemePath $src)

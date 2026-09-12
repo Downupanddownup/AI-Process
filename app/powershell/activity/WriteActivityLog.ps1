@@ -42,6 +42,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 名字与动作性格一律问单源（app\powershell\conventions\DomainConventions.psm1）
+Import-Module (Join-Path $PSScriptRoot "..\conventions\DomainConventions.psm1") -ErrorAction Stop
+
 function Write-ActivityErrorLog {
     param([Parameter(Mandatory = $true)][string]$Error)
     try {
@@ -108,10 +111,9 @@ try {
         $record["agent"] = $AgentName.Trim()
     }
     $record["action"] = $Action
-    # 轮次类型：四类发送动作携带 round-type（复执行=execute，复需求/复回复/质检码=discussion），供统计直读
-    if ($Action -eq '复执行' -or $Action -eq '复需求' -or $Action -eq '复回复' -or $Action -eq '质检码') {
-        $rt = 'discussion'
-        if ($Action -eq '复执行') { $rt = 'execute' }
+    # 轮次类型：由动作表决定（复执行=execute，其余主循环动作=discussion），供统计直读
+    if (Test-IsMainRoundAction $Action) {
+        $rt = Get-RoundType $Action
         if ($properties -is [System.Collections.IDictionary]) {
             $properties["round-type"] = $rt
         } else {
@@ -123,7 +125,7 @@ try {
 
     $jsonLine = ($record | ConvertTo-Json -Compress) + "`n"
 
-    $logDir = Join-Path $CurrentDir ".aiprocess"
+    $logDir = Join-Path $CurrentDir (Get-DataDirName)
     EnsureDirectory -Path $logDir
 
     $logFile = Join-Path $logDir "log.jsonl"
