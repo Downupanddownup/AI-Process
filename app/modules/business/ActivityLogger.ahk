@@ -19,16 +19,20 @@ LogActivity(action, content, properties := "") {
         tmpDir := currentDir "\.aiprocess\_tmp"
         DirCreate(tmpDir)
 
-        timestamp := A_Now . A_MSec
+        ; 临时文件名用 GUID：文件名只需要"唯一"这一件事。
+        ; 旧写法 A_Now . A_MSec 不满足它——Windows 计时器一拍约 17.5ms，同一拍内的
+        ; 两次调用会拿到完全相同的名字，第二次 FileAppend 会追加到第一次的文件上，
+        ; PowerShell 读到两个 JSON 对象解析失败、整条日志丢失（实测背靠背 40/40 撞名）。
+        token := NewGuid()
 
         ; 把 content 写入临时文件
-        contentFile := tmpDir "\content_" timestamp ".txt"
+        contentFile := tmpDir "\content_" token ".txt"
         FileAppend(content, contentFile, "UTF-8")
 
         ; 把 properties 序列化为 JSON 字符串并写入临时文件
         JSON.EscapeUnicode := false
         propertiesJson := JSON.Dump(properties)
-        propertiesFile := tmpDir "\properties_" timestamp ".json"
+        propertiesFile := tmpDir "\properties_" token ".json"
         FileAppend(propertiesJson, propertiesFile, "UTF-8")
 
         windowId := GetActiveWindowId()
