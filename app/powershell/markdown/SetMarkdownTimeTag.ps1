@@ -1,25 +1,20 @@
 ﻿<#
 .SYNOPSIS
-    向 Markdown 文件写入/更新耗时标记（YAML Front Matter 的 human/ai/total 键）。
+    向 Markdown 文件写入/更新耗时标记（YAML Front Matter）。
 
 .DESCRIPTION
-    仅处理"轮次 md"（vN.md / 实施文档.md / 已实施.md）。依据主题目录 .aiprocess/log.jsonl
-    中动作的归属标识（properties.target / source）做确定性配对，计算本轮耗时：
+    仅处理"轮次 md"（vN.md / 实施文档.md / 已实施.md）。
 
-      human = 同 source 的 建X → 复X          （执行类文件恒 0）
-      ai    = 同 target 的 复X → 其后第一条同 target 的完成通知（无则用当前时刻兜底，重算收敛）
-      消歧  = 同 target 多次发送 → 配最后一次
-      total = 未忽略段之和；任一段 > 阈值（默认 60 分钟）标"忽略·<时长>"
+    数据**不再自己配对计算**：从主题目录 .aiprocess\stats.json 的 roundDetail 里取本文件那一行
+    （同名多行时取 sendTime 最新的一行）——统计与打标因此是同一套口径、同一个来源，打标只负责写文件。
+
+    写入八个键：gap / human / ai / total / excluded-human / excluded-ai / excluded-count / round-type。
+    行内值为 null 时写"未知"（不编造）；roundDetail 里没有本文件的行时不写盘（保持原样）。
 
     边界语义：
-      - 允许重算：配对锚点是事实记录，重算幂等收敛；
-      - 配对失败（日志无 target）→ 写"未知"四键，不编造数字。
-
-    - 文件已有 front matter：在其中合并/更新这三个键，其余键（含 ai-agent）与正文不动；
-    - 文件无 front matter：在头部插入新块；
-    - 幂等：键值均未变化则不写盘；
-    - 保留原文件 BOM 与换行风格（LF/CRLF）；
-    - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程。
+      - 幂等：键值均未变化则不写盘；
+      - 保留原文件 BOM 与换行风格（LF/CRLF）；
+      - 失败隔离：任何异常仅输出警告，退出码始终为 0，不阻断调用方主流程。
 
 .PARAMETER FilePath
     要写入的 Markdown 文件绝对路径。
@@ -44,30 +39,20 @@ trap {
 }
 
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
-$modulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"
-$resolverPath = Join-Path $scriptDirectory "..\time\RoundResolver.psm1"
-$appSettingsPath = Join-Path $scriptDirectory "..\config\AppSettings.psm1"
-$conventionsPath = Join-Path $scriptDirectory "..\conventions\DomainConventions.psm1"   # 名字与动作性格单源
+$timeModulePath = Join-Path $scriptDirectory "..\time\TimeCalculator.psm1"              # 友好时长换算（展示口径同源）
+$conventionsPath = Join-Path $scriptDirectory "..\conventions\DomainConventions.psm1"   # 名字与正则单源
 
 if (-not (Test-Path -LiteralPath $FilePath)) {
     exit 0
 }
-if (-not (Test-Path -LiteralPath $modulePath)) {
-    exit 0
-}
-if (-not (Test-Path -LiteralPath $resolverPath)) {
-    exit 0
-}
-if (-not (Test-Path -LiteralPath $appSettingsPath)) {
+if (-not (Test-Path -LiteralPath $timeModulePath)) {
     exit 0
 }
 if (-not (Test-Path -LiteralPath $conventionsPath)) {
     exit 0
 }
 try {
-    Import-Module $modulePath -ErrorAction Stop
-    Import-Module $resolverPath -ErrorAction Stop
-    Import-Module $appSettingsPath -ErrorAction Stop
+    Import-Module $timeModulePath -ErrorAction Stop
     Import-Module $conventionsPath -ErrorAction Stop
 } catch {
     exit 0
@@ -75,29 +60,63 @@ try {
 
 $themeDir = Split-Path -Parent $FilePath
 $fileName = Split-Path -Leaf $FilePath
-$logFile = Join-Path (Join-Path $themeDir (Get-DataDirName)) "log.jsonl"
+$statsFile = Join-Path (Join-Path $themeDir (Get-DataDirName)) 'stats.json'
 
-# ---------- 轮次配对逻辑已抽取至 app/powershell/time/RoundResolver.psm1（顶部导入） ----------
+# ---------- 只处理轮次 md ----------
+function Test-RoundMdName {
+    param([string]$Name)
+    return ($Name -match (Get-VersionFilePattern) -or $Name -eq (Get-ImplDocFileName) -or $Name -eq (Get-ExecutedFileName))
+}
+if (-not (Test-RoundMdName $fileName)) {
+    exit 0
+}
+
+# ---------- 取本文件在统计产物里的那一行（同名多行取 sendTime 最新） ----------
+function Get-StatsRowForFile {
+    param(
+        [string]$StatsPath,
+        [string]$Name
+    )
+    if (-not (Test-Path -LiteralPath $StatsPath)) { return $null }
+    try {
+        $data = [System.IO.File]::ReadAllText($StatsPath) | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+    if ($null -eq $data.roundDetail) { return $null }
+    $hit = $null
+    foreach ($r in @($data.roundDetail)) {
+        if ($r.file -ne $Name) { continue }
+        # sendTime 形如 yyyy-MM-dd HH:mm:ss，字典序即时间序
+        if ($null -eq $hit -or [string]$r.sendTime -gt [string]$hit.sendTime) { $hit = $r }
+    }
+    return $hit
+}
+
+# 秒 → 显示文本；null 记"未知"（不编造）
+function Format-TagDuration {
+    param([object]$Seconds)
+    if ($null -eq $Seconds) { return '未知' }
+    return Format-FriendlyDuration -Seconds ([int]$Seconds)
+}
 
 # ---------- 合并写入 front matter ----------
 function Write-FrontMatterTag {
     param(
         [string]$Path,
-        [string]$Gap,
-        [string]$Human,
-        [string]$Ai,
-        [string]$Total,
+        [hashtable]$Tags,
         [string]$RoundType = ""
     )
-    # 英文短键，冒号/值对齐到同一列（与 ai-agent: "..." 的单空格布局对齐，值列 = 11）
-    $padWidth = 10
+    # 英文短键，冒号/值对齐到同一列（最长的 excluded-count 有 14 字符，故值列 = 17）
+    $padWidth = 16
+    $order = @('gap', 'human', 'ai', 'total', 'excluded-human', 'excluded-ai', 'excluded-count')
     $tagLines = @()
-    $tagLines += (("gap:").PadRight($padWidth) + '"' + $Gap + '"')
-    $tagLines += (("human:").PadRight($padWidth) + '"' + $Human + '"')
-    $tagLines += (("ai:").PadRight($padWidth) + '"' + $Ai + '"')
-    $tagLines += (("total:").PadRight($padWidth) + '"' + $Total + '"')
+    foreach ($k in $order) {
+        if (-not $Tags.ContainsKey($k)) { continue }
+        $tagLines += (("$k" + ":").PadRight($padWidth) + '"' + [string]$Tags[$k] + '"')
+    }
     if ($RoundType -ne "") {
-        $tagLines += ('round-type: ' + '"' + $RoundType + '"')
+        $tagLines += (('round-type:').PadRight($padWidth) + '"' + $RoundType + '"')
     }
 
     $rawBytes = [System.IO.File]::ReadAllBytes($Path)
@@ -118,7 +137,7 @@ function Write-FrontMatterTag {
     $newContent = $null
 
     if ($closingIndex -gt 0) {
-        # 已有 front matter：移除旧的 gap/human/ai/total 及中文旧键，保留其余键（含 ai-agent），再统一插入 new 键组
+        # 已有 front matter：移除旧的标记键（含中文旧键），保留其余键（含 ai-agent），再统一插入 new 键组
         $built = [System.Collections.Generic.List[string]]::new()
         $built.Add($lines[0])   # 开 ---
 
@@ -127,8 +146,7 @@ function Write-FrontMatterTag {
         if ($bodyEnd -ge $bodyStart) {
             foreach ($kv in $lines[$bodyStart..$bodyEnd]) {
                 $t = $kv.Trim()
-                # 新的 gap/human/ai/total/round-type 键：跳过，稍后统一插回
-                if ($t -match "^(gap|human|ai|total|round-type)\s*:") { continue }
+                if ($t -match "^(gap|human|ai|total|excluded-human|excluded-ai|excluded-count|round-type)\s*:") { continue }
                 $built.Add($kv)
             }
         }
@@ -155,48 +173,26 @@ function Write-FrontMatterTag {
 
 # ============ main ============
 
-$threshold = Get-IdleThresholdMinutes
-$entries = Get-LogEntries -LogFile $logFile
-$round = Get-TargetRoundInfo -Entries $entries -FileName $fileName
-if ($null -eq $round) {
+$row = Get-StatsRowForFile -StatsPath $statsFile -Name $fileName
+if ($null -eq $row) {
+    # 统计产物里没有这个文件的结果 → 没有可写的东西，保持原样
     exit 0
 }
 
-# 轮次类型：配对成功按动作表派生；配对失败仅文件名可确定的（实施文档/已实施）才写，vN.md 不编造
-$roundTypeValue = ""
-if ($round.matched) {
-    $rt = Get-RoundType $round.sendAction
-    if ($null -ne $rt) { $roundTypeValue = $rt }
-} else {
-    if ($fileName -eq (Get-ExecutedFileName)) { $roundTypeValue = 'execute' }
-    elseif ($fileName -eq (Get-ImplDocFileName)) { $roundTypeValue = 'discussion' }
+# 轮次类型：明细直读日志 round-type；"未标注"（老日志缺字段）不写这个键
+$roundTypeValue = [string]$row.type
+if ($roundTypeValue -eq '未标注') { $roundTypeValue = '' }
+
+$tags = @{
+    'gap'            = (Format-FriendlyDuration -Seconds ([int]$row.gapSec))
+    'human'          = (Format-TagDuration $row.humanSec)
+    'ai'             = (Format-TagDuration $row.aiSec)
+    'total'          = (Format-TagDuration $row.totalSec)
+    'excluded-human' = (Format-FriendlyDuration -Seconds ([int]$row.humanExcludedSec))
+    'excluded-ai'    = (Format-FriendlyDuration -Seconds ([int]$row.aiExcludedSec))
+    'excluded-count' = ([string][int]$row.excludedCount)
 }
 
-# 配对失败（日志无 target，如首轮直建实施文档.md）：写"未知"四键，不编造数字
-if (-not $round.matched) {
-    Write-FrontMatterTag -Path $FilePath -Gap "未知" -Human "未知" -Ai "未知" -Total "未知" -RoundType $roundTypeValue
-    exit 0
-}
-
-# AI 处理终点：thisSend 之后第一条同 target 的完成通知；无则用当前时刻（创建当下≈AI 刚完成，重算时收敛到真实通知）
-$aiEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $round.thisSend
-if ($null -eq $aiEnd) { $aiEnd = Get-Date }
-$breakdown = Get-RoundBreakdown -HumanStart $round.humanStart -ThisSend $round.thisSend -AiEnd $aiEnd -ThresholdMinutes $threshold
-
-# 轮间间隔：本轮起点（建X，配不上则复X）− 此前最近一条完成通知；打标时刻两端均已发生，一次写入终身准确
-$gapStart = if ($null -ne $round.humanStart) { $round.humanStart } else { $round.thisSend }
-$gapDisplay = Format-FriendlyDuration -Seconds (Get-RoundGap -Entries $entries -RoundStart $gapStart)
-
-$aiDisplay = Format-FriendlyDuration -Seconds $breakdown.aiSeconds -Ignored $breakdown.aiIgnored
-if ($round.humanUnknown) {
-    # human 段配不齐：不编造，human/total 均显"未知"
-    $humanDisplay = "未知"
-    $totalDisplay = "未知"
-} else {
-    $humanDisplay = Format-FriendlyDuration -Seconds $breakdown.humanSeconds -Ignored $breakdown.humanIgnored
-    $totalDisplay = Format-FriendlyDuration -Seconds $breakdown.totalSeconds -Ignored $false
-}
-
-Write-FrontMatterTag -Path $FilePath -Gap $gapDisplay -Human $humanDisplay -Ai $aiDisplay -Total $totalDisplay -RoundType $roundTypeValue
+Write-FrontMatterTag -Path $FilePath -Tags $tags -RoundType $roundTypeValue
 
 exit 0

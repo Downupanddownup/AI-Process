@@ -6,9 +6,8 @@
     纯计算 + 只读采集，不落盘、不渲染、不级联——那些是编排层（ComputeThemeStats.ps1）的职责。
     "给我主题路径，还我一个 stats 对象"是这一层的全部契约，便于直接调用与比对。
 
-    依赖（均为工具侧叶子，单向）：RoundResolver.psm1（读日志与轮次配对）、TimeCalculator.psm1（时长换算）、
-    ThemeAggregation.psm1（子主题发现与汇总）、DomainConventions.psm1（名字与动作性格）、
-    ActiveDurationCalculator.ps1（活跃时长）。
+    依赖（均为工具侧叶子，单向）：RoundResolver.psm1（读日志、轮次配对与逐档降级）、TimeCalculator.psm1（时长换算）、
+    ThemeAggregation.psm1（子主题发现与汇总）、DomainConventions.psm1（名字与动作性格）。
 
     前置条件：ThemePath 下存在 .aiprocess 目录（由编排层确认；本层不重复判断）。
 
@@ -20,7 +19,6 @@ Import-Module (Join-Path $PSScriptRoot "..\conventions\DomainConventions.psm1") 
 Import-Module (Join-Path $PSScriptRoot "..\time\TimeCalculator.psm1") -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot "..\time\RoundResolver.psm1") -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot "ThemeAggregation.psm1") -ErrorAction Stop
-. (Join-Path $PSScriptRoot "ActiveDurationCalculator.ps1")
 
 # ---------- 字符数：isAiBody=$true 时剥离 front matter（首行 --- 起 50 行内闭合 --- 的块，与打标同一判定） ----------
 function Get-FileCharCount {
@@ -94,26 +92,16 @@ function Get-ThemeStats {
     $discussion = 0; $execute = 0; $unknown = 0
     $executeByStrategy = [ordered]@{}
     $roundDetail = @()
-    # 重复发送去重：同 target 且配对同一完成通知 → 合并为一轮（取首次发送数值）；$pairedNotifKeyByTarget 登记 target→通知键，$dupSendCountByTarget 记重复次数供统计.md 标注
-    $pairedNotifKeyByTarget = @{}
+    # 重复发送合并标注：被合并的次数（展示层 +1 显示总数）、其中执行类几次
     $dupSendCountByTarget = @{}
+    $dupExecCountByTarget = @{}
+
+    # 发送侧候选窗口（RoundResolver 单源）：同 target 且配同一条完成通知的发送 = 一轮；
+    # 该轮时长取自"第一个不超阈值的候选"，被放弃的跨度记剔除——重复发送的合并与逐档降级都在窗口里完成
+    $sendWindows = Get-SendWindows -Entries $entries -ThresholdMinutes $threshold
 
     foreach ($e in $entries) {
         if ($sendActions -notcontains $e.action) { continue }
-
-        # 去重判定（仅单 target 发送参与；多 target 含 '|' 的维持逐文件配对现状）
-        $targetParts = @($e.target -split '\|' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
-        if ($targetParts.Count -eq 1) {
-            $dupCheckEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $targetParts[0] -After $e.time
-            if ($null -ne $dupCheckEnd) {
-                $notifKey = $dupCheckEnd.ToString('yyyyMMddHHmmss')
-                if ($pairedNotifKeyByTarget.ContainsKey($targetParts[0]) -and $pairedNotifKeyByTarget[$targetParts[0]] -eq $notifKey) {
-                    $dupSendCountByTarget[$targetParts[0]]++
-                    continue
-                }
-                $pairedNotifKeyByTarget[$targetParts[0]] = $notifKey
-            }
-        }
 
         # 轮次类型直读日志 round-type 字段；老日志缺字段 → 计“未标注”，不报错
         $roundType = '未标注'
@@ -128,16 +116,40 @@ function Get-ThemeStats {
         }
         if ([string]::IsNullOrWhiteSpace($e.target)) { $unknown++; continue }
 
-        $isExecute = ($roundType -eq 'execute')
-        $human = $null
-        if (-not $isExecute) { $human = Get-HumanStartForSend -Entries $entries -Send $e }
+        # 逐 target 取本轮窗口：只有"该 target 那一组的首次发送"才落成明细行；
+        # 被合并的重复发送查不到窗口键，自然跳过（合并次数与逐档降级都由窗口承载）
+        $rows = @()
+        foreach ($part in ($e.target -split '\|')) {
+            $fileName = $part.Trim()
+            if ($fileName -eq '') { continue }
+            $winKey = "$fileName|" + $e.time.ToString('yyyyMMddHHmmss')
+            if (-not $sendWindows.ContainsKey($winKey)) { continue }
+            $rows += [PSCustomObject]@{
+                fileName   = $fileName
+                win        = $sendWindows[$winKey]
+                fileExists = (Test-Path -LiteralPath (Join-Path $ThemePath $fileName))
+            }
+        }
+        if ($rows.Count -eq 0) { continue }
+
+        # 虚空 target（文件不存在且无通知）剔除——统计只反映实际产出；全虚空时保留首个记"未闭环"（人的时间不丢账）
+        $kept = @($rows | Where-Object { $_.fileExists -or $null -ne $_.win.aiEnd })
+        if ($kept.Count -eq 0) { $kept = @($rows[0]) }
+
+        # 人段：终点 = 本轮真正生效的那次发送（有采用候选时取它，否则退回本轮首次发送）
+        $humanEnd = $e.time
+        foreach ($r in $rows) {
+            if ($null -ne $r.win.pickedSendTime) { $humanEnd = $r.win.pickedSendTime; break }
+        }
+        $human = Get-HumanWindow -Entries $entries -Send $e -EndTime $humanEnd -ThresholdMinutes $threshold
 
         # 轮间间隔：本轮起点（建X，配不上则复X）− 此前最近一条完成通知；首轮恒 0（与打标同调 RoundResolver.Get-RoundGap）
         $roundStart = $e.time
-        if ($null -ne $human -and -not $human.humanUnknown -and $null -ne $human.humanStart) { $roundStart = $human.humanStart }
+        if (-not $human.unknown -and $null -ne $human.pickedStart) { $roundStart = $human.pickedStart }
         $gapSec = Get-RoundGap -Entries $entries -RoundStart $roundStart
 
         # 人文件字符数：讨论轮取 source 文件（无 source 时按动作表给的兜底）；无输入文件的动作 → 0
+        $isExecute = ($roundType -eq 'execute')
         $srcChars = $null
         if (-not $isExecute) {
             $src = $e.source
@@ -150,36 +162,23 @@ function Get-ThemeStats {
             }
         }
 
-        # 多 target 逐文件配对：先判定各 target 是否有效（文件存在或有完成通知）；
-        # 虚空 target（文件不存在且无通知）剔除——统计只反映实际产出；全虚空时保留首个记"未闭环"（人的时间不丢账）；
         # 人耗时/轮间间隔只归属第一个有效行，其余有效行记 0（一条发送只有一份）；AI耗时/字数仍逐文件独立
-        $partInfos = @()
-        foreach ($part in ($e.target -split '\|')) {
-            $fileName = $part.Trim()
-            if ($fileName -eq '') { continue }
-            $partEnd = Get-FirstTargetNotificationAfter -Entries $entries -FileName $fileName -After $e.time
-            $partInfos += [PSCustomObject]@{
-                fileName   = $fileName
-                aiEnd      = $partEnd
-                fileExists = (Test-Path -LiteralPath (Join-Path $ThemePath $fileName))
-            }
-        }
-        $kept = @($partInfos | Where-Object { $_.fileExists -or $null -ne $_.aiEnd })
-        if ($kept.Count -eq 0 -and $partInfos.Count -gt 0) { $kept = @($partInfos[0]) }
         $isFirstKept = $true
         foreach ($pi in $kept) {
             $fileName = $pi.fileName
-            $aiEnd = $pi.aiEnd
-            $aiEndKnown = ($null -ne $aiEnd)
-            # 无完成通知 = 该轮未闭环：aiSec 记 null 不编造（统计脚本在完成通知后触发，缺通知即真未完成）；人耗时段不受影响照常计算
-            $humanStart = if ($null -ne $human) { $human.humanStart } else { $null }
-            $breakdown = Get-RoundBreakdown -HumanStart $humanStart -ThisSend $e.time -AiEnd $aiEnd -ThresholdMinutes $threshold
-            $aiSec = $null
-            if ($aiEndKnown) { $aiSec = $breakdown.aiSeconds }
+            $win = $pi.win
+            # 无完成通知 = 该轮未闭环：aiSec 记 null 不编造（统计脚本在完成通知后触发，缺通知即真未完成）
+            $aiSec = $win.aiSec
             $humanSec = $null
             if (-not $isFirstKept) { $humanSec = 0 }
             elseif ($isExecute) { $humanSec = 0 }
-            elseif (-not $human.humanUnknown) { $humanSec = $breakdown.humanSeconds }
+            elseif (-not $human.unknown) { $humanSec = $human.sec }
+            # 剔除：人段只在第一个有效行归属一次；AI 段逐文件独立
+            $humanExcluded = 0
+            $rowExcludedCount = 0
+            if ($isFirstKept) { $humanExcluded = $human.excludedSec; $rowExcludedCount += $human.excludedCount }
+            $aiExcluded = $win.excludedSec
+            $rowExcludedCount += $win.excludedCount
             $rowGapSec = if ($isFirstKept) { $gapSec } else { 0 }
             $rowHumanChars = 0
             if ($isFirstKept -and -not $isExecute) { $rowHumanChars = $srcChars }
@@ -190,20 +189,28 @@ function Get-ThemeStats {
                 if ($null -ne $humanSec) { $totalSec += $humanSec }
                 if ($null -ne $aiSec) { $totalSec += $aiSec }
             }
+            # 重复发送合并标注（展示层按"次数 + 1"显示总数，并带出被合并的执行类次数）
+            if ($win.itemCount -gt 1 -and -not $dupSendCountByTarget.ContainsKey($fileName)) {
+                $dupSendCountByTarget[$fileName] = $win.itemCount - 1
+                if ($win.mergedExecCount -gt 0) { $dupExecCountByTarget[$fileName] = $win.mergedExecCount }
+            }
             $isFirstKept = $false
 
             $roundDetail += [PSCustomObject][ordered]@{
-                file       = $fileName
-                type       = $roundType
-                agent      = $e.agent
-                sendTime   = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
-                humanSec   = $humanSec
-                aiSec      = $aiSec
-                totalSec   = $totalSec
-                gapSec     = $rowGapSec
-                humanChars = $rowHumanChars
-                aiChars    = $aiChars
-                known      = ($aiEndKnown -and ($isExecute -or -not $human.humanUnknown))
+                file             = $fileName
+                type             = $roundType
+                agent            = $e.agent
+                sendTime         = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
+                humanSec         = $humanSec
+                aiSec            = $aiSec
+                totalSec         = $totalSec
+                gapSec           = $rowGapSec
+                humanExcludedSec = $humanExcluded
+                aiExcludedSec    = $aiExcluded
+                excludedCount    = $rowExcludedCount
+                humanChars       = $rowHumanChars
+                aiChars          = $aiChars
+                known            = (($null -ne $win.aiEnd) -and ($isExecute -or -not $human.unknown))
             }
         }
     }
@@ -214,7 +221,7 @@ function Get-ThemeStats {
     $roundDetail = @($roundDetail + $rebuildRows | Sort-Object sendTime)
 
     # ---------- 时长类 ----------
-    $activeSec = 0; $wallClockSec = 0; $idleIgnoredSec = 0; $idleIgnoredCount = 0
+    $wallClockSec = 0
     $createdAt = $null; $lastAt = $null
     if ($entries.Count -gt 0) {
         $sorted = @($entries | Sort-Object time)
@@ -224,25 +231,18 @@ function Get-ThemeStats {
         $lastAt = $last.ToString('yyyy-MM-dd HH:mm:ss')
         if ($last -gt $first) {
             $wallClockSec = [int][Math]::Round(($last - $first).TotalSeconds)
-            $logTimes = @($sorted | ForEach-Object { $_.time })
-            $activeSec = [int][Math]::Round((Get-ActiveDuration -Start $first -End $last -LogTimes $logTimes -ThresholdMinutes $threshold).TotalSeconds)
-            $idleIgnoredSec = $wallClockSec - $activeSec
-            # 忽略段数：相邻日志点间隔超阈值的次数（按秒去重后）
-            $uniqueMap = @{}
-            foreach ($t in $logTimes) { $k = $t.ToString('yyyyMMddHHmmss'); if (-not $uniqueMap.ContainsKey($k)) { $uniqueMap[$k] = $t } }
-            $deduped = @($uniqueMap.Values | Sort-Object)
-            $thresholdSec = $threshold * 60
-            for ($i = 0; $i -lt $deduped.Count - 1; $i++) {
-                if (($deduped[$i + 1] - $deduped[$i]).TotalSeconds -gt $thresholdSec) { $idleIgnoredCount++ }
-            }
         }
     }
 
-    # ---------- 人/AI 时长合计（raw 秒数求和；null 不计） ----------
+    # ---------- 人/AI 时长合计（raw 秒数求和；null 不计）与剔除合计 ----------
     $humanSecTotal = 0; $aiSecTotal = 0
+    $humanExcludedTotal = 0; $aiExcludedTotal = 0; $excludedCountTotal = 0
     foreach ($r in $roundDetail) {
         if ($null -ne $r.humanSec) { $humanSecTotal += $r.humanSec }
         if ($null -ne $r.aiSec) { $aiSecTotal += $r.aiSec }
+        if ($null -ne $r.humanExcludedSec) { $humanExcludedTotal += $r.humanExcludedSec }
+        if ($null -ne $r.aiExcludedSec) { $aiExcludedTotal += $r.aiExcludedSec }
+        if ($null -ne $r.excludedCount) { $excludedCountTotal += $r.excludedCount }
     }
     $roundTotalSec = $humanSecTotal + $aiSecTotal
     $gapTotalSec = 0
@@ -272,22 +272,24 @@ function Get-ThemeStats {
 
     # ---------- 父子聚合：父.aggregate = 自身 + Σ 直接子.aggregate（子的发布数据，不翻子的日志） ----------
     $selfAgg = [PSCustomObject][ordered]@{
-        humanSec      = $humanSecTotal
-        aiSec         = $aiSecTotal
-        roundTotalSec = $roundTotalSec
-        gapTotalSec   = $gapTotalSec
-        activeSec     = $activeSec
-        files         = $fileTotal
-        humanFiles    = $humanFiles
-        aiFiles       = $aiFiles
-        humanChars    = $humanCharsTotal
-        aiChars       = $aiCharsTotal
-        discussion    = $discussion
-        execute       = $execute
-        unknown       = $unknown
-        rebuild       = $rebuild
-        createdAt     = $createdAt
-        lastActiveAt  = $lastAt
+        humanSec          = $humanSecTotal
+        aiSec             = $aiSecTotal
+        roundTotalSec     = $roundTotalSec
+        gapTotalSec       = $gapTotalSec
+        humanExcludedSec  = $humanExcludedTotal
+        aiExcludedSec     = $aiExcludedTotal
+        excludedCount     = $excludedCountTotal
+        files             = $fileTotal
+        humanFiles        = $humanFiles
+        aiFiles           = $aiFiles
+        humanChars        = $humanCharsTotal
+        aiChars           = $aiCharsTotal
+        discussion        = $discussion
+        execute           = $execute
+        unknown           = $unknown
+        rebuild           = $rebuild
+        createdAt         = $createdAt
+        lastActiveAt      = $lastAt
     }
     $children = @()
     $childAggs = @()
@@ -313,12 +315,12 @@ function Get-ThemeStats {
         time       = [PSCustomObject][ordered]@{
             roundTotalSec    = $roundTotalSec
             gapTotalSec      = $gapTotalSec
-            activeSec        = $activeSec
+            humanExcludedSec = $humanExcludedTotal
+            aiExcludedSec    = $aiExcludedTotal
+            excludedCount    = $excludedCountTotal
             wallClockSec     = $wallClockSec
             humanSec         = $humanSecTotal
             aiSec            = $aiSecTotal
-            idleIgnoredSec   = $idleIgnoredSec
-            idleIgnoredCount = $idleIgnoredCount
             createdAt        = $createdAt
             lastActiveAt     = $lastAt
         }
@@ -349,6 +351,7 @@ function Get-ThemeStats {
     return [PSCustomObject]@{
         Stats                = $stats
         DupSendCountByTarget = $dupSendCountByTarget
+        DupExecCountByTarget = $dupExecCountByTarget
     }
 }
 

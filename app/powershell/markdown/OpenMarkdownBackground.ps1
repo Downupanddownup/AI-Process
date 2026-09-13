@@ -44,13 +44,17 @@ Assert-PathExists -Path $notificationScript -Description "Notification script"
 Assert-PathExists -Path $FilePath -Description "Markdown file"
 
 function Invoke-CenterNotification {
-    param([string]$Id = "", [string]$TargetFile = "")
+    param([string]$Id = "", [string]$TargetFile = "", [string]$TargetPath = "")
     $notifyArgs = @("-ExecutionPolicy", "Bypass", "-File", "`"$notificationScript`"")
     if ($Id -ne "") {
         $notifyArgs += @("-WindowId", "`"$Id`"")
     }
     if ($TargetFile -ne "") {
         $notifyArgs += @("-TargetFile", "`"$TargetFile`"")
+    }
+    # 完整路径供打标定位（叶子名只用于写日志）；两者同源，通知脚本会自校验一致性
+    if ($TargetPath -ne "") {
+        $notifyArgs += @("-TargetPath", "`"$TargetPath`"")
     }
     Start-Process -FilePath "powershell" -ArgumentList $notifyArgs -NoNewWindow
 }
@@ -65,4 +69,4 @@ $pendingKey = "Window" + $WindowId + "PendingMd"
 
 Write-Host "Cached '$FilePath' to [PendingMd] $pendingKey for Window $WindowId."
 
-Invoke-CenterNotification -Id $WindowId -TargetFile (Split-Path -Leaf $FilePath)
+Invoke-CenterNotification -Id $WindowId -TargetFile (Split-Path -Leaf $FilePath) -TargetPath $FilePath

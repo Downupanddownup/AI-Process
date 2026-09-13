@@ -32,10 +32,16 @@ $script:Metrics = @(
         Rule='各轮 humanSec + aiSec 求和；null 不计' }
     [ordered]@{ Key='time.gapTotalSec'; Name='轮间间隔合计'; Form='Storage'; Group='时长'; Summed=$true
         Meaning='轮与轮之间的空档合计'
-        Rule='各轮 gapSec 求和' }
-    [ordered]@{ Key='time.activeSec'; Name='总时长（活跃，剔除 >{threshold}min 空闲段）'; Form='Storage'; Group='时长'; Summed=$true
-        Meaning='剔除大段离开后的真实投入'
-        Rule='首末日志点之间，相邻日志点间隔 ≤{threshold}min 的段累加，超阈值的整段剔除' }
+        Rule='各轮 gapSec 求和；间隔原样记，不做剔除' }
+    [ordered]@{ Key='time.humanExcludedSec'; Name='剔除时长（人）'; Form='Storage'; Group='时长'; Summed=$true
+        Meaning='被放弃的人思考跨度合计'
+        Rule='各轮 humanExcludedSec 求和；= 第一候选 建X → 采用候选 建X（降到底时为 第一候选 → 本轮发送）' }
+    [ordered]@{ Key='time.aiExcludedSec'; Name='剔除时长（AI）'; Form='Storage'; Group='时长'; Summed=$true
+        Meaning='被放弃的 AI 处理跨度合计'
+        Rule='各轮 aiExcludedSec 求和；= 第一候选发送 → 采用候选发送（降到底时为 第一候选 → 末候选通知）。⚠ 与人的那笔可能在时间上嵌套，不构成可相加的分区' }
+    [ordered]@{ Key='time.excludedCount'; Name='剔除次数'; Form='Storage'; Group='时长'; Summed=$true
+        Meaning='出现过剔除的段数'
+        Rule='按段计：人段 / AI 段各最多 1 次，一轮最多 2 次；降档跳过多个候选仍只记 1 次' }
     [ordered]@{ Key='time.wallClockSec'; Name='墙钟时长（首末日志原始跨度）'; Form='Storage'; Group='时长'; Summed=$false
         Meaning='首末日志的原始跨度，不剔除任何空闲'
         Rule='末条日志时刻 − 首条日志时刻' }
@@ -44,13 +50,7 @@ $script:Metrics = @(
         Rule='各轮 humanSec 求和；执行轮与重建轮恒 0，故实等于讨论轮合计' }
     [ordered]@{ Key='time.aiSec'; Name='AI 执行时长（合计）'; Form='Storage'; Group='时长'; Summed=$true
         Meaning='AI 从收到到完成的时长合计'
-        Rule='各轮 aiSec 求和（含重建轮）；无完成通知的轮记未知、不计入' }
-    [ordered]@{ Key='time.idleIgnoredSec'; Name='忽略时长'; Form='Storage'; Group='时长'; Summed=$false
-        Meaning='被活跃时长剔除掉的那部分'
-        Rule='墙钟时长 − 活跃时长。⚠ 不进 aggregate（父级没有"忽略"这个视角）' }
-    [ordered]@{ Key='time.idleIgnoredCount'; Name='忽略段数'; Form='Storage'; Group='时长'; Summed=$false
-        Meaning='超阈值空闲段的个数'
-        Rule='相邻日志点（按秒去重）间隔 >{threshold}min 的次数。⚠ 不进 aggregate' }
+        Rule='各轮 aiSec 求和（含重建轮）；无完成通知的轮记未知、不计入；超阈值的候选降级后只计采用的那个' }
     [ordered]@{ Key='time.createdAt'; Name='主题创建'; Form='Storage'; Group='时长'; Summed=$false
         Meaning='首条日志时刻'
         Rule='最早一条日志的 time' }
@@ -126,16 +126,25 @@ $script:Metrics = @(
         Rule='发送日志的 time' }
     [ordered]@{ Key='roundDetail[].humanSec'; Name='明细-人耗时'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮人思考秒数'
-        Rule='讨论轮=建X→复X；执行轮/重建轮=0；多 target 只有第一有效行记值、其余 0；配不上建X 记 null' }
+        Rule='候选 = 同 source 的每一次 建X（终点为本轮真正生效的那次发送）；取第一个不超阈值的候选；降到底记 0；多 target 只有第一有效行记值、其余 0；配不上 建X 记 null' }
     [ordered]@{ Key='roundDetail[].aiSec'; Name='明细-AI耗时'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮 AI 执行秒数'
-        Rule='复X → 其后第一条同 target 完成通知；无通知记 null（不编造）' }
+        Rule='候选 = 同 target 的每一次发送（同一条完成通知为一轮）；取第一个不超阈值的候选；降到底记 0；无通知记 null（不编造）' }
     [ordered]@{ Key='roundDetail[].totalSec'; Name='明细-合计耗时'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮人+AI'
         Rule='humanSec + aiSec；null 不计；两者皆 null 记 null' }
     [ordered]@{ Key='roundDetail[].gapSec'; Name='明细-轮间间隔'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮起点与上一轮结束之间的空档'
-        Rule='本轮起点（建X，配不上则复X）− 此前最近一条完成通知；首轮 0；多 target 只有第一有效行记值' }
+        Rule='本轮起点（建X，配不上则复X）− 此前最近一条完成通知；首轮 0；多 target 只有第一有效行记值；原样记不做剔除' }
+    [ordered]@{ Key='roundDetail[].humanExcludedSec'; Name='明细-剔除（人）'; Form='Storage'; Group='轮次明细'; Summed=$false
+        Meaning='本轮被放弃的人思考跨度'
+        Rule='第一候选 建X → 采用候选 建X（降到底时为 第一候选 → 本轮发送）；只归属第一有效行，无剔除记 0' }
+    [ordered]@{ Key='roundDetail[].aiExcludedSec'; Name='明细-剔除（AI）'; Form='Storage'; Group='轮次明细'; Summed=$false
+        Meaning='本轮被放弃的 AI 处理跨度'
+        Rule='第一候选发送 → 采用候选发送（降到底时为 第一候选 → 末候选通知）；无剔除记 0' }
+    [ordered]@{ Key='roundDetail[].excludedCount'; Name='明细-剔除次数'; Form='Storage'; Group='轮次明细'; Summed=$false
+        Meaning='本轮出现剔除的段数'
+        Rule='人段与 AI 段各最多计 1；一轮最多 2' }
     [ordered]@{ Key='roundDetail[].humanChars'; Name='明细-人字数'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮输入文件的字符数（轮次求和口径）'
         Rule='第一有效行的 source 文件全文长度；无输入文件的动作记 0。⚠ 与 files.humanChars 不是同一个数' }
@@ -178,16 +187,18 @@ $script:Metrics = @(
 # ---------- 口径约定（跨指标的规则，统计.md 尾部"口径说明"段逐条来自这里） ----------
 # 占位符：{threshold} / {now}
 $script:RuleNotes = @(
-    '- 轮次总耗时（人+AI）= 各轮 人耗时+AI耗时 合计；轮间间隔 = 本轮起点 − 上一轮完成通知（首轮为 0）'
-    '- 人思考=建X→复X（仅讨论轮，执行轮恒 0）；AI执行=复X→同 target 完成通知（无通知记未知，不编造）'
-    '- 总时长（活跃）= 首末日志剔除 >{threshold}min 空闲段；墙钟=首末日志原始跨度'
+    '- 轮次总耗时（人+AI）= 各轮 人耗时+AI耗时 合计；轮间间隔 = 本轮起点 − 上一轮完成通知（首轮为 0），原样记不剔除'
+    '- 人思考=同 source 每次 建X 里第一个不超阈值的候选（执行轮恒 0）；AI执行=同 target 每次发送里第一个不超阈值的候选（无通知记未知，不编造）'
+    '- 剔除 = 本轮被放弃的跨度（第一候选 → 采用候选）；人 / AI 各一笔、分列记不合并；降档到底则该段时长记 0'
+    '- 剔除次数按段计：人段 / AI 段各最多 1 次，一轮最多 2 次'
+    '- 墙钟=首末日志原始跨度；未计入的时间 = 墙钟 − 人 − AI − 间隔（天然不重复）'
     '- 人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）'
     '- 字符数 >=1万 按量级缩写（如 2.05万），精确值见 stats.json'
-    '- 重复发送去重：同 target 且配对同一完成通知的重复发送合并为一轮，取首次发送数值（明细文件列标注已合并）'
-    '- 多 target 发送：人耗时/轮间间隔只计入第一个有效文件行，其余记 0；文件不存在且无通知的虚空行不列入明细（全虚空时保留首行记未闭环）'
+    '- 重复发送去重：同 target 且配对同一完成通知的重复发送合并为一轮，取第一个不超阈值的候选（明细文件列标注已合并，并带出被合并的执行类次数）'
+    '- 多 target 发送：人耗时/轮间间隔/人的剔除只计入第一个有效文件行，其余记 0；文件不存在且无通知的虚空行不列入明细（全虚空时保留首行记未闭环）'
     '- 百分比分母：总览三列统一为总跨度（可跨列相加：自身+子主题≈总）；自身统计与轮次明细为自身墙钟；无发送记录的孤儿时段不计轮，故百分比合计可能不足 100%'
     "- 重建轮=复关系发送→上下文重建完成通知（人耗时/字数恒 0，轮间间隔照常，其完成通知参与轮间锚点）；未知轮数=三类发送中无 target 的计数
-- 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；活跃/墙钟类仅自身不求和，总跨度取最早创建→最晚活动
+- 总览三列：总（含子主题）= 自身 + Σ 直接子主题的 aggregate（孙主题已含在子内）；墙钟类仅自身不求和，总跨度取最早创建→最晚活动
 - 子主题识别：后代目录含 .aiprocess 即子主题（结果微调为容器），只聚合直接子"
     '- 计算时间：{now}（脚本自动生成，每次重算全量覆盖）'
 )

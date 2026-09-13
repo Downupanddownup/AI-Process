@@ -48,11 +48,9 @@ if ((Test-Path $tagScript) -and $WindowId -ne "") {
     & powershell -ExecutionPolicy Bypass -File "`"$tagScript`"" -FilePath "`"$FilePath`"" -WindowId "`"$WindowId`""
 }
 
-# 写入耗时标记（人思考时长/AI处理时长；独立业务脚本，失败不影响打开流程）
-$timeTagScript = Join-Path $scriptDirectory "SetMarkdownTimeTag.ps1"
-if (Test-Path $timeTagScript) {
-    & powershell -ExecutionPolicy Bypass -File "`"$timeTagScript`"" -FilePath "`"$FilePath`"" -WindowId "`"$WindowId`""
-}
+# 写入耗时标记已迁出：打标改由完成通知脚本（ShowCenterNotification.ps1）在统计重算之后执行，
+# 只打当前这一个文件（见《跨天BUG以及重构\实施文档.md》4.8）。
+# 这里不再有打标动作——打开文件与写标记是两件事。
 
 $arguments = @("-FilePath", "`"$FilePath`"")
 if ($WindowId -ne "") {

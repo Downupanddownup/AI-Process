@@ -36,7 +36,7 @@ LoadThemeStats(themePath) {
     result["HasData"] := true
 
     sections := Map(
-        "time", ["activeSec", "humanSec", "aiSec"],
+        "time", ["roundTotalSec", "humanSec", "aiSec"],
         "rounds", ["discussion", "execute", "rebuild"],
         "files", ["humanChars", "aiChars"])
     for sectionName, keys in sections {

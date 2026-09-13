@@ -11,6 +11,9 @@
       - Get-HumanStartForSend：按发送动作的 source 定位人思考起点（建X）；复执行/质检码 恒无（人耗时 0）。
       - Get-RoundGap：轮间间隔 = 本轮起点 − 此前最近一条完成通知；首轮或无先例通知时为 0。
       - Get-RebuildRoundRows：重建轮（复关系 → 上下文重建完成通知）；人耗时/字数恒 0，轮间间隔照常。
+      - Get-EffectiveRoundWindow：候选序列的逐档降级（"第一个不超阈值的候选"= 有效时长，被放弃的跨度 = 剔除）。
+      - Get-SendWindows：AI 段候选分组（同 target + 配同一条完成通知的连续发送 = 一轮）。
+      - Get-HumanWindow：人段候选分组与降级（同 source 的每一次 建X，终点为本轮真正生效的那次发送）。
 
     兼容 Windows PowerShell 5.1。保持单向依赖：本模块不引用任何调用方/业务模块。
 #>
@@ -199,20 +202,185 @@ function Get-RebuildRoundRows {
         $aiSec = $null
         if ($null -ne $aiEnd) { $aiSec = [int][Math]::Round(($aiEnd - $e.time).TotalSeconds) }
         $rows += [PSCustomObject][ordered]@{
-            file       = (Get-ContextRebuildName)
-            type       = 'rebuild'
-            agent      = $e.agent
-            sendTime   = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
-            humanSec   = 0
-            aiSec      = $aiSec
-            totalSec   = $aiSec
-            gapSec     = (Get-RoundGap -Entries $Entries -RoundStart $e.time)
-            humanChars = 0
-            aiChars    = 0
-            known      = ($null -ne $aiEnd)
+            file             = (Get-ContextRebuildName)
+            type             = 'rebuild'
+            agent            = $e.agent
+            sendTime         = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
+            humanSec         = 0
+            aiSec            = $aiSec
+            totalSec         = $aiSec
+            gapSec           = (Get-RoundGap -Entries $Entries -RoundStart $e.time)
+            humanExcludedSec = 0
+            aiExcludedSec    = 0
+            excludedCount    = 0
+            humanChars       = 0
+            aiChars          = 0
+            known            = ($null -ne $aiEnd)
         }
     }
     return $rows
 }
 
-Export-ModuleMember -Function Get-LogEntries, Test-TargetMatch, Get-TargetRoundInfo, Get-FirstTargetNotificationAfter, Get-HumanStartForSend, Get-RoundGap, Get-RebuildRoundRows
+# ---------- 逐档降级：候选序列里取"第一个不超阈值的候选" ----------
+# 口径（与已确认的规则逐条对应）：
+#   候选按 start 升序；采用 = 第一个 (end - start) ≤ 阈值的候选
+#   降档成功 → 有效时长 = 采用候选的时长；剔除 = 第一候选起点 → 采用候选起点；剔除次数 1（仅当采用的不是第一个）
+#   降档到底 → 有效时长 = 0；剔除 = 第一候选起点 → 最后候选终点；剔除次数 1
+#   第一候选就合格 → 剔除 0、剔除次数 0（没发生剔除）
+# 纯函数：不读日志、不碰文件系统。统计与打标两条链共用这一份判定。
+function Get-EffectiveRoundWindow {
+    param(
+        [Parameter(Mandatory = $true)][array]$Candidates,
+        [Parameter(Mandatory = $true)][int]$ThresholdMinutes
+    )
+    if ($Candidates.Count -eq 0) {
+        return [PSCustomObject]@{ resolved = $false; effectiveSec = $null; pickedStart = $null; excludedSec = 0; excludedCount = 0 }
+    }
+    $thresholdSec = $ThresholdMinutes * 60
+    $first = $Candidates[0]
+    $picked = $null
+    foreach ($c in $Candidates) {
+        $sec = [int][Math]::Round(($c.end - $c.start).TotalSeconds)
+        if ($sec -le $thresholdSec) { $picked = $c; break }
+    }
+    if ($null -ne $picked) {
+        $count = 0
+        if ($picked.start -gt $first.start) { $count = 1 }
+        return [PSCustomObject]@{
+            resolved      = $true
+            effectiveSec  = [int][Math]::Round(($picked.end - $picked.start).TotalSeconds)
+            pickedStart   = $picked.start
+            excludedSec   = [int][Math]::Round(($picked.start - $first.start).TotalSeconds)
+            excludedCount = $count
+        }
+    }
+    $last = $Candidates[$Candidates.Count - 1]
+    return [PSCustomObject]@{
+        resolved      = $false
+        effectiveSec  = 0
+        pickedStart   = $null
+        excludedSec   = [int][Math]::Round(($last.end - $first.start).TotalSeconds)
+        excludedCount = 1
+    }
+}
+
+# ---------- AI 段候选分组：同一 target 内，配到同一条完成通知的连续发送归为一轮 ----------
+# 返回 hashtable：键 = "target|组内首次发送时刻键" → 该轮的窗口对象
+#   窗口 = { target; firstTime; firstEntry; resolved; aiEnd; aiSec; pickedSendTime; excludedSec; excludedCount; itemCount; mergedExecCount }
+#   - 组内全部配不到通知（本轮未闭环）→ aiSec = null（不编造）
+#   - 被通知截断后另起一组（另一轮）→ 各自成组
+function Get-SendWindows {
+    param(
+        [Parameter(Mandatory = $true)][array]$Entries,
+        [Parameter(Mandatory = $true)][int]$ThresholdMinutes
+    )
+    $sendNames = Get-MainRoundActionNames
+    $byTarget = @{}
+    foreach ($e in $Entries) {
+        if ($sendNames -notcontains $e.action) { continue }
+        if ([string]::IsNullOrWhiteSpace($e.target)) { continue }
+        foreach ($part in ($e.target -split '\|')) {
+            $t = $part.Trim()
+            if ($t -eq '') { continue }
+            if (-not $byTarget.ContainsKey($t)) { $byTarget[$t] = New-Object System.Collections.ArrayList }
+            [void]$byTarget[$t].Add($e)
+        }
+    }
+
+    $groups = @()
+    foreach ($t in $byTarget.Keys) {
+        $sends = @($byTarget[$t] | Sort-Object time)
+        $cur = $null
+        foreach ($s in $sends) {
+            $end = Get-FirstTargetNotificationAfter -Entries $Entries -FileName $t -After $s.time
+            $notifKey = 'none'
+            if ($null -ne $end) { $notifKey = $end.ToString('yyyyMMddHHmmss') }
+            if ($null -eq $cur -or $cur.notifKey -ne $notifKey) {
+                $cur = [PSCustomObject]@{
+                    target     = $t
+                    notifKey   = $notifKey
+                    firstTime  = $s.time
+                    firstEntry = $s
+                    items      = New-Object System.Collections.ArrayList
+                }
+                $groups += $cur
+            }
+            [void]$cur.items.Add([PSCustomObject]@{ start = $s.time; end = $end; entry = $s })
+        }
+    }
+
+    $result = @{}
+    foreach ($g in $groups) {
+        $key = "$($g.target)|" + $g.firstTime.ToString('yyyyMMddHHmmss')
+        $mergedExec = 0
+        $items = @($g.items | Sort-Object { $_.start })
+        for ($i = 1; $i -lt $items.Count; $i++) {
+            if ($items[$i].entry.action -eq '复执行') { $mergedExec++ }
+        }
+        if ($g.notifKey -eq 'none') {
+            $result[$key] = [PSCustomObject]@{
+                target = $g.target; firstTime = $g.firstTime; firstEntry = $g.firstEntry
+                resolved = $false; aiEnd = $null; aiSec = $null; pickedSendTime = $null
+                excludedSec = 0; excludedCount = 0
+                itemCount = $items.Count; mergedExecCount = $mergedExec
+            }
+            continue
+        }
+        $win = Get-EffectiveRoundWindow -Candidates $items -ThresholdMinutes $ThresholdMinutes
+        $result[$key] = [PSCustomObject]@{
+            target = $g.target; firstTime = $g.firstTime; firstEntry = $g.firstEntry
+            resolved = $win.resolved; aiEnd = $items[0].end; aiSec = $win.effectiveSec
+            pickedSendTime = $win.pickedStart
+            excludedSec = $win.excludedSec; excludedCount = $win.excludedCount
+            itemCount = $items.Count; mergedExecCount = $mergedExec
+        }
+    }
+    return $result
+}
+
+# ---------- 人段候选 + 降级：同 source 的每一次 建X，终点 = 本轮真正生效的那次发送 ----------
+# 返回 { sec; excludedSec; excludedCount; pickedStart; unknown }
+#   sec = 0       该动作无人的时间（执行类 / 质检码）
+#   sec = null    定位不到 source 或没有任何 建X（未知，不编造）
+#   sec = <int>   降级后的有效人时长（降档到底时记 0）
+function Get-HumanWindow {
+    param(
+        [Parameter(Mandatory = $true)][array]$Entries,
+        [Parameter(Mandatory = $true)][object]$Send,
+        [Parameter(Mandatory = $true)][object]$EndTime,
+        [Parameter(Mandatory = $true)][int]$ThresholdMinutes
+    )
+    if (Test-HasNoHumanTime $Send.action) {
+        return [PSCustomObject]@{ sec = 0; excludedSec = 0; excludedCount = 0; pickedStart = $null; unknown = $false }
+    }
+    $src = $Send.source
+    $defaultSrc = Get-DefaultSourceFor $Send.action
+    if ($defaultSrc -ne '' -and [string]::IsNullOrWhiteSpace($src)) { $src = $defaultSrc }
+    if ([string]::IsNullOrWhiteSpace($src)) {
+        return [PSCustomObject]@{ sec = $null; excludedSec = 0; excludedCount = 0; pickedStart = $null; unknown = $true }
+    }
+    $buildAction = Get-BuildActionFor $src
+    $candidates = New-Object System.Collections.ArrayList
+    if (-not [string]::IsNullOrWhiteSpace($buildAction)) {
+        foreach ($e in $Entries) {
+            if ($e.action -ne $buildAction) { continue }
+            if ($e.target -ne $src) { continue }
+            if ($e.time -gt $EndTime) { continue }
+            [void]$candidates.Add([PSCustomObject]@{ start = $e.time; end = $EndTime })
+        }
+    }
+    $list = @($candidates | Sort-Object { $_.start })
+    if ($list.Count -eq 0) {
+        return [PSCustomObject]@{ sec = $null; excludedSec = 0; excludedCount = 0; pickedStart = $null; unknown = $true }
+    }
+    $win = Get-EffectiveRoundWindow -Candidates $list -ThresholdMinutes $ThresholdMinutes
+    return [PSCustomObject]@{
+        sec           = $win.effectiveSec
+        excludedSec   = $win.excludedSec
+        excludedCount = $win.excludedCount
+        pickedStart   = $win.pickedStart
+        unknown       = $false
+    }
+}
+
+Export-ModuleMember -Function Get-LogEntries, Test-TargetMatch, Get-TargetRoundInfo, Get-FirstTargetNotificationAfter, Get-HumanStartForSend, Get-RoundGap, Get-RebuildRoundRows, Get-EffectiveRoundWindow, Get-SendWindows, Get-HumanWindow

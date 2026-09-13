@@ -7,6 +7,12 @@
     支持 -WindowId 参数显示窗口编号，无参数时显示默认"已完成"文本。
     不抢焦点、不中断输入、无声音，3 秒后自动淡出消失。
 
+    本轮动作的收尾链（顺序即契约，见《跨天BUG以及重构\实施文档.md》4.8）：
+      ① 写「完成通知」——"这一轮的动作完成了"，日志里只此一条
+      ② 重算主题统计（此时完成通知已在日志里，AI 时长是真实值）
+      ③ 给当前这一个文件打标（数据取自统计产物；只打它自己，不碰任何历史文件）
+      ④ 弹 UI 通知——纯展示，放在最后，不挡前面的数据动作
+
     可靠性设计：
     - 启动清场：杀掉同脚本旧实例，保证单实例（停旧播新），顺带清理卡死僵尸。
     - 兜底超时：独立线程看门狗 10 秒强制结束进程，Dispatcher 卡死也能触发。
@@ -20,8 +26,11 @@
 .PARAMETER TargetFile
     本次通知归属的目标文件名（写入日志 properties.target）。可选。
 
+.PARAMETER TargetPath
+    本次产物的完整路径（打标定位用）。可选；与 TargetFile 不一致时跳过打标并留痕。
+
 .PARAMETER Silent
-    静默模式：只写日志（通知开始/完成通知），不弹窗。
+    静默模式：只做 ①②③（写日志 / 统计 / 打标），不弹窗。
 #>
 
 param(
@@ -31,6 +40,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [string]$TargetFile = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$TargetPath = "",
 
     [Parameter(Mandatory = $false)]
     [switch]$Silent
@@ -103,6 +115,28 @@ function Invoke-ThemeStatsRecompute {
     }
 }
 
+# 给"当前这一个文件"打标：数据取自统计产物（stats.json），不自己算、不碰其它文件
+# 失败静默——打标是增强功能，绝不阻断通知与统计
+function Invoke-ThemeTimeTag {
+    try {
+        if ([string]::IsNullOrWhiteSpace($TargetPath)) { return }
+        $tagScript = Join-Path $scriptDirectory "..\markdown\SetMarkdownTimeTag.ps1"
+        if (-not (Test-Path -LiteralPath $tagScript)) { return }
+        # 目标必须是真实文件："上下文重建"这类虚拟 target 磁盘上没有对应文件，跳过
+        if (-not (Test-Path -LiteralPath $TargetPath -PathType Leaf)) { return }
+        # 自校验：完整路径的叶子必须与日志里的归属名一致，防"日志记 A、打标写 B"的静默错位
+        if (-not [string]::IsNullOrWhiteSpace($TargetFile)) {
+            if ((Split-Path -Leaf $TargetPath) -ne $TargetFile) {
+                Write-NotificationLog -Action "打标跳过" -Detail "路径与归属名不一致：$TargetPath / $TargetFile"
+                return
+            }
+        }
+        & powershell -ExecutionPolicy Bypass -File $tagScript -FilePath $TargetPath -WindowId $WindowId
+    } catch {
+        # 静默忽略
+    }
+}
+
 # 启动清场：结束同脚本的旧实例（含卡死僵尸），保证单实例
 function Clear-OldNotificationInstances {
     $killed = 0
@@ -128,16 +162,21 @@ function Clear-OldNotificationInstances {
 }
 
 try {
-    # 静默模式：只写日志不弹窗（开关关闭时的完成时刻补全，不受清场影响）
+    # 静默模式：做完整条收尾链（完成通知 → 统计 → 打标），只是不弹窗
     if ($Silent) {
-        Write-NotificationLog -Action "通知开始"
         Write-NotificationLog -Action "完成通知"
         Invoke-ThemeStatsRecompute
+        Invoke-ThemeTimeTag
         exit 0
     }
 
     Clear-OldNotificationInstances
-    Write-NotificationLog -Action "通知开始"
+
+    # ①②③ 先落数据：完成通知（只此一条）→ 统计重算 → 当前文件打标
+    # 放在弹窗之前，既让统计/打标拿到本轮真实结果，也不被 3.8 秒弹窗拖住
+    Write-NotificationLog -Action "完成通知"
+    Invoke-ThemeStatsRecompute
+    Invoke-ThemeTimeTag
 
     Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
 
@@ -437,11 +476,7 @@ public class NotificationWindow : Window {
     $window.Show()
     [System.Windows.Threading.Dispatcher]::Run()
 
-    # 通知显示完成后，写入操作日志
-    Write-NotificationLog -Action "完成通知"
-
-    # 本轮日志已写全，顺带全量重算主题总体统计
-    Invoke-ThemeStatsRecompute
+    # ④ UI 到此结束：数据动作已在弹窗之前完成，此处不再写日志、不再重算
 } catch {
     Write-NotificationLog -Action "通知异常" -Detail $_.Exception.Message
     exit 1

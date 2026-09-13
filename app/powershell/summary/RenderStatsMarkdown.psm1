@@ -57,8 +57,9 @@ function Format-WithPercent {
 }
 
 # ---------- 渲染入口 ----------
-# Context.ThresholdMinutes    空闲阈值（分钟），用于"剔除 >Xmin 空闲段"的提示文字
+# Context.ThresholdMinutes    空闲阈值（分钟），用于口径说明段的占位符替换
 # Context.DupSendCountByTarget  target → 被合并的重复发送次数（供明细标注）；不落 stats.json，故走参数
+# Context.DupExecCountByTarget  target → 被合并的执行类次数（同上，供明细标注）
 function ConvertTo-StatsMarkdown {
     param(
         [Parameter(Mandatory = $true)][object]$Stats,
@@ -68,17 +69,19 @@ function ConvertTo-StatsMarkdown {
     $threshold = [int]$Context.ThresholdMinutes
     $dupSendCountByTarget = $Context.DupSendCountByTarget
     if ($null -eq $dupSendCountByTarget) { $dupSendCountByTarget = @{} }
+    $dupExecCountByTarget = $Context.DupExecCountByTarget
+    if ($null -eq $dupExecCountByTarget) { $dupExecCountByTarget = @{} }
 
     # 自身段
     $themeName = $Stats.theme.name
     $roundTotalSec = $Stats.time.roundTotalSec
     $gapTotalSec = $Stats.time.gapTotalSec
-    $activeSec = $Stats.time.activeSec
+    $humanExcludedSec = $Stats.time.humanExcludedSec
+    $aiExcludedSec = $Stats.time.aiExcludedSec
+    $excludedCountTotal = $Stats.time.excludedCount
     $wallClockSec = $Stats.time.wallClockSec
     $humanSecTotal = $Stats.time.humanSec
     $aiSecTotal = $Stats.time.aiSec
-    $idleIgnoredSec = $Stats.time.idleIgnoredSec
-    $idleIgnoredCount = $Stats.time.idleIgnoredCount
     $createdAt = $Stats.time.createdAt
     $lastAt = $Stats.time.lastActiveAt
     $fileTotal = $Stats.files.total
@@ -127,6 +130,8 @@ function ConvertTo-StatsMarkdown {
     $childFiles = $aggregate.files - $fileTotal
     $childHChars = $aggregate.humanChars - $humanCharsTotal
     $childAChars = $aggregate.aiChars - $aiCharsTotal
+    $childHumanExcluded = $aggregate.humanExcludedSec - $humanExcludedSec
+    $childAiExcluded = $aggregate.aiExcludedSec - $aiExcludedSec
     $spanText = '未知'
     $spanSec = $null
     if ($aggregate.createdAt -and $aggregate.lastActiveAt) {
@@ -152,7 +157,7 @@ function ConvertTo-StatsMarkdown {
         @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $spanSec $true); C = (Format-WithPercent $childRound $spanSec $true); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec $true) }
         @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $spanSec $true) / $(Format-WithPercent $aiSecTotal $spanSec $true)"; C = "$(Format-WithPercent $childHuman $spanSec $true) / $(Format-WithPercent $childAi $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec $true) / $(Format-WithPercent $aggregate.aiSec $spanSec $true)" }
         @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $spanSec $true); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $spanSec $true); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec $true) }
-        @{ Label = '活跃时长（剔除空闲段）'; S = (Format-WithPercent $activeSec $spanSec $true); C = (Format-WithPercent ($aggregate.activeSec - $activeSec) $spanSec $true); T = (Format-WithPercent $aggregate.activeSec $spanSec $true) }
+        @{ Label = '剔除时长（人 / AI）'; S = "$(Format-WithPercent $humanExcludedSec $spanSec $true) / $(Format-WithPercent $aiExcludedSec $spanSec $true)"; C = "$(Format-WithPercent $childHumanExcluded $spanSec $true) / $(Format-WithPercent $childAiExcluded $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanExcludedSec $spanSec $true) / $(Format-WithPercent $aggregate.aiExcludedSec $spanSec $true)" }
         @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
         @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
         @{ Label = '轮次（讨论 / 执行 / 重建）'; S = "$discussion / $execute / $rebuild"; C = "$childDisc / $childExec / $childRebuild"; T = "$($aggregate.discussion) / $($aggregate.execute) / $($aggregate.rebuild)" }
@@ -173,9 +178,9 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-WithPercent $humanSecTotal $wallClockSec) |")
     [void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-WithPercent $aiSecTotal $wallClockSec) |")
     [void]$sb.AppendLine("| 轮间间隔合计 | $(Format-WithPercent $gapTotalSec $wallClockSec) |")
-    [void]$sb.AppendLine("| 总时长（活跃，剔除 >${threshold}min 空闲段） | $(Format-WithPercent $activeSec $wallClockSec) |")
+    [void]$sb.AppendLine("| 剔除时长（人 / AI） | $(Format-WithPercent $humanExcludedSec $wallClockSec $true) / $(Format-WithPercent $aiExcludedSec $wallClockSec $true) |")
+    [void]$sb.AppendLine("| 剔除次数 | $excludedCountTotal 次 |")
     [void]$sb.AppendLine("| 墙钟时长（首末日志原始跨度） | $(Format-Stat $wallClockSec) |")
-    [void]$sb.AppendLine("| 忽略时长 / 段数 | $(Format-WithPercent $idleIgnoredSec $wallClockSec) / $idleIgnoredCount 段 |")
     $strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
     if ($strategyText -eq '') { $strategyText = '无' }
     [void]$sb.AppendLine("| 讨论轮 / 执行轮 / 重建轮 | $discussion / $execute / $rebuild（$strategyText） |")
@@ -192,21 +197,35 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 轮次明细")
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 人字数 | AI字数 | Agent |")
-    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|")
+    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 剔除(人/AI) | 人字数 | AI字数 | Agent |")
+    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|")
     foreach ($r in $roundDetail) {
         $typeText = if ($r.type -eq 'execute') { '执行' } elseif ($r.type -eq 'rebuild') { '重建' } else { '讨论' }
         $hc = Format-FriendlyCount $r.humanChars
         $ac = Format-FriendlyCount $r.aiChars
         $ag = if ([string]::IsNullOrWhiteSpace($r.agent)) { '' } else { $r.agent }
+        # 剔除列：0 记破折号，有值才显示（人 / AI 两笔分列，不做合并）
+        $hEx = if ($null -ne $r.humanExcludedSec -and [int]$r.humanExcludedSec -gt 0) { Format-Stat $r.humanExcludedSec } else { '—' }
+        $aEx = if ($null -ne $r.aiExcludedSec -and [int]$r.aiExcludedSec -gt 0) { Format-Stat $r.aiExcludedSec } else { '—' }
+        $exText = "$hEx / $aEx"
         $fileText = $r.file
         if ($dupSendCountByTarget.ContainsKey($r.file) -and $dupSendCountByTarget[$r.file] -gt 0) {
-            $fileText = "$($r.file)（重复发送 $($dupSendCountByTarget[$r.file] + 1) 次已合并）"
+            $fileText = "$($r.file)（重复发送 $($dupSendCountByTarget[$r.file] + 1) 次已合并"
+            if ($dupExecCountByTarget.ContainsKey($r.file) -and $dupExecCountByTarget[$r.file] -gt 0) {
+                $fileText += "，含 复执行 $($dupExecCountByTarget[$r.file]) 次"
+            }
+            $fileText += "）"
         }
-        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $hc | $ac | $ag |")
+        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $exText | $hc | $ac | $ag |")
     }
     if ($roundDetail.Count -gt 0) {
-        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
+        $detailHumanExcluded = 0
+        $detailAiExcluded = 0
+        foreach ($r in $roundDetail) {
+            if ($null -ne $r.humanExcludedSec) { $detailHumanExcluded += $r.humanExcludedSec }
+            if ($null -ne $r.aiExcludedSec) { $detailAiExcluded += $r.aiExcludedSec }
+        }
+        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
     }
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 子主题汇总")
