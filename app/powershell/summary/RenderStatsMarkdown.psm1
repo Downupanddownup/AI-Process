@@ -135,6 +135,7 @@ function ConvertTo-StatsMarkdown {
     $childAChars = $aggregate.aiChars - $aiCharsTotal
     $childHumanExcluded = $aggregate.humanExcludedSec - $humanExcludedSec
     $childAiExcluded = $aggregate.aiExcludedSec - $aiExcludedSec
+    $childCognition = $aggregate.humanCognitionSec - $humanCognitionSec
     $spanText = '未知'
     $spanSec = $null
     if ($aggregate.createdAt -and $aggregate.lastActiveAt) {
@@ -202,7 +203,7 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 轮次明细")
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 认知时长 | 剔除(人/AI) | 人字数 | AI字数 | Agent |")
+    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | 认知时长 | AI耗时 | 合计耗时 | 轮间间隔 | 剔除(人/AI) | 人字数 | AI字数 | Agent |")
     [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|")
     foreach ($r in $roundDetail) {
         $typeText = if ($r.type -eq 'execute') { '执行' } elseif ($r.type -eq 'rebuild') { '重建' } else { '讨论' }
@@ -221,7 +222,7 @@ function ConvertTo-StatsMarkdown {
             }
             $fileText += "）"
         }
-        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $(Format-Stat $r.humanCognitionSec) | $exText | $hc | $ac | $ag |")
+        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.humanCognitionSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $exText | $hc | $ac | $ag |")
     }
     if ($roundDetail.Count -gt 0) {
         $detailHumanExcluded = 0
@@ -230,21 +231,21 @@ function ConvertTo-StatsMarkdown {
             if ($null -ne $r.humanExcludedSec) { $detailHumanExcluded += $r.humanExcludedSec }
             if ($null -ne $r.aiExcludedSec) { $detailAiExcluded += $r.aiExcludedSec }
         }
-        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $humanCognitionSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
+        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $humanCognitionSec) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
     }
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 子主题汇总")
     [void]$sb.AppendLine("")
     if ($children.Count -gt 0) {
-        [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执/建) | 总投入 | 人 / AI | 文件数 | 字符数(人/AI) | 最后活动 |")
-        [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|")
+        [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执/建) | 总投入 | 人 / AI | 认知时长 | 文件数 | 字符数(人/AI) | 最后活动 |")
+        [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|")
         foreach ($ch in $children) {
             $ca = $ch.aggregate
             $lastText = if ($ca.lastActiveAt) { $ca.lastActiveAt } else { '未知' }
-            [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) / $($ca.rebuild) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
+            [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) / $($ca.rebuild) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $(Format-Stat $ca.humanCognitionSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
         }
         # 合计行：与"总览"的"子主题"列数值一致，可互查
-        [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec / $childRebuild | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
+        [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec / $childRebuild | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $(Format-Stat $childCognition) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
     } else {
         [void]$sb.AppendLine("无子主题。")
     }
