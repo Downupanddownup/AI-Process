@@ -187,8 +187,13 @@ function Get-RoundGap {
 
 # ---------- 重建轮：复关系发送 → target=上下文重建 完成通知；人耗时/字数恒 0；轮间间隔照常 ----------
 # 重复发送去重：与讨论/执行轮同口径——配对同一完成通知的重复 复关系 发送合并为一轮（取首次）
+# ThinkThresholdMinutes：认知时长的判定阈值（重建轮人耗时为 0，故认知时长只可能来自 ≤阈值的间隔）
 function Get-RebuildRoundRows {
-    param([array]$Entries)
+    param(
+        [array]$Entries,
+        [int]$ThinkThresholdMinutes = 0
+    )
+    $thinkThresholdSec = $ThinkThresholdMinutes * 60
     $rows = @()
     $pairedNotifKey = $null
     foreach ($e in $Entries) {
@@ -201,6 +206,9 @@ function Get-RebuildRoundRows {
         }
         $aiSec = $null
         if ($null -ne $aiEnd) { $aiSec = [int][Math]::Round(($aiEnd - $e.time).TotalSeconds) }
+        $rowGapSec = (Get-RoundGap -Entries $Entries -RoundStart $e.time)
+        $rowCognitionSec = 0
+        if ($rowGapSec -le $thinkThresholdSec) { $rowCognitionSec = $rowGapSec }
         $rows += [PSCustomObject][ordered]@{
             file             = (Get-ContextRebuildName)
             type             = 'rebuild'
@@ -209,7 +217,8 @@ function Get-RebuildRoundRows {
             humanSec         = 0
             aiSec            = $aiSec
             totalSec         = $aiSec
-            gapSec           = (Get-RoundGap -Entries $Entries -RoundStart $e.time)
+            gapSec           = $rowGapSec
+            humanCognitionSec = $rowCognitionSec
             humanExcludedSec = 0
             aiExcludedSec    = 0
             excludedCount    = 0

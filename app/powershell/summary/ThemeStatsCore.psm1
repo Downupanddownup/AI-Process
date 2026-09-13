@@ -63,10 +63,12 @@ function Get-ThemeStats {
     param(
         [Parameter(Mandatory = $true)][string]$ThemePath,
         [Parameter(Mandatory = $true)][int]$ThresholdMinutes,
+        [Parameter(Mandatory = $true)][int]$ThinkThresholdMinutes,
         [Parameter(Mandatory = $true)][datetime]$Now
     )
 
     $threshold = $ThresholdMinutes
+    $thinkThresholdSec = $ThinkThresholdMinutes * 60
     $aiProcessDir = Join-Path $ThemePath (Get-DataDirName)
     $logFile = Join-Path $aiProcessDir "log.jsonl"
     $entries = @(Get-LogEntries -LogFile $logFile)
@@ -180,6 +182,11 @@ function Get-ThemeStats {
             $aiExcluded = $win.excludedSec
             $rowExcludedCount += $win.excludedCount
             $rowGapSec = if ($isFirstKept) { $gapSec } else { 0 }
+            # 认知时长 = 人思考 + 落在阈值内的轮间间隔（估计值：≤阈值的间隔视为"人在读在想"）
+            # 人段为 null 的轮只计间隔、不因未知而丢账；多 target 时间隔只归第一有效行，故此处同此
+            $rowCognitionSec = 0
+            if ($null -ne $humanSec) { $rowCognitionSec += $humanSec }
+            if ($rowGapSec -le $thinkThresholdSec) { $rowCognitionSec += $rowGapSec }
             $rowHumanChars = 0
             if ($isFirstKept -and -not $isExecute) { $rowHumanChars = $srcChars }
             $aiChars = Get-FileCharCount -Path (Join-Path $ThemePath $fileName) -AiBody $true
@@ -205,6 +212,7 @@ function Get-ThemeStats {
                 aiSec            = $aiSec
                 totalSec         = $totalSec
                 gapSec           = $rowGapSec
+                humanCognitionSec = $rowCognitionSec
                 humanExcludedSec = $humanExcluded
                 aiExcludedSec    = $aiExcluded
                 excludedCount    = $rowExcludedCount
@@ -216,7 +224,7 @@ function Get-ThemeStats {
     }
 
     # ---------- 重建轮：复关系 → 上下文重建完成通知；人耗时/字数恒 0；按发送时间并入明细 ----------
-    $rebuildRows = @(Get-RebuildRoundRows -Entries $entries)
+    $rebuildRows = @(Get-RebuildRoundRows -Entries $entries -ThinkThresholdMinutes $ThinkThresholdMinutes)
     $rebuild = $rebuildRows.Count
     $roundDetail = @($roundDetail + $rebuildRows | Sort-Object sendTime)
 
@@ -234,12 +242,13 @@ function Get-ThemeStats {
         }
     }
 
-    # ---------- 人/AI 时长合计（raw 秒数求和；null 不计）与剔除合计 ----------
-    $humanSecTotal = 0; $aiSecTotal = 0
+    # ---------- 人/AI 时长合计（raw 秒数求和；null 不计）与剔除/认知合计 ----------
+    $humanSecTotal = 0; $aiSecTotal = 0; $humanCognitionTotal = 0
     $humanExcludedTotal = 0; $aiExcludedTotal = 0; $excludedCountTotal = 0
     foreach ($r in $roundDetail) {
         if ($null -ne $r.humanSec) { $humanSecTotal += $r.humanSec }
         if ($null -ne $r.aiSec) { $aiSecTotal += $r.aiSec }
+        if ($null -ne $r.humanCognitionSec) { $humanCognitionTotal += $r.humanCognitionSec }
         if ($null -ne $r.humanExcludedSec) { $humanExcludedTotal += $r.humanExcludedSec }
         if ($null -ne $r.aiExcludedSec) { $aiExcludedTotal += $r.aiExcludedSec }
         if ($null -ne $r.excludedCount) { $excludedCountTotal += $r.excludedCount }
@@ -276,6 +285,7 @@ function Get-ThemeStats {
         aiSec             = $aiSecTotal
         roundTotalSec     = $roundTotalSec
         gapTotalSec       = $gapTotalSec
+        humanCognitionSec = $humanCognitionTotal
         humanExcludedSec  = $humanExcludedTotal
         aiExcludedSec     = $aiExcludedTotal
         excludedCount     = $excludedCountTotal
@@ -315,6 +325,7 @@ function Get-ThemeStats {
         time       = [PSCustomObject][ordered]@{
             roundTotalSec    = $roundTotalSec
             gapTotalSec      = $gapTotalSec
+            humanCognitionSec = $humanCognitionTotal
             humanExcludedSec = $humanExcludedTotal
             aiExcludedSec    = $aiExcludedTotal
             excludedCount    = $excludedCountTotal

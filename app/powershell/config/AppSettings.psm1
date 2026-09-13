@@ -38,6 +38,14 @@ function Get-IdleThresholdMinutes {
     return 60
 }
 
+function Get-ThinkThresholdMinutes {
+    # 认知时长的判定阈值（分钟）：轮间间隔 ≤ 它才算作"人在读在想"。
+    # 默认值 10 的语义唯一收编于此；读不到/非法一律回落到默认值。
+    $v = Read-IniValue -Path (Get-AppSettingsPath) -Section 'Report' -Key 'ThinkThresholdMinutes'
+    if ($v -match '^\d+$' -and [int]$v -gt 0) { return [int]$v }
+    return 10
+}
+
 # ---------- [PendingMd] 后台打开缓存（写） ----------
 function Set-PendingMd {
     param(
@@ -48,4 +56,4 @@ function Set-PendingMd {
 }
 
 Export-ModuleMember -Function Get-AppSettingsPath, Get-WindowCurrentDir, Get-WindowAgentName,
-    Get-FileToolPath, Get-IdleThresholdMinutes, Set-PendingMd
+    Get-FileToolPath, Get-IdleThresholdMinutes, Get-ThinkThresholdMinutes, Set-PendingMd

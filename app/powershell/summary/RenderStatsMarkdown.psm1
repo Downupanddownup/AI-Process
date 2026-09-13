@@ -67,6 +67,8 @@ function ConvertTo-StatsMarkdown {
     )
 
     $threshold = [int]$Context.ThresholdMinutes
+    $thinkThreshold = 0
+    if ($Context.ContainsKey('ThinkThresholdMinutes')) { $thinkThreshold = [int]$Context.ThinkThresholdMinutes }
     $dupSendCountByTarget = $Context.DupSendCountByTarget
     if ($null -eq $dupSendCountByTarget) { $dupSendCountByTarget = @{} }
     $dupExecCountByTarget = $Context.DupExecCountByTarget
@@ -76,6 +78,7 @@ function ConvertTo-StatsMarkdown {
     $themeName = $Stats.theme.name
     $roundTotalSec = $Stats.time.roundTotalSec
     $gapTotalSec = $Stats.time.gapTotalSec
+    $humanCognitionSec = $Stats.time.humanCognitionSec
     $humanExcludedSec = $Stats.time.humanExcludedSec
     $aiExcludedSec = $Stats.time.aiExcludedSec
     $excludedCountTotal = $Stats.time.excludedCount
@@ -156,6 +159,7 @@ function ConvertTo-StatsMarkdown {
     $overviewRows = @(
         @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $spanSec $true); C = (Format-WithPercent $childRound $spanSec $true); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec $true) }
         @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $spanSec $true) / $(Format-WithPercent $aiSecTotal $spanSec $true)"; C = "$(Format-WithPercent $childHuman $spanSec $true) / $(Format-WithPercent $childAi $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec $true) / $(Format-WithPercent $aggregate.aiSec $spanSec $true)" }
+        @{ Label = "认知时长（含 ≤${thinkThreshold}min 间隔）"; S = (Format-WithPercent $humanCognitionSec $spanSec $true); C = (Format-WithPercent ($aggregate.humanCognitionSec - $humanCognitionSec) $spanSec $true); T = (Format-WithPercent $aggregate.humanCognitionSec $spanSec $true) }
         @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $spanSec $true); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $spanSec $true); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec $true) }
         @{ Label = '剔除时长（人 / AI）'; S = "$(Format-WithPercent $humanExcludedSec $spanSec $true) / $(Format-WithPercent $aiExcludedSec $spanSec $true)"; C = "$(Format-WithPercent $childHumanExcluded $spanSec $true) / $(Format-WithPercent $childAiExcluded $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanExcludedSec $spanSec $true) / $(Format-WithPercent $aggregate.aiExcludedSec $spanSec $true)" }
         @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
@@ -176,6 +180,7 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("|---|---|")
     [void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-WithPercent $roundTotalSec $wallClockSec) |")
     [void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-WithPercent $humanSecTotal $wallClockSec) |")
+    [void]$sb.AppendLine("| 认知时长（含 ≤${thinkThreshold}min 间隔） | $(Format-WithPercent $humanCognitionSec $wallClockSec $true) |")
     [void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-WithPercent $aiSecTotal $wallClockSec) |")
     [void]$sb.AppendLine("| 轮间间隔合计 | $(Format-WithPercent $gapTotalSec $wallClockSec) |")
     [void]$sb.AppendLine("| 剔除时长（人 / AI） | $(Format-WithPercent $humanExcludedSec $wallClockSec $true) / $(Format-WithPercent $aiExcludedSec $wallClockSec $true) |")
@@ -197,8 +202,8 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 轮次明细")
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 剔除(人/AI) | 人字数 | AI字数 | Agent |")
-    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|")
+    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | AI耗时 | 合计耗时 | 轮间间隔 | 认知时长 | 剔除(人/AI) | 人字数 | AI字数 | Agent |")
+    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|")
     foreach ($r in $roundDetail) {
         $typeText = if ($r.type -eq 'execute') { '执行' } elseif ($r.type -eq 'rebuild') { '重建' } else { '讨论' }
         $hc = Format-FriendlyCount $r.humanChars
@@ -216,7 +221,7 @@ function ConvertTo-StatsMarkdown {
             }
             $fileText += "）"
         }
-        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $exText | $hc | $ac | $ag |")
+        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $(Format-Stat $r.humanCognitionSec) | $exText | $hc | $ac | $ag |")
     }
     if ($roundDetail.Count -gt 0) {
         $detailHumanExcluded = 0
@@ -225,7 +230,7 @@ function ConvertTo-StatsMarkdown {
             if ($null -ne $r.humanExcludedSec) { $detailHumanExcluded += $r.humanExcludedSec }
             if ($null -ne $r.aiExcludedSec) { $detailAiExcluded += $r.aiExcludedSec }
         }
-        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
+        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $humanCognitionSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
     }
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 子主题汇总")
@@ -249,7 +254,7 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("**口径说明**")
     [void]$sb.AppendLine("")
     # 条目文本来自 StatsSchema.psm1（定义单源），本文件只负责排版
-    foreach ($note in @(Get-StatsRuleText -ThresholdMinutes $threshold -ComputedAt $Stats.computedAt)) {
+    foreach ($note in @(Get-StatsRuleText -ThresholdMinutes $threshold -ComputedAt $Stats.computedAt -ThinkThresholdMinutes $thinkThreshold)) {
         [void]$sb.AppendLine($note)
     }
 

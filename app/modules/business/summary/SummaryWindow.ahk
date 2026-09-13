@@ -49,7 +49,7 @@ CreateSummaryGui() {
     global SummaryGui, SummaryListView, SummaryTotalCountText
     global SummaryRefreshButton, SummaryImportHistoryButton, SummaryFilterButtons, SummaryDateRangeText
 
-    SummaryGui := Gui("+Resize +MinSize1200x600", "经验总结")
+    SummaryGui := Gui("+Resize +MinSize1290x600", "经验总结")
     SummaryGui.SetFont("s9", "Microsoft YaHei UI")
     SummaryGui.OnEvent("Close", SummaryGuiClose)
     SummaryGui.OnEvent("Size", SummaryGuiSize)
@@ -93,7 +93,7 @@ CreateSummaryGui() {
     SummaryTotalCountText := SummaryGui.Add("Text", "x+12 yp w80 h18", "")
 
     ; ListView
-    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w1160 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "目录状态", "总耗时(自身)", "人 / AI(自身)", "轮次(自身)", "人产出(自身)", "AI 产出(自身)"])
+    SummaryListView := SummaryGui.Add("ListView", "xm y+8 w1250 h380 Grid -Multi", ["序号", "主题名称", "归属项目", "最后访问时间", "目录状态", "总耗时(自身)", "人 / AI(自身)", "认知时长(自身)", "轮次(自身)", "人产出(自身)", "AI 产出(自身)"])
     SummaryListView.ModifyCol(1, "40 Integer Right")     ; 序号
     SummaryListView.ModifyCol(2, 180)                    ; 主题名称
     SummaryListView.ModifyCol(3, 200)                    ; 归属项目（容下最长仓库名）
@@ -101,15 +101,16 @@ CreateSummaryGui() {
     SummaryListView.ModifyCol(5, 70)                     ; 目录状态
     SummaryListView.ModifyCol(6, "90 Logical Right")     ; 总耗时(自身)，排序键为轮次总耗时（人+AI）
     SummaryListView.ModifyCol(7, "110 Logical Right")    ; 人 / AI(自身)，排序键为人时长
-    SummaryListView.ModifyCol(8, "100 Logical")          ; 轮次(自身)，排序键为讨论轮数
-    SummaryListView.ModifyCol(9, "90 Logical Right")     ; 人产出(自身)
-    SummaryListView.ModifyCol(10, "90 Logical Right")    ; AI 产出(自身)
+    SummaryListView.ModifyCol(8, "90 Logical Right")     ; 认知时长(自身)，排序键为认知时长（人思考 + ≤10min 间隔）
+    SummaryListView.ModifyCol(9, "100 Logical")          ; 轮次(自身)，排序键为讨论轮数
+    SummaryListView.ModifyCol(10, "90 Logical Right")    ; 人产出(自身)
+    SummaryListView.ModifyCol(11, "90 Logical Right")    ; AI 产出(自身)
     SummaryListView.OnEvent("Click", SummaryListViewClick)
     SummaryListView.OnEvent("DoubleClick", SummaryListViewDoubleClick)
     SummaryListView.OnEvent("ItemSelect", SummaryListViewSelect)
 
-    ; 计算窗口尺寸：固定 1200×680，主屏幕居中
-    width := 1200
+    ; 计算窗口尺寸：固定 1290×680，主屏幕居中（列宽合计 1200 ≤ ListView 1250）
+    width := 1290
     height := 680
     x := Integer((A_ScreenWidth - width) / 2)
     y := Integer((A_ScreenHeight - height) / 2)
@@ -329,6 +330,7 @@ RenderThemeList() {
         rowIndex := SummaryListView.Add(, index, theme.name, projectName, theme.lastAccessTime, theme.dirStatus
             , FormatStatDuration(stats, "roundTotalSec")
             , FormatStatHumanAi(stats)
+            , FormatStatDuration(stats, "humanCognitionSec")
             , FormatStatRounds(stats)
             , FormatStatCount(stats, "humanChars")
             , FormatStatCount(stats, "aiChars"))

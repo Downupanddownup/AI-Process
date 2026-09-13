@@ -109,7 +109,7 @@ function Write-FrontMatterTag {
     )
     # 英文短键，冒号/值对齐到同一列（最长的 excluded-count 有 14 字符，故值列 = 17）
     $padWidth = 16
-    $order = @('gap', 'human', 'ai', 'total', 'excluded-human', 'excluded-ai', 'excluded-count')
+    $order = @('gap', 'human', 'ai', 'total', 'cognition', 'excluded-human', 'excluded-ai', 'excluded-count')
     $tagLines = @()
     foreach ($k in $order) {
         if (-not $Tags.ContainsKey($k)) { continue }
@@ -188,6 +188,7 @@ $tags = @{
     'human'          = (Format-TagDuration $row.humanSec)
     'ai'             = (Format-TagDuration $row.aiSec)
     'total'          = (Format-TagDuration $row.totalSec)
+    'cognition'      = (Format-FriendlyDuration -Seconds ([int]$row.humanCognitionSec))
     'excluded-human' = (Format-FriendlyDuration -Seconds ([int]$row.humanExcludedSec))
     'excluded-ai'    = (Format-FriendlyDuration -Seconds ([int]$row.aiExcludedSec))
     'excluded-count' = ([string][int]$row.excludedCount)

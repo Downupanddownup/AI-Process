@@ -33,6 +33,9 @@ $script:Metrics = @(
     [ordered]@{ Key='time.gapTotalSec'; Name='轮间间隔合计'; Form='Storage'; Group='时长'; Summed=$true
         Meaning='轮与轮之间的空档合计'
         Rule='各轮 gapSec 求和；间隔原样记，不做剔除' }
+    [ordered]@{ Key='time.humanCognitionSec'; Name='认知时长（含 ≤{think}min 间隔）'; Form='Storage'; Group='时长'; Summed=$true
+        Meaning='人从上一轮结束（开始读 AI 产出）到本轮发出的整段时间：读 + 想 + 写'
+        Rule='各轮 humanCognitionSec 求和；每轮 = humanSec + (gapSec ≤{think}min 时计入的 gapSec)。⚠ 估计值（保守下界）：≤阈值的间隔里也可能人在做别的' }
     [ordered]@{ Key='time.humanExcludedSec'; Name='剔除时长（人）'; Form='Storage'; Group='时长'; Summed=$true
         Meaning='被放弃的人思考跨度合计'
         Rule='各轮 humanExcludedSec 求和；= 第一候选 建X → 采用候选 建X（降到底时为 第一候选 → 本轮发送）' }
@@ -136,6 +139,9 @@ $script:Metrics = @(
     [ordered]@{ Key='roundDetail[].gapSec'; Name='明细-轮间间隔'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮起点与上一轮结束之间的空档'
         Rule='本轮起点（建X，配不上则复X）− 此前最近一条完成通知；首轮 0；多 target 只有第一有效行记值；原样记不做剔除' }
+    [ordered]@{ Key='roundDetail[].humanCognitionSec'; Name='明细-认知时长'; Form='Storage'; Group='轮次明细'; Summed=$false
+        Meaning='本轮的人思考 + 落在阈值内的间隔'
+        Rule='humanSec（为 null 则记 0）+（gapSec ≤{think}min ? gapSec : 0）；多 target 只有第一有效行有间隔，故此处同此' }
     [ordered]@{ Key='roundDetail[].humanExcludedSec'; Name='明细-剔除（人）'; Form='Storage'; Group='轮次明细'; Summed=$false
         Meaning='本轮被放弃的人思考跨度'
         Rule='第一候选 建X → 采用候选 建X（降到底时为 第一候选 → 本轮发送）；只归属第一有效行，无剔除记 0' }
@@ -190,6 +196,7 @@ $script:RuleNotes = @(
     '- 轮次总耗时（人+AI）= 各轮 人耗时+AI耗时 合计；轮间间隔 = 本轮起点 − 上一轮完成通知（首轮为 0），原样记不剔除'
     '- 人思考=同 source 每次 建X 里第一个不超阈值的候选（执行轮恒 0）；AI执行=同 target 每次发送里第一个不超阈值的候选（无通知记未知，不编造）'
     '- 剔除 = 本轮被放弃的跨度（第一候选 → 采用候选）；人 / AI 各一笔、分列记不合并；降档到底则该段时长记 0'
+    '- 认知时长 = 人思考 + 落在 ≤{think}min 的轮间间隔（估计值，保守下界）；它与「人思考」并列，人思考与轮间间隔本身不变'
     '- 剔除次数按段计：人段 / AI 段各最多 1 次，一轮最多 2 次'
     '- 墙钟=首末日志原始跨度；未计入的时间 = 墙钟 − 人 − AI − 间隔（天然不重复）'
     '- 人字数=需求.txt+对vN回复.txt；AI字数=vN.md+实施/已实施.md 正文（剥离 front matter）'
@@ -205,8 +212,9 @@ $script:RuleNotes = @(
 
 # ---------- 内部：占位符替换 ----------
 function Expand-StatsRuleText {
-    param([string]$Text, [int]$ThresholdMinutes, [string]$ComputedAt)
+    param([string]$Text, [int]$ThresholdMinutes, [string]$ComputedAt, [int]$ThinkThresholdMinutes = 0)
     $t = $Text.Replace('{threshold}', [string]$ThresholdMinutes)
+    if ($t.Contains('{think}')) { $t = $t.Replace('{think}', [string]$ThinkThresholdMinutes) }
     if ($ComputedAt -ne '') { $t = $t.Replace('{now}', $ComputedAt) }
     return $t
 }
@@ -246,9 +254,10 @@ function Get-StatsRuleText {
     # 统计.md 尾部"口径说明"的条目文本（占位符已替换）
     param(
         [Parameter(Mandatory = $true)][int]$ThresholdMinutes,
-        [Parameter(Mandatory = $false)][string]$ComputedAt = ''
+        [Parameter(Mandatory = $false)][string]$ComputedAt = '',
+        [Parameter(Mandatory = $false)][int]$ThinkThresholdMinutes = 0
     )
-    return @($script:RuleNotes | ForEach-Object { Expand-StatsRuleText -Text $_ -ThresholdMinutes $ThresholdMinutes -ComputedAt $ComputedAt })
+    return @($script:RuleNotes | ForEach-Object { Expand-StatsRuleText -Text $_ -ThresholdMinutes $ThresholdMinutes -ComputedAt $ComputedAt -ThinkThresholdMinutes $ThinkThresholdMinutes })
 }
 
 Export-ModuleMember -Function Get-StatsMetrics,
