@@ -16,7 +16,8 @@ global WindowSessions := Map(
         "AgentName", "",
         "AgentAfterCopyAction", 3,
         "AppendImplementationTail", true,
-        "ExecuteStrategy", "tweak"
+        "ExecuteStrategy", "tweak",
+        "ReviewMode", "defense"
     ),
     2, Map(
         "CurrentDir", "",
@@ -27,7 +28,8 @@ global WindowSessions := Map(
         "AgentName", "",
         "AgentAfterCopyAction", 3,
         "AppendImplementationTail", true,
-        "ExecuteStrategy", "tweak"
+        "ExecuteStrategy", "tweak",
+        "ReviewMode", "defense"
     ),
     3, Map(
         "CurrentDir", "",
@@ -38,7 +40,8 @@ global WindowSessions := Map(
         "AgentName", "",
         "AgentAfterCopyAction", 3,
         "AppendImplementationTail", true,
-        "ExecuteStrategy", "tweak"
+        "ExecuteStrategy", "tweak",
+        "ReviewMode", "defense"
     )
 )
 

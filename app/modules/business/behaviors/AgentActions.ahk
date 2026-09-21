@@ -46,4 +46,10 @@ class AgentActions {
         global QualityCheck
         return (QualityCheck()).Run()
     }
+
+    ; 复盘（ai）：答辩 / 技炼 两模式，共用一套实现
+    static Review(*) {
+        global Review
+        return (Review()).Run()
+    }
 }

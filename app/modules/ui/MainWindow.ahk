@@ -23,6 +23,8 @@ global CopyReplyPromptButton := ""
 global CopyRelationsButton := ""
 global CopyExecuteButton := ""
 global ExecuteStrategyDropdown := ""
+global ReviewButton := ""
+global ReviewModeDropdown := ""
 global MainGui := ""
 global HoverTooltipVisible := false
 
@@ -33,6 +35,7 @@ CreateMainGui() {
     global DomainTreeButton
     global CreateRequirementButton, CopyRequirementPromptButton, QualityCheckButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown
+    global ReviewButton, ReviewModeDropdown
     actionButtonWidth := 60
     actionButtonHeight := 24
     actionGap := 6
@@ -76,7 +79,7 @@ CreateMainGui() {
     DomainTreeButton.OnEvent("Click", ShowDomainTreeWindow)
     ApplyButtonStyle(DomainTreeButton)
 
-    BindAgentWindowButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
+    BindAgentWindowButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
     BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
     ApplyButtonStyle(BindAgentWindowButton)
 
@@ -87,17 +90,13 @@ CreateMainGui() {
     AgentNameText := MainGui.AddText("x+" actionGap " yp+4 w62 h18", "")
     AgentNameTextHwnd := AgentNameText.Hwnd
 
-    CreateRequirementButton := MainGui.AddButton("xm y+8 w" actionButtonWidth " h" actionButtonHeight, "建需求")
+    CreateRequirementButton := MainGui.AddButton("xm " RowYAfter(UnbindAgentWindowButton, actionGap) " w" actionButtonWidth " h" actionButtonHeight, "建需求")
     CreateRequirementButton.OnEvent("Click", AgentActions.CreateRequirement)
     ApplyButtonStyle(CreateRequirementButton)
 
     CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
     CopyRequirementPromptButton.OnEvent("Click", AgentActions.CopyRequirement)
     ApplyButtonStyle(CopyRequirementPromptButton)
-
-    QualityCheckButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "质检码")
-    QualityCheckButton.OnEvent("Click", AgentActions.QualityCheck)
-    ApplyButtonStyle(QualityCheckButton)
 
     CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
     CreateReplyButton.OnEvent("Click", AgentActions.CreateReply)
@@ -110,7 +109,7 @@ CreateMainGui() {
     ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
     ReplyImplementationTailCheckbox.OnEvent("Click", OnImplementationTailToggle)
 
-    CopyRelationsButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "复关系")
+    CopyRelationsButton := MainGui.AddButton("xm " RowYAfter(CopyReplyPromptButton, actionGap) " w" actionButtonWidth " h" actionButtonHeight, "复关系")
     CopyRelationsButton.OnEvent("Click", AgentActions.CopyRelations)
     ApplyButtonStyle(CopyRelationsButton)
 
@@ -132,8 +131,39 @@ CreateMainGui() {
     }
     ExecuteStrategyDropdown.Choose(initialIndex)
 
+    ; 第七行：质检码 + 复盘（复盘与「复执行」同列，模式下拉与「改吧」同列）
+    QualityCheckButton := MainGui.AddButton("xm " RowYAfter(CopyExecuteButton, actionGap) " w" actionButtonWidth " h" actionButtonHeight, "质检码")
+    QualityCheckButton.OnEvent("Click", AgentActions.QualityCheck)
+    ApplyButtonStyle(QualityCheckButton)
+
+    ReviewButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复盘")
+    ReviewButton.OnEvent("Click", AgentActions.Review)
+    ApplyButtonStyle(ReviewButton)
+
+    reviewModeOptions := ReviewModeRegistry.BuildOptions()
+    ReviewModeDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", reviewModeOptions)
+    ReviewModeDropdown.OnEvent("Change", OnReviewModeChange)
+    reviewModeKey := GetSession(windowId, "ReviewMode")
+    reviewModeIndex := 1
+    for index, mode in ReviewModeRegistry.Modes {
+        if (mode["key"] = reviewModeKey) {
+            reviewModeIndex := index
+            break
+        }
+    }
+    ReviewModeDropdown.Choose(reviewModeIndex)
+
     SetControlsEnabled(false)
     RefreshDirectoryStateUI()
+}
+
+; 下一行首个控件的 y 选项串：锚在"上一行按钮"的下沿 + 行距。
+; 不用相对写法（y+6 是相对上一个控件）的原因：行尾可能是不足行高的控件
+; （ZCode 文本框 h18+yp4、☐实 复选框 h18+yp4、「改吧」下拉框按字体定高），
+; 锚在它们身上会把行距吃掉几 px——结果微调 01 修的就是这个。
+RowYAfter(anchorButton, gap) {
+    anchorButton.GetPos(&x, &y, &w, &h)
+    return "y" (y + h + gap)
 }
 
 
@@ -226,7 +256,7 @@ OpenPendingMarkdownIfAny(windowId) {
 }
 
 RefreshMainWindow() {
-    global MainGui, ReplyImplementationTailCheckbox, ExecuteStrategyDropdown
+    global MainGui, ReplyImplementationTailCheckbox, ExecuteStrategyDropdown, ReviewModeDropdown
 
     if (!MainGui) {
         return
@@ -250,6 +280,17 @@ RefreshMainWindow() {
         for index, strategy in ExecuteStrategyRegistry.Strategies {
             if (strategy["key"] = strategyKey) {
                 ExecuteStrategyDropdown.Choose(index)
+                break
+            }
+        }
+    }
+
+    ; 同步复盘模式下拉框
+    if (ReviewModeDropdown) {
+        reviewModeKey := GetSession(windowId, "ReviewMode")
+        for index, mode in ReviewModeRegistry.Modes {
+            if (mode["key"] = reviewModeKey) {
+                ReviewModeDropdown.Choose(index)
                 break
             }
         }
@@ -289,6 +330,7 @@ HandleClose(*) {
 SetControlsEnabled(enabled) {
     global CreateRequirementButton, CopyRequirementPromptButton, QualityCheckButton, CreateReplyButton
     global CopyReplyPromptButton, CopyRelationsButton, CopyExecuteButton, ExecuteStrategyDropdown, ReplyImplementationTailCheckbox, CreateIssueButton, ReturnParentButton
+    global ReviewButton, ReviewModeDropdown
     global NewThemeButton, BindAgentWindowButton, UnbindAgentWindowButton
     CreateRequirementButton.Enabled := enabled
     CopyRequirementPromptButton.Enabled := enabled
@@ -299,6 +341,8 @@ SetControlsEnabled(enabled) {
     CopyRelationsButton.Enabled := enabled
     CopyExecuteButton.Enabled := enabled
     ExecuteStrategyDropdown.Enabled := enabled
+    ReviewButton.Enabled := enabled
+    ReviewModeDropdown.Enabled := enabled
     CreateIssueButton.Enabled := enabled
     ReturnParentButton.Enabled := enabled
     NewThemeButton.Enabled := enabled
@@ -361,6 +405,14 @@ OnExecuteStrategyChange(ctrl, *) {
     selectedIndex := ctrl.Value
     if (selectedIndex >= 1 && selectedIndex <= ExecuteStrategyRegistry.Strategies.Length) {
         SetSession(GetActiveWindowId(), "ExecuteStrategy", ExecuteStrategyRegistry.Strategies[selectedIndex]["key"])
+        SaveWindowSession(GetActiveWindowId())
+    }
+}
+
+OnReviewModeChange(ctrl, *) {
+    selectedIndex := ctrl.Value
+    if (selectedIndex >= 1 && selectedIndex <= ReviewModeRegistry.Modes.Length) {
+        SetSession(GetActiveWindowId(), "ReviewMode", ReviewModeRegistry.Modes[selectedIndex]["key"])
         SaveWindowSession(GetActiveWindowId())
     }
 }

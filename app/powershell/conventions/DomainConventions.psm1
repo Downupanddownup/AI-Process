@@ -52,6 +52,8 @@ $script:Actions = @(
     @{ Name = '复回复'; Kind = 'Send';  MainRound = $true;  RoundType = 'discussion'; NoHumanTime = $false; NoInputFile = $false; DefaultSource = '' }
     @{ Name = '复执行'; Kind = 'Send';  MainRound = $true;  RoundType = 'execute';    NoHumanTime = $true;  NoInputFile = $false; DefaultSource = '' }
     @{ Name = '质检码'; Kind = 'Send';  MainRound = $true;  RoundType = 'discussion'; NoHumanTime = $true;  NoInputFile = $true;  DefaultSource = '' }
+    # 复盘：出题产 v(N+1).md、评价在下一轮「复回复」，性格与质检码一致（无输入文件，人耗时恒 0）
+    @{ Name = '复盘'; Kind = 'Send';  MainRound = $true;  RoundType = 'discussion'; NoHumanTime = $true;  NoInputFile = $true;  DefaultSource = '' }
     # 复关系：发送类，但走独立的重建路（Get-RebuildRoundRows 内部派生 rebuild）——RebuildPath 标出它，
     # 那条路本轮的逻辑不动，只是把它的名字也收进来。
     @{ Name = '复关系'; Kind = 'Send';  MainRound = $false; RoundType = 'rebuild';    NoHumanTime = $true;  NoInputFile = $false; DefaultSource = ''; RebuildPath = $true }

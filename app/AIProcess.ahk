@@ -37,6 +37,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\services\PromptElements.ahk
 #Include %A_ScriptDir%\modules\business\services\EditorOpener.ahk
 #Include %A_ScriptDir%\modules\business\services\ExecuteStrategyRegistry.ahk
+#Include %A_ScriptDir%\modules\business\services\ReviewModeRegistry.ahk
 #Include %A_ScriptDir%\modules\business\services\ActionGuard.ahk
 #Include %A_ScriptDir%\modules\business\services\ThemeStats.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActionBase.ahk
@@ -47,6 +48,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyExecute.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRelations.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\QualityCheck.ahk
+#Include %A_ScriptDir%\modules\business\behaviors\actions\Review.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActions.ahk
 #Include %A_ScriptDir%\modules\business\summary\HistoricalThemeImporter.ahk
 #Include %A_ScriptDir%\modules\business\summary\ThemePathUtils.ahk

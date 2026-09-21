@@ -29,7 +29,7 @@ EnsureDefaultFiles() {
         IniWrite("210", SettingsFile, "Window", "Width")
     }
     if (IniRead(SettingsFile, "Window", "Height", "") = "") {
-        IniWrite("190", SettingsFile, "Window", "Height")
+        IniWrite("218", SettingsFile, "Window", "Height")
     }
     if (IniRead(SettingsFile, "Window", "PosX", "") = "") {
         IniWrite("", SettingsFile, "Window", "PosX")
@@ -121,6 +121,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window1", "ExecuteStrategy", "") = "") {
         IniWrite("tweak", SettingsFile, "Window1", "ExecuteStrategy")
     }
+    if (IniRead(SettingsFile, "Window1", "ReviewMode", "") = "") {
+        IniWrite("defense", SettingsFile, "Window1", "ReviewMode")
+    }
 
     ; [Window2] 段
     if (IniRead(SettingsFile, "Window2", "CurrentDir", "") = "") {
@@ -149,6 +152,9 @@ EnsureDefaultFiles() {
     }
     if (IniRead(SettingsFile, "Window2", "ExecuteStrategy", "") = "") {
         IniWrite("tweak", SettingsFile, "Window2", "ExecuteStrategy")
+    }
+    if (IniRead(SettingsFile, "Window2", "ReviewMode", "") = "") {
+        IniWrite("defense", SettingsFile, "Window2", "ReviewMode")
     }
 
     ; [Window3] 段
@@ -179,6 +185,9 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Window3", "ExecuteStrategy", "") = "") {
         IniWrite("tweak", SettingsFile, "Window3", "ExecuteStrategy")
     }
+    if (IniRead(SettingsFile, "Window3", "ReviewMode", "") = "") {
+        IniWrite("defense", SettingsFile, "Window3", "ReviewMode")
+    }
 
 }
 
@@ -191,8 +200,8 @@ LoadConfig() {
     AppConfig["IconIndex"] := IniRead(SettingsFile, "App", "IconIndex", "44") + 0
     AppConfig["WindowWidth"] := IniRead(SettingsFile, "Window", "Width", "210") + 0
     AppConfig["WindowHeight"] := IniRead(SettingsFile, "Window", "Height", "150") + 0
-    if (AppConfig["WindowHeight"] < 190) {
-        AppConfig["WindowHeight"] := 190
+    if (AppConfig["WindowHeight"] < 218) {
+        AppConfig["WindowHeight"] := 218
     }
     AppConfig["WindowPosX"] := IniRead(SettingsFile, "Window", "PosX", "")
     AppConfig["WindowPosY"] := IniRead(SettingsFile, "Window", "PosY", "")
@@ -231,6 +240,7 @@ LoadWindowSessions() {
         WindowSessions[windowId]["AgentAfterCopyAction"] := IniRead(SettingsFile, section, "AgentAfterCopyAction", "3") + 0
         WindowSessions[windowId]["AppendImplementationTail"] := IniRead(SettingsFile, section, "AppendImplementationTail", "1") = "1"
         WindowSessions[windowId]["ExecuteStrategy"] := IniRead(SettingsFile, section, "ExecuteStrategy", "tweak")
+        WindowSessions[windowId]["ReviewMode"] := IniRead(SettingsFile, section, "ReviewMode", "defense")
     }
 }
 
@@ -263,6 +273,7 @@ SaveWindowSession(windowId) {
     SafeIniWrite(WindowSessions[windowId]["AgentAfterCopyAction"], SettingsFile, section, "AgentAfterCopyAction")
     SafeIniWrite(WindowSessions[windowId]["AppendImplementationTail"] ? "1" : "0", SettingsFile, section, "AppendImplementationTail")
     SafeIniWrite(WindowSessions[windowId]["ExecuteStrategy"], SettingsFile, section, "ExecuteStrategy")
+    SafeIniWrite(WindowSessions[windowId]["ReviewMode"], SettingsFile, section, "ReviewMode")
 }
 
 ; 保存窗口位置到配置文件，并同步更新 AppConfig
