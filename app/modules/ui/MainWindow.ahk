@@ -54,20 +54,39 @@ CreateMainGui() {
     MainGui.OnEvent("Escape", HideToTray)
     RegisterWindowPositionTracking(MainGui.Hwnd)
 
-    CurrentPathText := MainGui.AddText("xm ym+2 w126 h18 +0x200", "未设置")
+    ; 布局规则：行游标。每行首个控件 `xm y{rowY}`，行内其余 `x+{actionGap} yp`，行末 rowY += 行高+行距。
+    ; y 只来自游标、不锚在任何控件上——行尾矮控件（文本 h18、复选框、下拉框）不再影响行距。
+    rowY := MainGui.MarginY
+
+    ; R0 绑定行：绑窗口（绑定后显示"已绑定"）+ 解绑 + Agent名
+    BindAgentWindowButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
+    BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
+    ApplyButtonStyle(BindAgentWindowButton)
+
+    UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
+    UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
+    ApplyButtonStyle(UnbindAgentWindowButton)
+
+    AgentNameText := MainGui.AddText("x+" actionGap " yp+4 w62 h18", "")
+    AgentNameTextHwnd := AgentNameText.Hwnd
+    rowY += actionButtonHeight + actionGap
+
+    ; R1 目录行：目录名 + 设目录/返（两按钮同坐标，靠显隐切换"原地变身"）
+    CurrentPathText := MainGui.AddText("xm y" (rowY + 2) " w126 h18 +0x200", "未设置")
     CurrentPathText.OnEvent("Click", ShowThemeSelectDialog)
     CurrentPathHwnd := CurrentPathText.Hwnd
     CurrentDirStateMark := MainGui.AddText("x+0 yp w0 h18 Hidden", "")
 
-    SetDirectoryButton := MainGui.AddButton("x148 ym w54 h22", "设目录")
+    SetDirectoryButton := MainGui.AddButton("x148 y" rowY " w54 h22", "设目录")
     SetDirectoryButton.OnEvent("Click", PromptForDirectory)
     ApplyButtonStyle(SetDirectoryButton)
-    ReturnParentButton := MainGui.AddButton("x148 ym w54 h22 Hidden", "返")
+    ReturnParentButton := MainGui.AddButton("x148 y" rowY " w54 h22 Hidden", "返")
     ReturnParentButton.OnEvent("Click", ReturnToThemeDir)
     ApplyButtonStyle(ReturnParentButton)
+    rowY += actionButtonHeight + actionGap
 
-
-    NewThemeButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "新主题")
+    ; R2 入口行：新主题 + 建问题 + 需求树
+    NewThemeButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "新主题")
     NewThemeButton.OnEvent("Click", CreateNewTheme)
     ApplyButtonStyle(NewThemeButton)
 
@@ -78,61 +97,10 @@ CreateMainGui() {
     DomainTreeButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "需求树")
     DomainTreeButton.OnEvent("Click", ShowDomainTreeWindow)
     ApplyButtonStyle(DomainTreeButton)
+    rowY += actionButtonHeight + actionGap
 
-    BindAgentWindowButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "绑窗口")
-    BindAgentWindowButton.OnEvent("Click", OnBindAgentWindowButtonClick)
-    ApplyButtonStyle(BindAgentWindowButton)
-
-    UnbindAgentWindowButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "解绑")
-    UnbindAgentWindowButton.OnEvent("Click", OnUnbindAgentWindowButtonClick)
-    ApplyButtonStyle(UnbindAgentWindowButton)
-
-    AgentNameText := MainGui.AddText("x+" actionGap " yp+4 w62 h18", "")
-    AgentNameTextHwnd := AgentNameText.Hwnd
-
-    CreateRequirementButton := MainGui.AddButton("xm " RowYAfter(UnbindAgentWindowButton, actionGap) " w" actionButtonWidth " h" actionButtonHeight, "建需求")
-    CreateRequirementButton.OnEvent("Click", AgentActions.CreateRequirement)
-    ApplyButtonStyle(CreateRequirementButton)
-
-    CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
-    CopyRequirementPromptButton.OnEvent("Click", AgentActions.CopyRequirement)
-    ApplyButtonStyle(CopyRequirementPromptButton)
-
-    CreateReplyButton := MainGui.AddButton("xm y+6 w" actionButtonWidth " h" actionButtonHeight, "建回复")
-    CreateReplyButton.OnEvent("Click", AgentActions.CreateReply)
-    ApplyButtonStyle(CreateReplyButton)
-
-    CopyReplyPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复回复")
-    CopyReplyPromptButton.OnEvent("Click", AgentActions.CopyReply)
-    ApplyButtonStyle(CopyReplyPromptButton)
-
-    ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
-    ReplyImplementationTailCheckbox.OnEvent("Click", OnImplementationTailToggle)
-
-    CopyRelationsButton := MainGui.AddButton("xm " RowYAfter(CopyReplyPromptButton, actionGap) " w" actionButtonWidth " h" actionButtonHeight, "复关系")
-    CopyRelationsButton.OnEvent("Click", AgentActions.CopyRelations)
-    ApplyButtonStyle(CopyRelationsButton)
-
-    CopyExecuteButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复执行")
-    CopyExecuteButton.OnEvent("Click", AgentActions.CopyExecute)
-    ApplyButtonStyle(CopyExecuteButton)
-
-    executeStrategyOptions := ExecuteStrategyRegistry.BuildOptions()
-    ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", executeStrategyOptions)
-    ExecuteStrategyDropdown.OnEvent("Change", OnExecuteStrategyChange)
-    windowId := GetActiveWindowId()
-    strategyKey := GetSession(windowId, "ExecuteStrategy")
-    initialIndex := 1
-    for index, strategy in ExecuteStrategyRegistry.Strategies {
-        if (strategy["key"] = strategyKey) {
-            initialIndex := index
-            break
-        }
-    }
-    ExecuteStrategyDropdown.Choose(initialIndex)
-
-    ; 第七行：质检码 + 复盘（复盘与「复执行」同列，模式下拉与「改吧」同列）
-    QualityCheckButton := MainGui.AddButton("xm " RowYAfter(CopyExecuteButton, actionGap) " w" actionButtonWidth " h" actionButtonHeight, "质检码")
+    ; R3 检查行：质检码 + 复盘 + 复盘模式下拉（复盘与「复执行」同列，模式下拉与「改吧」同列）
+    QualityCheckButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "质检码")
     QualityCheckButton.OnEvent("Click", AgentActions.QualityCheck)
     ApplyButtonStyle(QualityCheckButton)
 
@@ -140,6 +108,7 @@ CreateMainGui() {
     ReviewButton.OnEvent("Click", AgentActions.Review)
     ApplyButtonStyle(ReviewButton)
 
+    windowId := GetActiveWindowId()
     reviewModeOptions := ReviewModeRegistry.BuildOptions()
     ReviewModeDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", reviewModeOptions)
     ReviewModeDropdown.OnEvent("Change", OnReviewModeChange)
@@ -152,18 +121,55 @@ CreateMainGui() {
         }
     }
     ReviewModeDropdown.Choose(reviewModeIndex)
+    rowY += actionButtonHeight + actionGap
+
+    ; R4 需求行：建需求 + 复需求
+    CreateRequirementButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "建需求")
+    CreateRequirementButton.OnEvent("Click", AgentActions.CreateRequirement)
+    ApplyButtonStyle(CreateRequirementButton)
+
+    CopyRequirementPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复需求")
+    CopyRequirementPromptButton.OnEvent("Click", AgentActions.CopyRequirement)
+    ApplyButtonStyle(CopyRequirementPromptButton)
+    rowY += actionButtonHeight + actionGap
+
+    ; R5 回复行：建回复 + 复回复 + ☐实
+    CreateReplyButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "建回复")
+    CreateReplyButton.OnEvent("Click", AgentActions.CreateReply)
+    ApplyButtonStyle(CreateReplyButton)
+
+    CopyReplyPromptButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复回复")
+    CopyReplyPromptButton.OnEvent("Click", AgentActions.CopyReply)
+    ApplyButtonStyle(CopyReplyPromptButton)
+
+    ReplyImplementationTailCheckbox := MainGui.AddCheckbox("x+" actionGap " yp+4 w28 h18 Checked", "实")
+    ReplyImplementationTailCheckbox.OnEvent("Click", OnImplementationTailToggle)
+    rowY += actionButtonHeight + actionGap
+
+    ; R6 执行行：复关系 + 复执行 + 执行策略下拉
+    CopyRelationsButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "复关系")
+    CopyRelationsButton.OnEvent("Click", AgentActions.CopyRelations)
+    ApplyButtonStyle(CopyRelationsButton)
+
+    CopyExecuteButton := MainGui.AddButton("x+" actionGap " yp w" actionButtonWidth " h" actionButtonHeight, "复执行")
+    CopyExecuteButton.OnEvent("Click", AgentActions.CopyExecute)
+    ApplyButtonStyle(CopyExecuteButton)
+
+    executeStrategyOptions := ExecuteStrategyRegistry.BuildOptions()
+    ExecuteStrategyDropdown := MainGui.AddDropDownList("x+" actionGap " yp w60", executeStrategyOptions)
+    ExecuteStrategyDropdown.OnEvent("Change", OnExecuteStrategyChange)
+    strategyKey := GetSession(windowId, "ExecuteStrategy")
+    initialIndex := 1
+    for index, strategy in ExecuteStrategyRegistry.Strategies {
+        if (strategy["key"] = strategyKey) {
+            initialIndex := index
+            break
+        }
+    }
+    ExecuteStrategyDropdown.Choose(initialIndex)
 
     SetControlsEnabled(false)
     RefreshDirectoryStateUI()
-}
-
-; 下一行首个控件的 y 选项串：锚在"上一行按钮"的下沿 + 行距。
-; 不用相对写法（y+6 是相对上一个控件）的原因：行尾可能是不足行高的控件
-; （ZCode 文本框 h18+yp4、☐实 复选框 h18+yp4、「改吧」下拉框按字体定高），
-; 锚在它们身上会把行距吃掉几 px——结果微调 01 修的就是这个。
-RowYAfter(anchorButton, gap) {
-    anchorButton.GetPos(&x, &y, &w, &h)
-    return "y" (y + h + gap)
 }
 
 
