@@ -76,14 +76,14 @@ StripMdPrefix(line) {
 }
 
 
-; 组装回复文件正文：每条问题一行 + 答：，问题间空一行，末尾接分割线
+; 组装回复文件正文：每条问题一行 + 答：- 及三个裸标识候选行，问题间空一行，末尾接分割线
 BuildReplyText(questions) {
     text := ""
     for q in questions {
         if (text != "") {
             text .= "`r`n`r`n"
         }
-        text .= q "`r`n答："
+        text .= q "`r`n答：-`r`n-需`r`n-荐`r`n-搁"
     }
     if (text != "") {
         text .= REPLY_SEPARATOR
