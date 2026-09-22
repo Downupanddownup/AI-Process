@@ -19,7 +19,7 @@ class QualityCheck extends AgentActionBase {
         }
         nextVersionFile := "v" chain.NextVersion() ".md"   ; 裸文件名（对齐复回复口径）
         content := this.LoadTemplate("quality_check_prompt.txt")
-        content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
+        content := StrReplace(content, "{{nextVersionFile}}", chain.Dir "\" nextVersionFile)  ; 绝对路径：质检无输入文件可锚定，裸文件名会让 AI 猜错目录
         content := PromptElements.NoModify(content)
         content := PromptElements.QuestionTemplate(content)
         content := PromptElements.OpenMd(content)
