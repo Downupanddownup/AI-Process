@@ -32,6 +32,7 @@ class CopyReply extends AgentActionBase {
         }
 
         content := PromptElements.NoModify(content)
+        content := PromptElements.ContentQuality(content)  ; 普通/勾实两分支共用此行，均生效
         if (!implChecked) {
             content := PromptElements.QuestionTemplate(content)
         }

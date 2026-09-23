@@ -35,6 +35,14 @@ class PromptElements {
         return PromptElements._Append(content, hint)
     }
 
+    ; 业务元素：内容质量约束（引子一行 + 细则文件指引，同 QuestionTemplate 模式）
+    static ContentQuality(content) {
+        global TemplateDir
+        PromptElements._EnsureTemplate("elements\content_quality.txt")
+        hint := "内容质量约束：给我读得省力的信息增量——聚焦当前问题，不复述、不凑数；细则请参照：" TemplateDir "\elements\content_quality.txt"
+        return PromptElements._Append(content, hint)
+    }
+
     ; 业务元素：打开 md 结束指令（模板原样追加，不 Trim）
     static OpenMd(content) {
         global AppConfig
