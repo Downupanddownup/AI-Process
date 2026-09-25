@@ -39,7 +39,7 @@ class PromptElements {
     static ContentQuality(content) {
         global TemplateDir
         PromptElements._EnsureTemplate("elements\content_quality.txt")
-        hint := "内容质量约束：给我读得省力的信息增量——聚焦当前问题，不复述、不凑数；细则请参照：" TemplateDir "\elements\content_quality.txt"
+        hint := "内容质量约束：给我读得省力的信息增量——聚焦当前问题，不复述、不凑数。但判据在细则里，动笔前先读完这份文件：" TemplateDir "\elements\content_quality.txt" "；交稿前逐条核验是否符合。"
         return PromptElements._Append(content, hint)
     }
 
