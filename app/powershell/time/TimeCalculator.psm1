@@ -3,9 +3,10 @@
     耗时计算共享模块：纯逻辑（不读/写文件），供注入脚本与后续汇总复用。
 
 .DESCRIPTION
-    提供两个导出函数：
+    提供三个导出函数：
       - Get-RoundBreakdown：按给定的三个时间点计算某轮"人思考/AI处理"秒数及是否跨天忽略。
       - Format-FriendlyDuration：把秒数转换为友好字符串（自动缩放单位、精确到秒）。
+      - Format-FriendlyCount：把字符数转换为友好字符串（<1万 原样+千分位；>=1万 按万/亿缩写）。
 
     兼容 Windows PowerShell 5.1。保持单向依赖：本模块不引用任何调用方/业务模块。
 #>
@@ -101,4 +102,29 @@ function Format-FriendlyDuration {
     return $text
 }
 
-Export-ModuleMember -Function Get-RoundBreakdown, Format-FriendlyDuration
+# ---------- 字符数友好显示：<1万 原样+千分位；>=1万 按万/亿缩写（3 位有效数字）；stats.json 恒为精确整数 ----------
+# ⚠ AHK 侧 app/modules/business/services/ThemeStats.ahk 有等价换算（列表显示用），改口径时两边一起改。
+function Format-FriendlyCount {
+    <#
+    .SYNOPSIS
+        把字符数转换为友好显示文本（统计.md 与文件元数据打标共用同一口径）。
+    .PARAMETER Number
+        字符数，null 记 "未知"。
+    #>
+    param([object]$Number)
+    if ($null -eq $Number) { return '未知' }
+    $v = [double]$Number
+    if ($v -lt 10000) { return ([int64]$v).ToString('N0') }
+    if ($v -lt 100000000) {
+        $w = $v / 10000
+        if ($w -lt 10) { return $w.ToString('0.00') + '万' }
+        if ($w -lt 100) { return $w.ToString('0.0') + '万' }
+        return ([int64][Math]::Round($w)).ToString('N0') + '万'
+    }
+    $y = $v / 100000000
+    if ($y -lt 10) { return $y.ToString('0.00') + '亿' }
+    if ($y -lt 100) { return $y.ToString('0.0') + '亿' }
+    return ([int64][Math]::Round($y)).ToString('N0') + '亿'
+}
+
+Export-ModuleMember -Function Get-RoundBreakdown, Format-FriendlyDuration, Format-FriendlyCount

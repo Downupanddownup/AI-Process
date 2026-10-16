@@ -8,7 +8,7 @@
     数据**不再自己配对计算**：从主题目录 .aiprocess\stats.json 的 roundDetail 里取本文件那一行
     （同名多行时取 sendTime 最新的一行）——统计与打标因此是同一套口径、同一个来源，打标只负责写文件。
 
-    写入八个键：gap / human / ai / total / excluded-human / excluded-ai / excluded-count / round-type。
+    写入九个键：gap / human / ai / total / cognition / excluded-human / excluded-ai / excluded-count / ai-chars（外加可选 round-type）。
     行内值为 null 时写"未知"（不编造）；roundDetail 里没有本文件的行时不写盘（保持原样）。
 
     边界语义：
@@ -109,7 +109,7 @@ function Write-FrontMatterTag {
     )
     # 英文短键，冒号/值对齐到同一列（最长的 excluded-count 有 14 字符，故值列 = 17）
     $padWidth = 16
-    $order = @('gap', 'human', 'ai', 'total', 'cognition', 'excluded-human', 'excluded-ai', 'excluded-count')
+    $order = @('gap', 'human', 'ai', 'total', 'cognition', 'excluded-human', 'excluded-ai', 'excluded-count', 'ai-chars')
     $tagLines = @()
     foreach ($k in $order) {
         if (-not $Tags.ContainsKey($k)) { continue }
@@ -146,7 +146,7 @@ function Write-FrontMatterTag {
         if ($bodyEnd -ge $bodyStart) {
             foreach ($kv in $lines[$bodyStart..$bodyEnd]) {
                 $t = $kv.Trim()
-                if ($t -match "^(gap|human|ai|total|excluded-human|excluded-ai|excluded-count|round-type)\s*:") { continue }
+                if ($t -match "^(gap|human|ai|total|cognition|excluded-human|excluded-ai|excluded-count|round-type|ai-chars)\s*:") { continue }
                 $built.Add($kv)
             }
         }
@@ -192,6 +192,7 @@ $tags = @{
     'excluded-human' = (Format-FriendlyDuration -Seconds ([int]$row.humanExcludedSec))
     'excluded-ai'    = (Format-FriendlyDuration -Seconds ([int]$row.aiExcludedSec))
     'excluded-count' = ([string][int]$row.excludedCount)
+    'ai-chars'       = (Format-FriendlyCount $row.aiChars)
 }
 
 Write-FrontMatterTag -Path $FilePath -Tags $tags -RoundType $roundTypeValue

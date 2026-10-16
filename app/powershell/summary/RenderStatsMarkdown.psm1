@@ -12,7 +12,7 @@
     版式标签与指标名不是一一对应。强行做成映射表只会造出一张假的对应关系。
     定义单源由 StatsSchema 承担，两边的一致性由 test\Verify-StatsSchema.ps1 对照清单兜底。
 
-    依赖：StatsSchema.psm1（口径说明段）、TimeCalculator.psm1（Format-FriendlyDuration）。
+    依赖：StatsSchema.psm1（口径说明段）、TimeCalculator.psm1（Format-FriendlyDuration / Format-FriendlyCount）。
     保持单向依赖：本模块不引用任何调用方/业务模块。
 #>
 
@@ -20,24 +20,7 @@
 Import-Module (Join-Path $PSScriptRoot "StatsSchema.psm1") -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot "..\time\TimeCalculator.psm1") -ErrorAction Stop
 
-# ---------- 字符数友好显示：<1万 原样+千分位；>=1万 按万/亿缩写（3 位有效数字）；stats.json 恒为精确整数 ----------
-# ⚠ AHK 侧 app/modules/business/services/ThemeStats.ahk 有等价换算（列表显示用），改口径时两边一起改。
-function Format-FriendlyCount {
-    param([object]$Number)
-    if ($null -eq $Number) { return '未知' }
-    $v = [double]$Number
-    if ($v -lt 10000) { return ([int64]$v).ToString('N0') }
-    if ($v -lt 100000000) {
-        $w = $v / 10000
-        if ($w -lt 10) { return $w.ToString('0.00') + '万' }
-        if ($w -lt 100) { return $w.ToString('0.0') + '万' }
-        return ([int64][Math]::Round($w)).ToString('N0') + '万'
-    }
-    $y = $v / 100000000
-    if ($y -lt 10) { return $y.ToString('0.00') + '亿' }
-    if ($y -lt 100) { return $y.ToString('0.0') + '亿' }
-    return ([int64][Math]::Round($y)).ToString('N0') + '亿'
-}
+# 字符数友好显示 Format-FriendlyCount 已迁至 TimeCalculator.psm1（打标脚本同用，口径单源）
 
 function Format-Stat {
     param([object]$Seconds)
@@ -262,4 +245,4 @@ function ConvertTo-StatsMarkdown {
     return $sb.ToString()
 }
 
-Export-ModuleMember -Function ConvertTo-StatsMarkdown, Format-FriendlyCount
+Export-ModuleMember -Function ConvertTo-StatsMarkdown
