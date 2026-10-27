@@ -23,10 +23,8 @@ class ContextRebuildManifest {
             isText := this.TextExtensions.Has(StrLower(ext))
             if (isText) {
                 textBytes += size
-                kindText := "文本"
             } else {
                 binaryFileCount++
-                kindText := "二进制"
             }
             entries.Push(Map(
                 "Path", path,
@@ -34,7 +32,7 @@ class ContextRebuildManifest {
                 "SizeBytes", size,
                 "IsText", isText
             ))
-            manifestText .= path " [" this.FormatKB(size) " KB / " kindText "]`n"
+            manifestText .= path " [" this.FormatKB(size) " KB]`n"
         }
 
         summary := "文件 " entries.Length " 份；可读取文本 " this.FormatKB(textBytes)
