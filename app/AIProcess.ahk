@@ -32,6 +32,9 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\ActivityLogger.ahk
 #Include %A_ScriptDir%\modules\business\AgentWindowManager.ahk
 #Include %A_ScriptDir%\modules\business\services\DomainConventions.ahk
+#Include %A_ScriptDir%\modules\business\services\ContextRebuildManifest.ahk
+#Include %A_ScriptDir%\modules\business\services\ContextRebuildScalePolicy.ahk
+#Include %A_ScriptDir%\modules\business\services\ContextRebuildPromptBuilder.ahk
 #Include %A_ScriptDir%\modules\business\services\DomainTree.ahk
 #Include %A_ScriptDir%\modules\business\services\VersionChain.ahk
 #Include %A_ScriptDir%\modules\business\services\PromptElements.ahk
