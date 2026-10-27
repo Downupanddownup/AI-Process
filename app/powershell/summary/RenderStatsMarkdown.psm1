@@ -8,7 +8,7 @@
 
     为什么指标名仍写在本文件里、不逐个向 StatsSchema 要：统计.md 的一张表里，
     一行往往合并多个指标（"轮次（讨论 / 执行 / 重建）"= 3 个键、"忽略时长 / 段数"= 2 个键），
-    总览还给了同一指标另一个版式标签（"总投入（人+AI）"vs"轮次总耗时（人+AI）"）——
+    总览还给了展示派生指标的版式标签（如"总投入（认知+AI）"）——
     版式标签与指标名不是一一对应。强行做成映射表只会造出一张假的对应关系。
     定义单源由 StatsSchema 承担，两边的一致性由 test\Verify-StatsSchema.ps1 对照清单兜底。
 
@@ -39,6 +39,14 @@ function Format-WithPercent {
     return "$text（$($pct.ToString('0.0'))%）"
 }
 
+function Get-CognitionAiTotal {
+    param([object]$CognitionSec, [object]$AiSec)
+    $total = 0
+    if ($null -ne $CognitionSec) { $total += [int]$CognitionSec }
+    if ($null -ne $AiSec) { $total += [int]$AiSec }
+    return $total
+}
+
 # ---------- 渲染入口 ----------
 # Context.ThresholdMinutes    空闲阈值（分钟），用于口径说明段的占位符替换
 # Context.DupSendCountByTarget  target → 被合并的重复发送次数（供明细标注）；不落 stats.json，故走参数
@@ -59,14 +67,12 @@ function ConvertTo-StatsMarkdown {
 
     # 自身段
     $themeName = $Stats.theme.name
-    $roundTotalSec = $Stats.time.roundTotalSec
     $gapTotalSec = $Stats.time.gapTotalSec
     $humanCognitionSec = $Stats.time.humanCognitionSec
     $humanExcludedSec = $Stats.time.humanExcludedSec
     $aiExcludedSec = $Stats.time.aiExcludedSec
     $excludedCountTotal = $Stats.time.excludedCount
     $wallClockSec = $Stats.time.wallClockSec
-    $humanSecTotal = $Stats.time.humanSec
     $aiSecTotal = $Stats.time.aiSec
     $createdAt = $Stats.time.createdAt
     $lastAt = $Stats.time.lastActiveAt
@@ -80,14 +86,21 @@ function ConvertTo-StatsMarkdown {
     $rebuild = $Stats.rounds.rebuild
     $unknown = $Stats.rounds.unknown
     $executeByStrategy = $Stats.rounds.executeByStrategy
-    $avgHumanSec = $Stats.derived.avgHumanSec
     $avgAiSec = $Stats.derived.avgAiSec
-    $longestFile = $Stats.derived.longestRound.file
-    $longestSec = $Stats.derived.longestRound.sec
     $agents = @($Stats.agents)
     $roundDetail = @($Stats.roundDetail)
     $aggregate = $Stats.aggregate
     $children = @($Stats.children)
+
+    $roundTotalSec = Get-CognitionAiTotal -CognitionSec $humanCognitionSec -AiSec $aiSecTotal
+    $aggregateRoundTotalSec = Get-CognitionAiTotal -CognitionSec $aggregate.humanCognitionSec -AiSec $aggregate.aiSec
+    $avgCognitionSec = 0
+    $discussionCognition = @($roundDetail | Where-Object { $_.type -eq 'discussion' -and $null -ne $_.humanCognitionSec })
+    if ($discussionCognition.Count -gt 0) {
+        $avgCognitionSec = [int][Math]::Round(($discussionCognition | Measure-Object humanCognitionSec -Sum).Sum / $discussionCognition.Count)
+    }
+    $longestFile = ''
+    $longestSec = 0
 
     # 明细合计（轮次求和口径，与 files.* 的文件扫描口径不是一个数）
     $rebuildAiSecTotal = 0
@@ -97,6 +110,11 @@ function ConvertTo-StatsMarkdown {
         if ($r.type -eq 'rebuild' -and $null -ne $r.aiSec) { $rebuildAiSecTotal += $r.aiSec }
         if ($null -ne $r.humanChars) { $detailHumanChars += $r.humanChars }
         if ($null -ne $r.aiChars) { $detailAiChars += $r.aiChars }
+        $rTotalSec = Get-CognitionAiTotal -CognitionSec $r.humanCognitionSec -AiSec $r.aiSec
+        if ($rTotalSec -gt $longestSec) {
+            $longestSec = $rTotalSec
+            $longestFile = $r.file
+        }
     }
 
     $sb = New-Object System.Text.StringBuilder
@@ -107,8 +125,7 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("## 总览")
     [void]$sb.AppendLine("")
     # 三列对照（自身 | 子主题 | 总）：行定义数组驱动，加指标=加一行；子值=aggregate−自身，有子无子同一套
-    $childRound = $aggregate.roundTotalSec - $roundTotalSec
-    $childHuman = $aggregate.humanSec - $humanSecTotal
+    $childRound = $aggregateRoundTotalSec - $roundTotalSec
     $childAi = $aggregate.aiSec - $aiSecTotal
     $childDisc = $aggregate.discussion - $discussion
     $childExec = $aggregate.execute - $execute
@@ -141,11 +158,10 @@ function ConvertTo-StatsMarkdown {
     $childSpanText = if ($children.Count -eq 0) { '—' } else { Format-Stat $childSpanSec }
     # 总览三列统一分母 = 总跨度（$spanSec，三列中最大）：横向可比、自身+子主题可相加出总列；0 值不挂百分比
     $overviewRows = @(
-        @{ Label = '总投入（人+AI）'; S = (Format-WithPercent $roundTotalSec $spanSec $true); C = (Format-WithPercent $childRound $spanSec $true); T = (Format-WithPercent $aggregate.roundTotalSec $spanSec $true) }
-        @{ Label = '其中：人思考 / AI 执行'; S = "$(Format-WithPercent $humanSecTotal $spanSec $true) / $(Format-WithPercent $aiSecTotal $spanSec $true)"; C = "$(Format-WithPercent $childHuman $spanSec $true) / $(Format-WithPercent $childAi $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanSec $spanSec $true) / $(Format-WithPercent $aggregate.aiSec $spanSec $true)" }
-        @{ Label = "认知时长（含 ≤${thinkThreshold}min 间隔）"; S = (Format-WithPercent $humanCognitionSec $spanSec $true); C = (Format-WithPercent ($aggregate.humanCognitionSec - $humanCognitionSec) $spanSec $true); T = (Format-WithPercent $aggregate.humanCognitionSec $spanSec $true) }
+        @{ Label = '总投入（认知+AI）'; S = (Format-WithPercent $roundTotalSec $spanSec $true); C = (Format-WithPercent $childRound $spanSec $true); T = (Format-WithPercent $aggregateRoundTotalSec $spanSec $true) }
+        @{ Label = '其中：认知时长 / AI 执行'; S = "$(Format-WithPercent $humanCognitionSec $spanSec $true) / $(Format-WithPercent $aiSecTotal $spanSec $true)"; C = "$(Format-WithPercent $childCognition $spanSec $true) / $(Format-WithPercent $childAi $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanCognitionSec $spanSec $true) / $(Format-WithPercent $aggregate.aiSec $spanSec $true)" }
         @{ Label = '轮间间隔合计'; S = (Format-WithPercent $gapTotalSec $spanSec $true); C = (Format-WithPercent ($aggregate.gapTotalSec - $gapTotalSec) $spanSec $true); T = (Format-WithPercent $aggregate.gapTotalSec $spanSec $true) }
-        @{ Label = '剔除时长（人 / AI）'; S = "$(Format-WithPercent $humanExcludedSec $spanSec $true) / $(Format-WithPercent $aiExcludedSec $spanSec $true)"; C = "$(Format-WithPercent $childHumanExcluded $spanSec $true) / $(Format-WithPercent $childAiExcluded $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanExcludedSec $spanSec $true) / $(Format-WithPercent $aggregate.aiExcludedSec $spanSec $true)" }
+        @{ Label = '剔除时长（输入段 / AI）'; S = "$(Format-WithPercent $humanExcludedSec $spanSec $true) / $(Format-WithPercent $aiExcludedSec $spanSec $true)"; C = "$(Format-WithPercent $childHumanExcluded $spanSec $true) / $(Format-WithPercent $childAiExcluded $spanSec $true)"; T = "$(Format-WithPercent $aggregate.humanExcludedSec $spanSec $true) / $(Format-WithPercent $aggregate.aiExcludedSec $spanSec $true)" }
         @{ Label = '墙钟时长（首末跨度）'; S = (Format-Stat $wallClockSec); C = $childSpanText; T = (Format-Stat $spanSec) }
         @{ Label = '总跨度（起 → 止）'; S = '—'; C = '—'; T = $spanText }
         @{ Label = '轮次（讨论 / 执行 / 重建）'; S = "$discussion / $execute / $rebuild"; C = "$childDisc / $childExec / $childRebuild"; T = "$($aggregate.discussion) / $($aggregate.execute) / $($aggregate.rebuild)" }
@@ -162,12 +178,11 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("| 指标 | 值 |")
     [void]$sb.AppendLine("|---|---|")
-    [void]$sb.AppendLine("| 轮次总耗时（人+AI） | $(Format-WithPercent $roundTotalSec $wallClockSec) |")
-    [void]$sb.AppendLine("| 人思考时长（讨论轮合计） | $(Format-WithPercent $humanSecTotal $wallClockSec) |")
+    [void]$sb.AppendLine("| 总投入（认知+AI） | $(Format-WithPercent $roundTotalSec $wallClockSec) |")
     [void]$sb.AppendLine("| 认知时长（含 ≤${thinkThreshold}min 间隔） | $(Format-WithPercent $humanCognitionSec $wallClockSec $true) |")
     [void]$sb.AppendLine("| AI 执行时长（合计） | $(Format-WithPercent $aiSecTotal $wallClockSec) |")
     [void]$sb.AppendLine("| 轮间间隔合计 | $(Format-WithPercent $gapTotalSec $wallClockSec) |")
-    [void]$sb.AppendLine("| 剔除时长（人 / AI） | $(Format-WithPercent $humanExcludedSec $wallClockSec $true) / $(Format-WithPercent $aiExcludedSec $wallClockSec $true) |")
+    [void]$sb.AppendLine("| 剔除时长（输入段 / AI） | $(Format-WithPercent $humanExcludedSec $wallClockSec $true) / $(Format-WithPercent $aiExcludedSec $wallClockSec $true) |")
     [void]$sb.AppendLine("| 剔除次数 | $excludedCountTotal 次 |")
     [void]$sb.AppendLine("| 墙钟时长（首末日志原始跨度） | $(Format-Stat $wallClockSec) |")
     $strategyText = @($executeByStrategy.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '、'
@@ -176,9 +191,9 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("| 文件数（总 / 人 / AI） | $fileTotal / $humanFiles / $aiFiles |")
     [void]$sb.AppendLine("| 字符数（人 / AI） | $(Format-FriendlyCount $humanCharsTotal) / $(Format-FriendlyCount $aiCharsTotal) 字符 |")
     [void]$sb.AppendLine("| 未知轮数（老日志配不上对） | $unknown |")
-    [void]$sb.AppendLine("| 平均每轮耗时（人 / AI） | $(Format-Stat $avgHumanSec) / $(Format-Stat $avgAiSec) |")
+    [void]$sb.AppendLine("| 平均每轮耗时（认知 / AI） | $(Format-Stat $avgCognitionSec) / $(Format-Stat $avgAiSec) |")
     $longestText = if ($longestFile -eq '') { '无' } else { "$longestFile（$(Format-Stat $longestSec)）" }
-    [void]$sb.AppendLine("| 最长轮次 | $longestText |")
+    [void]$sb.AppendLine("| 最长轮次（按认知+AI） | $longestText |")
     [void]$sb.AppendLine("| 重建轮（复关系） | $rebuild 次 / AI 耗时 $(Format-Stat $rebuildAiSecTotal) |")
     $agentsText = if ($agents.Count -gt 0) { $agents -join '、' } else { '未知' }
     [void]$sb.AppendLine("| 参与 Agent | $agentsText |")
@@ -186,14 +201,14 @@ function ConvertTo-StatsMarkdown {
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 轮次明细")
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("| 文件 | 类型 | 人耗时 | 认知时长 | AI耗时 | 合计耗时 | 轮间间隔 | 剔除(人/AI) | 人字数 | AI字数 | Agent |")
-    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|")
+    [void]$sb.AppendLine("| 文件 | 类型 | 认知时长 | AI耗时 | 合计耗时（认知+AI） | 轮间间隔 | 剔除(输入段/AI) | 人字数 | AI字数 | Agent |")
+    [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|")
     foreach ($r in $roundDetail) {
         $typeText = if ($r.type -eq 'execute') { '执行' } elseif ($r.type -eq 'rebuild') { '重建' } else { '讨论' }
         $hc = Format-FriendlyCount $r.humanChars
         $ac = Format-FriendlyCount $r.aiChars
         $ag = if ([string]::IsNullOrWhiteSpace($r.agent)) { '' } else { $r.agent }
-        # 剔除列：0 记破折号，有值才显示（人 / AI 两笔分列，不做合并）
+        # 剔除列：0 记破折号，有值才显示（输入段 / AI 两笔分列，不做合并）
         $hEx = if ($null -ne $r.humanExcludedSec -and [int]$r.humanExcludedSec -gt 0) { Format-Stat $r.humanExcludedSec } else { '—' }
         $aEx = if ($null -ne $r.aiExcludedSec -and [int]$r.aiExcludedSec -gt 0) { Format-Stat $r.aiExcludedSec } else { '—' }
         $exText = "$hEx / $aEx"
@@ -205,7 +220,8 @@ function ConvertTo-StatsMarkdown {
             }
             $fileText += "）"
         }
-        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanSec) | $(Format-Stat $r.humanCognitionSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $r.totalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $exText | $hc | $ac | $ag |")
+        $rTotalSec = Get-CognitionAiTotal -CognitionSec $r.humanCognitionSec -AiSec $r.aiSec
+        [void]$sb.AppendLine("| $fileText | $typeText | $(Format-Stat $r.humanCognitionSec) | $(Format-Stat $r.aiSec) | $(Format-WithPercent $rTotalSec $wallClockSec) | $(Format-WithPercent $r.gapSec $wallClockSec) | $exText | $hc | $ac | $ag |")
     }
     if ($roundDetail.Count -gt 0) {
         $detailHumanExcluded = 0
@@ -214,21 +230,22 @@ function ConvertTo-StatsMarkdown {
             if ($null -ne $r.humanExcludedSec) { $detailHumanExcluded += $r.humanExcludedSec }
             if ($null -ne $r.aiExcludedSec) { $detailAiExcluded += $r.aiExcludedSec }
         }
-        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanSecTotal) | $(Format-Stat $humanCognitionSec) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
+        [void]$sb.AppendLine("| **合计** | — | $(Format-Stat $humanCognitionSec) | $(Format-Stat $aiSecTotal) | $(Format-WithPercent $roundTotalSec $wallClockSec) | $(Format-WithPercent $gapTotalSec $wallClockSec) | $(Format-Stat $detailHumanExcluded) / $(Format-Stat $detailAiExcluded) | $(Format-FriendlyCount $detailHumanChars) | $(Format-FriendlyCount $detailAiChars) | — |")
     }
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("## 子主题汇总")
     [void]$sb.AppendLine("")
     if ($children.Count -gt 0) {
-        [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执/建) | 总投入 | 人 / AI | 认知时长 | 文件数 | 字符数(人/AI) | 最后活动 |")
-        [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|---|")
+        [void]$sb.AppendLine("| 子主题 | 路径 | 轮次(讨/执/建) | 总投入（认知+AI） | 认知 / AI | 文件数 | 字符数(人/AI) | 最后活动 |")
+        [void]$sb.AppendLine("|---|---|---|---|---|---|---|---|")
         foreach ($ch in $children) {
             $ca = $ch.aggregate
+            $caTotalSec = Get-CognitionAiTotal -CognitionSec $ca.humanCognitionSec -AiSec $ca.aiSec
             $lastText = if ($ca.lastActiveAt) { $ca.lastActiveAt } else { '未知' }
-            [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) / $($ca.rebuild) | $(Format-Stat $ca.roundTotalSec) | $(Format-Stat $ca.humanSec) / $(Format-Stat $ca.aiSec) | $(Format-Stat $ca.humanCognitionSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
+            [void]$sb.AppendLine("| $($ch.name) | $($ch.relPath) | $($ca.discussion) / $($ca.execute) / $($ca.rebuild) | $(Format-Stat $caTotalSec) | $(Format-Stat $ca.humanCognitionSec) / $(Format-Stat $ca.aiSec) | $($ca.files) | $(Format-FriendlyCount $ca.humanChars) / $(Format-FriendlyCount $ca.aiChars) | $lastText |")
         }
         # 合计行：与"总览"的"子主题"列数值一致，可互查
-        [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec / $childRebuild | $(Format-Stat $childRound) | $(Format-Stat $childHuman) / $(Format-Stat $childAi) | $(Format-Stat $childCognition) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
+        [void]$sb.AppendLine("| **合计** | — | $childDisc / $childExec / $childRebuild | $(Format-Stat $childRound) | $(Format-Stat $childCognition) / $(Format-Stat $childAi) | $childFiles | $(Format-FriendlyCount $childHChars) / $(Format-FriendlyCount $childAChars) | — |")
     } else {
         [void]$sb.AppendLine("无子主题。")
     }
