@@ -32,11 +32,11 @@ class ContextRebuildManifest {
                 "SizeBytes", size,
                 "IsText", isText
             ))
-            manifestText .= path " [" this.FormatKB(size) " KB]`n"
+            manifestText .= path " [" FormatByteSize(size) "]`n"
         }
 
-        summary := "文件 " entries.Length " 份；可读取文本 " this.FormatKB(textBytes)
-            . " KB；二进制文件 " binaryFileCount " 份。"
+        summary := "文件 " entries.Length " 份；可读取文本 " FormatByteSize(textBytes)
+            . "；二进制文件 " binaryFileCount " 份。"
         return Map(
             "Entries", entries,
             "FileCount", entries.Length,
@@ -45,9 +45,5 @@ class ContextRebuildManifest {
             "Summary", summary,
             "ManifestText", manifestText
         )
-    }
-
-    static FormatKB(bytes) {
-        return Format("{:.1f}", bytes / 1024)
     }
 }

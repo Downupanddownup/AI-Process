@@ -45,3 +45,20 @@ JoinArray(items, separator) {
     }
     return result
 }
+
+FormatByteSize(bytes) {
+    if (bytes < 0) {
+        throw Error("文件大小不能为负数")
+    }
+    units := ["B", "KB", "MB", "GB", "TB"]
+    value := bytes + 0.0
+    unitIndex := 1
+    while (value >= 1024 && unitIndex < units.Length) {
+        value /= 1024
+        unitIndex++
+    }
+    if (unitIndex = 1) {
+        return Integer(value) " B"
+    }
+    return Format("{:.1f}", value) " " units[unitIndex]
+}
