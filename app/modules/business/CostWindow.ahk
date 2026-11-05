@@ -18,6 +18,15 @@ global CostVisibleRows := []
 global CostSortKey := "lastActive"
 global CostSortDesc := true
 
+; 时间范围筛选：名称 / 自定义起止 / 是否至今
+global CostCurrentFilter := "全部"
+global CostCustomStart := ""
+global CostCustomEnd := ""
+global CostCustomEndIsNow := true
+global CostFilterButtons := []
+global CostDateRangeText := ""
+global CostFilterNames := ["全部", "今天", "本周", "上周", "本月", "上月", "本季", "本年", "自定义"]
+
 global CostDetailGui := ""
 global CostDetailTree := ""
 global CostDetailSelectedText := ""
@@ -97,12 +106,24 @@ CreateCostGui() {
     refreshButton := CostGui.Add("Button", "x+8 ym-1 w60 h24", "刷新")
     refreshButton.OnEvent("Click", CostRefreshClick)
 
+    ; 第二行：时间范围
+    CostFilterButtons := []
+    xPos := 10
+    for filterName in CostFilterNames {
+        buttonWidth := (filterName = "自定义") ? 60 : 44
+        filterButton := CostGui.Add("Button", "x" xPos " y36 w" buttonWidth " h22", filterName)
+        filterButton.OnEvent("Click", CostOnFilterButtonClick)
+        CostFilterButtons.Push(filterButton)
+        xPos += buttonWidth + 4
+    }
+    CostDateRangeText := CostGui.Add("Text", "x" (xPos + 12) " y40 w300 h18", "")
+
     titles := []
     for column in CostColumns {
         titles.Push(column.title)
     }
 
-    CostListView := CostGui.Add("ListView", "xm y+8 w1470 h600 Grid -Multi", titles)
+    CostListView := CostGui.Add("ListView", "xm y72 w1470 h560 Grid -Multi", titles)
     index := 1
     for column in CostColumns {
         CostListView.ModifyCol(index, column.width)
@@ -118,6 +139,127 @@ CreateCostGui() {
     x := Integer((A_ScreenWidth - width) / 2)
     y := Integer((A_ScreenHeight - height) / 2)
     CostGui.Show(Format("w{} h{} x{} y{}", width, height, x, y))
+
+    UpdateCostFilterButtonState()
+    UpdateCostDateRangeText()
+}
+
+
+UpdateCostFilterButtonState() {
+    global CostFilterButtons, CostCurrentFilter
+
+    for button in CostFilterButtons {
+        button.Enabled := (button.Text != CostCurrentFilter)
+    }
+}
+
+
+UpdateCostDateRangeText() {
+    global CostDateRangeText, CostCurrentFilter, CostCustomStart, CostCustomEnd, CostCustomEndIsNow
+
+    if (!CostDateRangeText) {
+        return
+    }
+    if (CostCurrentFilter = "全部") {
+        CostDateRangeText.Text := ""
+        return
+    }
+    range := GetFilterDateRange(CostCurrentFilter, CostCustomStart, CostCustomEnd, CostCustomEndIsNow)
+    CostDateRangeText.Text := FormatDateRangeText(range)
+}
+
+
+CostOnFilterButtonClick(ctrl, *) {
+    global CostCurrentFilter
+
+    name := ctrl.Text
+    if (name = "自定义") {
+        ShowCostCustomDateDialog()
+        return
+    }
+    CostCurrentFilter := name
+    UpdateCostFilterButtonState()
+    UpdateCostDateRangeText()
+    RenderCostList()
+}
+
+
+ShowCostCustomDateDialog() {
+    global CostGui, CostCustomStart, CostCustomEnd, CostCustomEndIsNow
+
+    dialog := Gui("+Owner" CostGui.Hwnd " +ToolWindow", "自定义时间范围")
+    dialog.SetFont("s9", "Microsoft YaHei UI")
+    dialog.MarginX := 12
+    dialog.MarginY := 10
+
+    dialog.Add("Text", "xm ym", "开始日期：")
+    startCtrl := dialog.Add("DateTime", "xm y+4 w140", "yyyy-MM-dd")
+
+    dialog.Add("Text", "xm y+8", "结束日期：")
+    endCtrl := dialog.Add("DateTime", "xm y+4 w140", "yyyy-MM-dd")
+    nowCtrl := dialog.Add("CheckBox", "x+8 yp w60", "至今")
+
+    try {
+        if (CostCustomStart != "") {
+            startCtrl.Value := CostCustomStart
+        }
+    }
+    try {
+        if (CostCustomEnd != "") {
+            endCtrl.Value := CostCustomEnd
+        }
+    }
+    nowCtrl.Value := CostCustomEndIsNow ? 1 : 0
+    endCtrl.Enabled := !CostCustomEndIsNow
+    nowCtrl.OnEvent("Click", (*) => endCtrl.Enabled := nowCtrl.Value != 1)
+
+    okButton := dialog.Add("Button", "xm y+12 w70 h24 Default", "确定")
+    okButton.OnEvent("Click", (*) => ApplyCostCustomDate(dialog, startCtrl, endCtrl, nowCtrl))
+
+    cancelButton := dialog.Add("Button", "x+8 yp w70 h24", "取消")
+    cancelButton.OnEvent("Click", (*) => dialog.Destroy())
+
+    dialog.Show()
+}
+
+
+ApplyCostCustomDate(dialog, startCtrl, endCtrl, nowCtrl) {
+    global CostCurrentFilter, CostCustomStart, CostCustomEnd, CostCustomEndIsNow
+
+    CostCurrentFilter := "自定义"
+    CostCustomStart := startCtrl.Value
+    CostCustomEndIsNow := nowCtrl.Value = 1
+    if (!CostCustomEndIsNow) {
+        CostCustomEnd := endCtrl.Value
+    }
+    dialog.Destroy()
+    UpdateCostFilterButtonState()
+    UpdateCostDateRangeText()
+    RenderCostList()
+}
+
+
+; 区间与「主题起止」有交集即保留（区间是日粒度，只比前 10 位）
+CostRowInRange(row, dateRange) {
+    startDate := dateRange["startDate"]
+    endDate := dateRange["endDate"]
+    if (startDate = "" || endDate = "") {
+        return true
+    }
+
+    ; GetFilterDateRange 各分支返回的格式不统一（有的带横线、有的不带），统一成 yyyyMMdd 再比
+    startNum := StrReplace(startDate, "-")
+    endNum := StrReplace(endDate, "-")
+    createdNum := StrReplace(SubStr(row["createdAt"], 1, 10), "-")
+    activeNum := StrReplace(SubStr(row["lastActive"], 1, 10), "-")
+
+    if (activeNum = "") {
+        return false
+    }
+    if (createdNum = "") {
+        return StrCompare(activeNum, startNum) >= 0
+    }
+    return StrCompare(createdNum, endNum) <= 0 && StrCompare(activeNum, startNum) >= 0
 }
 
 
@@ -135,7 +277,7 @@ CostGuiSize(gui, minMax, width, height) {
     if (minMax = -1) {
         return
     }
-    CostListView.Move(10, 44, width - 30, height - 96)
+    CostListView.Move(10, 72, width - 30, height - 124)
     CostStatusText.Move(10, height - 40, width - 30, 20)
 }
 
@@ -192,11 +334,17 @@ CostOnDoubleClick(ctrl, row, *) {
 
 RenderCostList() {
     global CostListView, CostStatusText, CostRows, CostVisibleRows
-    global CostPathFilterValue, CostSortKey, CostSortDesc
+    global CostPathFilterValue, CostSortKey, CostSortDesc, CostCurrentFilter
+    global CostCustomStart, CostCustomEnd, CostCustomEndIsNow
+
+    dateRange := GetFilterDateRange(CostCurrentFilter, CostCustomStart, CostCustomEnd, CostCustomEndIsNow)
 
     filtered := []
     for row in CostRows {
         if (CostPathFilterValue != "" && !InStr(row["path"], CostPathFilterValue)) {
+            continue
+        }
+        if (!CostRowInRange(row, dateRange)) {
             continue
         }
         filtered.Push(row)
@@ -222,7 +370,13 @@ RenderCostList() {
     }
 
     order := CostSortDesc ? "降序" : "升序"
-    CostStatusText.Text := "共 " CostVisibleRows.Length " 个需求 · 按「" CostColumnTitle(CostSortKey) "」" order " · 数据为各主题上次统计时间"
+    statusText := "共 " CostVisibleRows.Length " 个需求"
+    if (CostCurrentFilter != "全部") {
+        rangeText := FormatDateRangeText(dateRange)
+        statusText .= " · 筛选：" CostCurrentFilter (rangeText != "" ? "（" rangeText "）" : "")
+    }
+    statusText .= " · 按「" CostColumnTitle(CostSortKey) "」" order " · 数据为各主题上次统计时间"
+    CostStatusText.Text := statusText
 }
 
 

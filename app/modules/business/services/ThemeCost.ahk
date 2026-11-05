@@ -77,6 +77,7 @@ class ThemeCost {
             "files", ThemeCost.GetNum(data, "aggregate", "files"),
             "children", childCount,
             "spanDays", spanDays,
+            "createdAt", createdAt,
             "lastActive", lastActive,
             "visits", visits,
             "computedAt", data.Has("computedAt") ? data["computedAt"] : ""
