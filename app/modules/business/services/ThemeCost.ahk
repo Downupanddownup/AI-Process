@@ -247,15 +247,7 @@ class ThemeCost {
                 continue
             }
             day := SubStr(stamp, 1, 10)
-            ; 按天与合计同口径：每轮取「认知 + AI」；旧数据缺这两个字段时退回 totalSec
-            seconds := 0
-            if (entry.Has("humanCognitionSec") || entry.Has("aiSec")) {
-                cognition := entry.Has("humanCognitionSec") ? entry["humanCognitionSec"] + 0 : 0
-                ai := entry.Has("aiSec") ? entry["aiSec"] + 0 : 0
-                seconds := cognition + ai
-            } else if (entry.Has("totalSec")) {
-                seconds := entry["totalSec"] + 0
-            }
+            seconds := ThemeCost.EntryCost(entry)
             days[day] := days.Has(day) ? days[day] + seconds : seconds
         }
         return days
@@ -310,7 +302,48 @@ class ThemeCost {
     }
 
     static SectionTotal(data, section) {
-        return ThemeCost.GetNum(data, section, "humanCognitionSec") + ThemeCost.GetNum(data, section, "aiSec")
+        ; 新世代有 humanCognitionSec；旧世代（备份仓库那批）没有，退回 humanSec
+        if (ThemeCost.HasNumber(data, section, "humanCognitionSec")) {
+            return ThemeCost.GetNum(data, section, "humanCognitionSec") + ThemeCost.GetNum(data, section, "aiSec")
+        }
+        return ThemeCost.GetNum(data, section, "humanSec") + ThemeCost.GetNum(data, section, "aiSec")
+    }
+
+    static HasNumber(data, section, key) {
+        if (!IsObject(data) || !data.Has(section)) {
+            return false
+        }
+        node := data[section]
+        return IsObject(node) && node.Has(key) && IsNumber(node[key])
+    }
+
+    ; 单轮的「认知 + AI」：旧世代没有 humanCognitionSec 时用 humanSec 顶替；
+    ; 两者都没有才退回 totalSec
+    static EntryCost(entry) {
+        cognition := ""
+        if (entry.Has("humanCognitionSec") && IsNumber(entry["humanCognitionSec"])) {
+            cognition := entry["humanCognitionSec"] + 0
+        } else if (entry.Has("humanSec") && IsNumber(entry["humanSec"])) {
+            cognition := entry["humanSec"] + 0
+        }
+
+        ai := ""
+        if (entry.Has("aiSec") && IsNumber(entry["aiSec"])) {
+            ai := entry["aiSec"] + 0
+        }
+
+        if (cognition = "" && ai = "") {
+            return (entry.Has("totalSec") && IsNumber(entry["totalSec"])) ? entry["totalSec"] + 0 : 0
+        }
+        return (cognition = "" ? 0 : cognition) + (ai = "" ? 0 : ai)
+    }
+
+    ; JSON 的 null 解成空串，空串不能直接参与算术；非数值一律当 0
+    static ToNumber(value) {
+        if (!IsNumber(value)) {
+            return 0
+        }
+        return value + 0
     }
 
     static GetAgentText(data) {

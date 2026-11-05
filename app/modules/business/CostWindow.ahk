@@ -35,6 +35,7 @@ global CostDetailCurrentNode := 0
 global CostMetricRows := []          ; 12 行：{label, value, note}，固定骨架只换值
 global CostDaysRows := []            ; 14 行：{date, bar, value}
 global CostDaysEmptyText := ""
+global CostDaysHeaderText := ""
 
 ; 右侧指标区：行位与标签（口径一律 aggregate；仅「自身」取 time）
 global CostMetricSpec := [
@@ -473,9 +474,13 @@ ShowCostDetail(row) {
     CostDetailTree.OnEvent("Click", CostDetailTreeClick)
 
     ; 分组标题：灰、小一号、加粗
+    CostDaysHeaderText := ""
     for group in CostGroupSpec {
         CostDetailGui.SetFont("s8 c808080 Bold", "Microsoft YaHei UI")
-        CostDetailGui.Add("Text", "x405 y" group.y " w660 h16", group.title)
+        headerCtrl := CostDetailGui.Add("Text", "x405 y" group.y " w660 h16", group.title)
+        if (SubStr(group.title, 1, 2) = "按天") {
+            CostDaysHeaderText := headerCtrl
+        }
     }
 
     ; 指标行：标签灰常规 / 数值黑加粗 / 说明灰小字
@@ -648,7 +653,7 @@ TruncateCostText(text, limit) {
 
 
 UpdateCostDaysRows(node) {
-    global CostDaysRows, CostDaysEmptyText
+    global CostDaysRows, CostDaysEmptyText, CostDaysHeaderText
 
     for row in CostDaysRows {
         row["date"].Visible := false
@@ -658,6 +663,20 @@ UpdateCostDaysRows(node) {
     CostDaysEmptyText.Visible := false
 
     days := node["days"]
+
+    ; 按天合计与合计的差额：旧世代缺轮次明细时补不上，如实标出来
+    daysSum := 0
+    for dayKey, daySeconds in days {
+        daysSum += daySeconds
+    }
+    headerText := "按天（该节点及其子主题）"
+    if (node["total"] - daysSum > 60) {
+        headerText .= "    ·    另有 " FormatCostDuration(node["total"] - daysSum) " 无轮次明细"
+    }
+    if (CostDaysHeaderText) {
+        CostDaysHeaderText.Text := headerText
+    }
+
     if (days.Count = 0) {
         CostDaysEmptyText.Text := "该节点没有轮次明细"
         CostDaysEmptyText.Visible := true
