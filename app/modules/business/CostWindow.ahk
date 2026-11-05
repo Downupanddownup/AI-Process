@@ -15,28 +15,54 @@ global CostPathFilterEdit := ""
 global CostPathFilterValue := ""
 global CostRows := []
 global CostVisibleRows := []
-global CostSortKey := "totalSec"
+global CostSortKey := "lastActive"
 global CostSortDesc := true
 
 global CostDetailGui := ""
 global CostDetailTree := ""
-global CostDetailMetricsText := ""
-global CostDetailDaysText := ""
 global CostDetailSelectedText := ""
 global CostDetailNodeByItem := Map()
 global CostDetailCurrentNode := 0
+global CostMetricRows := []          ; 12 行：{label, value, note}，固定骨架只换值
+global CostDaysRows := []            ; 14 行：{date, bar, value}
+global CostDaysEmptyText := ""
+
+; 右侧指标区：行位与标签（口径一律 aggregate；仅「自身」取 time）
+global CostMetricSpec := [
+    {label: "合计", y: 32},
+    {label: "认知", y: 52},
+    {label: "AI", y: 72},
+    {label: "自身", y: 92},
+    {label: "轮次", y: 136},
+    {label: "轮间间隔", y: 180},
+    {label: "剔除", y: 200},
+    {label: "字数", y: 244},
+    {label: "文件", y: 264},
+    {label: "跨度", y: 308},
+    {label: "Agent", y: 328},
+    {label: "统计时间", y: 348}
+]
+
+global CostGroupSpec := [
+    {title: "量", y: 12},
+    {title: "结构", y: 116},
+    {title: "时间", y: 160},
+    {title: "产出", y: 224},
+    {title: "活动", y: 288},
+    {title: "按天（该节点及其子主题）", y: 378}
+]
 
 global CostColumns := [
     {title: "需求", width: 240, key: "name", numeric: false},
     {title: "项目", width: 150, key: "project", numeric: false},
-    {title: "合计", width: 80, key: "totalSec", numeric: true},
-    {title: "人", width: 70, key: "humanSec", numeric: true},
-    {title: "AI", width: 70, key: "aiSec", numeric: true},
+    {title: "合计", width: 96, key: "totalSec", numeric: true},
+    {title: "人（认知）", width: 88, key: "cognitionSec", numeric: true},
+    {title: "AI", width: 84, key: "aiSec", numeric: true},
     {title: "轮次 合计·讨/执/建", width: 140, key: "rounds", numeric: true},
     {title: "字数 人/AI", width: 130, key: "humanChars", numeric: true},
     {title: "文件", width: 55, key: "files", numeric: true},
     {title: "子主题", width: 60, key: "children", numeric: true},
-    {title: "跨度", width: 80, key: "spanDays", numeric: true},
+    {title: "跨度", width: 88, key: "spanDays", numeric: true},
     {title: "最后活动", width: 110, key: "lastActive", numeric: false},
     {title: "访问", width: 60, key: "visits", numeric: true}
 ]
@@ -184,7 +210,7 @@ RenderCostList() {
             row["name"],
             row["project"],
             FormatCostDuration(row["totalSec"]),
-            FormatCostDuration(row["humanSec"]),
+            FormatCostDuration(row["cognitionSec"]),
             FormatCostDuration(row["aiSec"]),
             FormatCostRounds(row),
             FormatCostChars(row),
@@ -216,7 +242,19 @@ CostColumnTitle(key) {
 ; ============================================================
 
 FormatCostDuration(seconds) {
-    return FormatStatDurationSec(seconds)
+    totalMinutes := Floor(seconds / 60)
+    if (totalMinutes <= 0) {
+        return seconds > 0 ? "<1 分" : "0 分"
+    }
+    hours := Floor(totalMinutes / 60)
+    minutes := Mod(totalMinutes, 60)
+    if (hours = 0) {
+        return minutes " 分"
+    }
+    if (minutes = 0) {
+        return hours " 时"
+    }
+    return hours " 时 " minutes " 分"
 }
 
 
@@ -237,6 +275,9 @@ FormatCostSpan(days) {
     if (days <= 0) {
         return "—"
     }
+    if (days < 0.1) {
+        return "<0.1 天"
+    }
     return Format("{:.1f} 天", days)
 }
 
@@ -255,7 +296,8 @@ FormatCostActive(text) {
 
 ShowCostDetail(row) {
     global CostGui, CostDetailGui, CostDetailTree, CostDetailNodeByItem, CostDetailCurrentNode
-    global CostDetailMetricsText, CostDetailDaysText, CostDetailSelectedText
+    global CostDetailSelectedText, CostMetricRows, CostDaysRows, CostDaysEmptyText
+    global CostMetricSpec, CostGroupSpec
 
     root := ThemeCost.BuildTree(row["path"])
     if (!IsObject(root)) {
@@ -276,9 +318,44 @@ ShowCostDetail(row) {
     CostDetailTree := CostDetailGui.Add("TreeView", "xm ym w380 h620")
     CostDetailTree.OnEvent("Click", CostDetailTreeClick)
 
-    CostDetailMetricsText := CostDetailGui.Add("Text", "x400 y10 w660 h300", "")
-    CostDetailDaysText := CostDetailGui.Add("Text", "x400 y330 w660 h270", "")
+    ; 分组标题：灰、小一号、加粗
+    for group in CostGroupSpec {
+        CostDetailGui.SetFont("s8 c808080 Bold", "Microsoft YaHei UI")
+        CostDetailGui.Add("Text", "x405 y" group.y " w660 h16", group.title)
+    }
 
+    ; 指标行：标签灰常规 / 数值黑加粗 / 说明灰小字
+    CostMetricRows := []
+    for spec in CostMetricSpec {
+        CostDetailGui.SetFont("s9 c606060", "Microsoft YaHei UI")
+        labelCtrl := CostDetailGui.Add("Text", "x405 y" spec.y " w76 h18", spec.label)
+        CostDetailGui.SetFont("s9 c000000 Bold", "Microsoft YaHei UI")
+        valueCtrl := CostDetailGui.Add("Text", "x485 y" spec.y " w190 h18", "")
+        CostDetailGui.SetFont("s8 c909090", "Microsoft YaHei UI")
+        noteCtrl := CostDetailGui.Add("Text", "x680 y" spec.y " w380 h18", "")
+        CostMetricRows.Push(Map("label", labelCtrl, "value", valueCtrl, "note", noteCtrl))
+    }
+
+    ; 按天：日期 / 条 / 数值，14 行固定骨架
+    CostDaysRows := []
+    Loop 14 {
+        rowY := 398 + (A_Index - 1) * 15
+        barY := rowY + 2
+        CostDetailGui.SetFont("s8 c606060", "Microsoft YaHei UI")
+        dateCtrl := CostDetailGui.Add("Text", "x405 y" rowY " w58 h14", "")
+        barCtrl := CostDetailGui.Add("Text", "x466 y" barY " w2 h10 Background1F6FEB", "")
+        CostDetailGui.SetFont("s8 c404040", "Microsoft YaHei UI")
+        valueCtrl := CostDetailGui.Add("Text", "x740 y" rowY " w120 h14", "")
+        dateCtrl.Visible := false
+        barCtrl.Visible := false
+        valueCtrl.Visible := false
+        CostDaysRows.Push(Map("date", dateCtrl, "bar", barCtrl, "value", valueCtrl, "barX", 466, "barY", barY))
+    }
+    CostDetailGui.SetFont("s8 c909090", "Microsoft YaHei UI")
+    CostDaysEmptyText := CostDetailGui.Add("Text", "x405 y398 w600 h16", "")
+    CostDaysEmptyText.Visible := false
+
+    CostDetailGui.SetFont("s9", "Microsoft YaHei UI")
     openButton := CostDetailGui.Add("Button", "x400 y630 w90 h26", "打开目录")
     openButton.OnEvent("Click", CostDetailOpenDir)
     copyButton := CostDetailGui.Add("Button", "x+8 yp w90 h26", "复制路径")
@@ -320,7 +397,7 @@ AddCostDetailNode(node, parentItem) {
 FormatCostNodeText(node) {
     text := node["name"]
     total := node["total"]
-    text .= "    " FormatStatDurationSec(total)
+    text .= "    " FormatCostDuration(total)
 
     if (node["isRework"]) {
         text .= "  ↻"
@@ -329,7 +406,7 @@ FormatCostNodeText(node) {
     rework := node["reworkSec"]
     if (rework > 0) {
         percent := total > 0 ? Round(rework / total * 100) : 0
-        text .= "  ↻" FormatStatDurationSec(rework) "(" percent "%)"
+        text .= "  ↻" FormatCostDuration(rework) "(" percent "%)"
     }
     return text
 }
@@ -345,36 +422,92 @@ CostDetailTreeClick(ctrl, item, *) {
 
 
 CostShowDetailNode(node) {
-    global CostDetailMetricsText, CostDetailDaysText, CostDetailSelectedText, CostDetailCurrentNode
+    global CostDetailSelectedText, CostDetailCurrentNode
 
     CostDetailCurrentNode := node
-    CostDetailMetricsText.Text := BuildCostMetricsText(node)
-    CostDetailDaysText.Text := BuildCostDaysText(node)
+    UpdateCostMetricRows(node)
+    UpdateCostDaysRows(node)
     CostDetailSelectedText.Text := "当前选中：" node["name"]
 }
 
 
-BuildCostMetricsText(node) {
-    text := ""
-    text .= "合计 " FormatStatDurationSec(node["total"]) "    人 " FormatStatDurationSec(node["humanSec"]) "    AI " FormatStatDurationSec(node["aiSec"]) "`n"
-    text .= "轮次 " (node["roundD"] + node["roundE"] + node["roundR"] + node["roundU"]) "（讨 " node["roundD"] " · 执 " node["roundE"] " · 建 " node["roundR"] "）`n"
-    text .= "认知 " FormatStatDurationSec(node["cognitionSec"]) "（思考 " FormatStatDurationSec(node["humanSec"]) " · 间隔 " FormatStatDurationSec(node["gapSec"]) "）`n"
-    text .= "轮间空档 " FormatStatDurationSec(node["gapSec"]) "    剔除 人 " FormatStatDurationSec(node["exclHumanSec"]) " / AI " FormatStatDurationSec(node["exclAiSec"]) "（" node["exclCount"] " 次）`n"
+SetCostMetric(index, valueText, noteText, visible := true) {
+    global CostMetricRows
 
-    ratio := node["humanChars"] > 0 ? Format("{:.1f}", node["aiChars"] / node["humanChars"]) : "—"
-    text .= "产出 " FormatStatCountValue(node["humanChars"]) " / " FormatStatCountValue(node["aiChars"]) " 字（1 : " ratio "）    文件 " node["files"] "（人 " node["humanFiles"] " / AI " node["aiFiles"] "）`n"
-
-    text .= "跨度 " FormatCostSpan(ThemeCost.SpanDays(node["createdAt"], node["lastActiveAt"])) "    " node["createdAt"] " → " node["lastActiveAt"] "`n"
-    text .= "Agent " (node["agents"] = "" ? "—" : node["agents"]) "`n"
-    text .= "自身 " FormatStatDurationSec(node["self"]) "    统计时间 " (node["computedAt"] = "" ? "—" : node["computedAt"]) "`n"
-    return text
+    row := CostMetricRows[index]
+    row["label"].Visible := visible
+    row["value"].Visible := visible
+    row["note"].Visible := visible
+    row["value"].Text := visible ? valueText : ""
+    row["note"].Text := visible ? noteText : ""
 }
 
 
-BuildCostDaysText(node) {
+UpdateCostMetricRows(node) {
+    total := node["total"]
+    cognition := node["cognitionSec"]
+    human := node["humanSec"]
+    ai := node["aiSec"]
+
+    innerGap := cognition - human
+    if (innerGap < 0) {
+        innerGap := 0
+    }
+
+    SetCostMetric(1, FormatCostDuration(total), "= 认知 " FormatCostDuration(cognition) " + AI " FormatCostDuration(ai))
+    SetCostMetric(2, FormatCostDuration(cognition), "= 思考 " FormatCostDuration(human) " + 阈值内间隔 " FormatCostDuration(innerGap))
+    SetCostMetric(3, FormatCostDuration(ai), "")
+
+    hasChildren := node["children"].Length > 0
+    SetCostMetric(4, FormatCostDuration(node["self"]), "本目录，不含子主题", hasChildren)
+
+    rounds := node["roundD"] + node["roundE"] + node["roundR"] + node["roundU"]
+    SetCostMetric(5, rounds, "讨 " node["roundD"] " · 执 " node["roundE"] " · 建 " node["roundR"])
+
+    SetCostMetric(6, FormatCostDuration(node["gapSec"]), "全部间隔，不计入合计")
+
+    if (node["exclCount"] > 0) {
+        SetCostMetric(7, "人 " FormatCostDuration(node["exclHumanSec"]) " / AI " FormatCostDuration(node["exclAiSec"]), node["exclCount"] " 次，不计入合计")
+    } else {
+        SetCostMetric(7, "—", "无剔除")
+    }
+
+    ratio := node["humanChars"] > 0 ? Format("{:.1f}", node["aiChars"] / node["humanChars"]) : "—"
+    SetCostMetric(8, FormatStatCountValue(node["humanChars"]) " / " FormatStatCountValue(node["aiChars"]), "人 : AI = 1 : " ratio)
+    SetCostMetric(9, node["files"], "人 " node["humanFiles"] " / AI " node["aiFiles"])
+
+    SetCostMetric(10, FormatCostSpan(ThemeCost.SpanDays(node["createdAt"], node["lastActiveAt"])), FormatCostActive(node["createdAt"]) " → " FormatCostActive(node["lastActiveAt"]))
+
+    agentNames := node["agents"]
+    agentCount := agentNames = "" ? 0 : StrSplit(agentNames, " · ").Length
+    SetCostMetric(11, (agentCount = 0 ? "—" : agentCount " 个"), TruncateCostText(agentNames, 40))
+    SetCostMetric(12, FormatCostActive(node["computedAt"]), "各主题上次统计")
+}
+
+
+TruncateCostText(text, limit) {
+    if (text = "" || StrLen(text) <= limit) {
+        return text
+    }
+    return SubStr(text, 1, limit) "…"
+}
+
+
+UpdateCostDaysRows(node) {
+    global CostDaysRows, CostDaysEmptyText
+
+    for row in CostDaysRows {
+        row["date"].Visible := false
+        row["bar"].Visible := false
+        row["value"].Visible := false
+    }
+    CostDaysEmptyText.Visible := false
+
     days := node["days"]
     if (days.Count = 0) {
-        return "按天：该节点没有轮次明细"
+        CostDaysEmptyText.Text := "该节点没有轮次明细"
+        CostDaysEmptyText.Visible := true
+        return
     }
 
     keys := []
@@ -383,7 +516,20 @@ BuildCostDaysText(node) {
     }
     SortCostDayKeys(keys)
 
-    startIndex := Max(1, keys.Length - 13)
+    ; 画得下就全画；画不下（超过 13 天）就把最早的那些折成一行
+    totalDays := keys.Length
+    dailyLimit := 13
+    olderDays := 0
+    olderSeconds := 0
+    startIndex := 1
+    if (totalDays > dailyLimit) {
+        olderDays := totalDays - dailyLimit
+        Loop olderDays {
+            olderSeconds += days[keys[A_Index]]
+        }
+        startIndex := olderDays + 1
+    }
+
     maxSeconds := 0
     index := 0
     for day in keys {
@@ -396,7 +542,17 @@ BuildCostDaysText(node) {
         }
     }
 
-    text := "按天（该节点及其子主题，最近 14 天）`n"
+    rowIndex := 1
+    if (olderDays > 0) {
+        olderRow := CostDaysRows[1]
+        olderRow["date"].Text := "更早 " olderDays " 天"
+        olderRow["date"].Visible := true
+        olderRow["bar"].Visible := false
+        olderRow["value"].Text := FormatCostDuration(olderSeconds)
+        olderRow["value"].Visible := true
+        rowIndex := 2
+    }
+
     index := 0
     for day in keys {
         index += 1
@@ -404,17 +560,19 @@ BuildCostDaysText(node) {
             continue
         }
         seconds := days[day]
-        blocks := maxSeconds > 0 ? Round(seconds / maxSeconds * 20) : 0
-        if (blocks < 1) {
-            blocks := 1
+        barWidth := maxSeconds > 0 ? Round(seconds / maxSeconds * 256) : 0
+        if (barWidth < 2) {
+            barWidth := 2
         }
-        bar := ""
-        Loop blocks {
-            bar .= "█"
-        }
-        text .= SubStr(day, 6, 5) "  " bar "  " FormatStatDurationSec(seconds) "`n"
+        row := CostDaysRows[rowIndex]
+        row["date"].Text := SubStr(day, 6, 5)
+        row["date"].Visible := true
+        row["bar"].Move(row["barX"], row["barY"], barWidth, 10)
+        row["bar"].Visible := true
+        row["value"].Text := FormatCostDuration(seconds)
+        row["value"].Visible := true
+        rowIndex += 1
     }
-    return text
 }
 
 
@@ -438,6 +596,7 @@ SortCostDayKeys(keys) {
 
 CostDetailClose(*) {
     global CostDetailGui, CostDetailTree, CostDetailNodeByItem, CostDetailCurrentNode
+    global CostMetricRows, CostDaysRows, CostDaysEmptyText
 
     if (CostDetailGui) {
         CostDetailGui.Destroy()
@@ -446,6 +605,9 @@ CostDetailClose(*) {
     CostDetailTree := ""
     CostDetailNodeByItem := Map()
     CostDetailCurrentNode := 0
+    CostMetricRows := []
+    CostDaysRows := []
+    CostDaysEmptyText := ""
 }
 
 

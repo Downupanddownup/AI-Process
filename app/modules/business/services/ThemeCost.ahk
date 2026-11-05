@@ -65,6 +65,7 @@ class ThemeCost {
             "project", ExtractProjectName(path),
             "totalSec", ThemeCost.SectionTotal(data, "aggregate"),
             "humanSec", ThemeCost.GetNum(data, "aggregate", "humanSec"),
+            "cognitionSec", ThemeCost.GetNum(data, "aggregate", "humanCognitionSec"),
             "aiSec", ThemeCost.GetNum(data, "aggregate", "aiSec"),
             "roundD", roundD,
             "roundE", roundE,
@@ -136,13 +137,15 @@ class ThemeCost {
             "isRework", DomainConventions.IsResultIssueDir(dirPath),
             "self", ThemeCost.SectionTotal(data, "time"),
             "total", ThemeCost.SectionTotal(data, "aggregate"),
-            "humanSec", ThemeCost.GetNum(data, "time", "humanSec"),
-            "aiSec", ThemeCost.GetNum(data, "time", "aiSec"),
-            "cognitionSec", ThemeCost.GetNum(data, "time", "humanCognitionSec"),
-            "gapSec", ThemeCost.GetNum(data, "time", "gapTotalSec"),
-            "exclHumanSec", ThemeCost.GetNum(data, "time", "humanExcludedSec"),
-            "exclAiSec", ThemeCost.GetNum(data, "time", "aiExcludedSec"),
-            "exclCount", ThemeCost.GetNum(data, "time", "excludedCount"),
+            ; 以下时间类指标一律取 aggregate（与「合计」同口径，保证 合计 = 认知 + AI 自洽）；
+            ; 仅「自身」取 time，供弹窗单列一行。
+            "humanSec", ThemeCost.GetNum(data, "aggregate", "humanSec"),
+            "aiSec", ThemeCost.GetNum(data, "aggregate", "aiSec"),
+            "cognitionSec", ThemeCost.GetNum(data, "aggregate", "humanCognitionSec"),
+            "gapSec", ThemeCost.GetNum(data, "aggregate", "gapTotalSec"),
+            "exclHumanSec", ThemeCost.GetNum(data, "aggregate", "humanExcludedSec"),
+            "exclAiSec", ThemeCost.GetNum(data, "aggregate", "aiExcludedSec"),
+            "exclCount", ThemeCost.GetNum(data, "aggregate", "excludedCount"),
             "humanChars", ThemeCost.GetNum(data, "aggregate", "humanChars"),
             "aiChars", ThemeCost.GetNum(data, "aggregate", "aiChars"),
             "files", ThemeCost.GetNum(data, "aggregate", "files"),
@@ -243,7 +246,15 @@ class ThemeCost {
                 continue
             }
             day := SubStr(stamp, 1, 10)
-            seconds := entry.Has("totalSec") ? entry["totalSec"] + 0 : 0
+            ; 按天与合计同口径：每轮取「认知 + AI」；旧数据缺这两个字段时退回 totalSec
+            seconds := 0
+            if (entry.Has("humanCognitionSec") || entry.Has("aiSec")) {
+                cognition := entry.Has("humanCognitionSec") ? entry["humanCognitionSec"] + 0 : 0
+                ai := entry.Has("aiSec") ? entry["aiSec"] + 0 : 0
+                seconds := cognition + ai
+            } else if (entry.Has("totalSec")) {
+                seconds := entry["totalSec"] + 0
+            }
             days[day] := days.Has(day) ? days[day] + seconds : seconds
         }
         return days
