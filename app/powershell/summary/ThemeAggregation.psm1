@@ -6,6 +6,7 @@
     供 ComputeThemeStats.ps1 使用的纯工具模块（不依赖任何业务模块）：
       - 递归模型：父.aggregate = 父自身基础数据 + Σ 直接子.aggregate（孙已含在子内，父不穿透）；
       - 子主题识别：每支下探到第一个含 .aiprocess 的目录为止（结果微调等容器目录无 .aiprocess，自然被下探）；
+        「统计单元 / 根统计单元」的定义见 约定.md 第一章，AHK 侧对应 DomainConventions.IsStatUnit / IsRootStatUnit；
       - 缺数据规则：子的 stats.json 不存在或无 aggregate 字段 → 返回 $null，由调用方跳过
         （子的下次轮次会级联触发父重算自动补齐；不做任何老格式合成/迁移）。
 #>

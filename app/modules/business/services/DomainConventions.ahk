@@ -66,6 +66,33 @@ class DomainConventions {
     static HasRequirement(dirPath) {
         return FileExist(DomainConventions.RequirementPath(dirPath)) ? true : false
     }
+    ; 统计单元：含 .aiprocess 的目录（有自己统计的目录）。术语见 约定.md 第一章。
+    ; 与"对话域"不同：对话域判的是"能不能作为主题加载"，统计单元判的是"有没有自己的统计"。
+    static IsStatUnit(dirPath) {
+        if (dirPath = "" || !DirExist(dirPath)) {
+            return false
+        }
+        return DirExist(dirPath "\" DomainConventions.DataDir) ? true : false
+    }
+    ; 根统计单元：祖先中没有统计单元的统计单元。
+    ; 等价说法：往上走，第一个带 .aiprocess 的目录就是它的根——第一个是自己时，它就是根。
+    static IsRootStatUnit(dirPath) {
+        if (!DomainConventions.IsStatUnit(dirPath)) {
+            return false
+        }
+        parentDir := ""
+        SplitPath(dirPath, , &parentDir)
+        ; "D:\" 只有 3 个字符，到盘符即止
+        while (parentDir != "" && StrLen(parentDir) > 3) {
+            if (DomainConventions.IsStatUnit(parentDir)) {
+                return false
+            }
+            nextDir := ""
+            SplitPath(parentDir, , &nextDir)
+            parentDir := nextDir
+        }
+        return true
+    }
 
     ; ==== 派生路径 ====
     static GetResultIssueRoot(themeDirPath) {

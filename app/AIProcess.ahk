@@ -43,6 +43,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\services\ReviewModeRegistry.ahk
 #Include %A_ScriptDir%\modules\business\services\ActionGuard.ahk
 #Include %A_ScriptDir%\modules\business\services\ThemeStats.ahk
+#Include %A_ScriptDir%\modules\business\services\ThemeCost.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActionBase.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CreateRequirement.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRequirement.ahk
@@ -56,6 +57,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\summary\HistoricalThemeImporter.ahk
 #Include %A_ScriptDir%\modules\business\summary\ThemePathUtils.ahk
 #Include %A_ScriptDir%\modules\business\summary\SummaryWindow.ahk
+#Include %A_ScriptDir%\modules\business\CostWindow.ahk
 #Include %A_ScriptDir%\modules\ui\StyleManager.ahk
 #Include %A_ScriptDir%\modules\ui\TextFit.ahk
 #Include %A_ScriptDir%\modules\ui\MainWindow.ahk

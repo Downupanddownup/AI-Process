@@ -155,3 +155,46 @@ UpdateThemePathInIndex(oldPath, newPath) {
     LogDebug("UpdateThemePathInIndex: scanned " fileCount " files, " lineChecked " lines, updated " updatedCount)
     return updatedCount
 }
+
+; 读取全部历史索引记录（只读，不改动索引文件）。
+; 返回记录数组，元素是索引里的原始 Map（time / window / theme / source / path）。
+; 解析失败的行跳过；path 去重与计数由调用方按需处理。
+ReadAllIndexRecords() {
+    global AppRoot
+
+    records := []
+
+    projectRoot := RegExReplace(AppRoot, "\\[^\\]+$")
+    if (projectRoot = "") {
+        projectRoot := AppRoot
+    }
+    indexDir := projectRoot "\history\index"
+    if (!DirExist(indexDir)) {
+        return records
+    }
+
+    Loop Files, indexDir "\*.jsonl", "F" {
+        try {
+            content := FileRead(A_LoopFileFullPath, "UTF-8")
+        } catch {
+            continue
+        }
+        Loop Parse, content, "`n", "`r" {
+            line := Trim(A_LoopField)
+            if (line = "") {
+                continue
+            }
+            try {
+                record := JSON.Load(line)
+            } catch {
+                continue
+            }
+            if (IsObject(record) && record.Has("path")) {
+                records.Push(record)
+            }
+        }
+    }
+
+    return records
+}
+
