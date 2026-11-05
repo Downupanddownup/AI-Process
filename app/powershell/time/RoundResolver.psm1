@@ -10,7 +10,8 @@
       - Get-FirstTargetNotificationAfter：thisSend 之后第一条同 target 的完成通知。
       - Get-HumanStartForSend：按发送动作的 source 定位人思考起点（建X）；复执行/质检码 恒无（人耗时 0）。
       - Get-RoundGap：轮间间隔 = 本轮起点 − 此前最近一条完成通知；首轮或无先例通知时为 0。
-      - Get-RebuildRoundRows：重建轮（复关系 → 上下文重建完成通知）；人耗时/字数恒 0，轮间间隔照常。
+      - Get-RebuildRoundRows：重建轮（上下文重建完成通知 → 向前配最近一次未被占用的 复关系 发送）；
+        人耗时/认知/字数恒 0，无阈值降级，轮间间隔照常；无通知不算一轮。
       - Get-EffectiveRoundWindow：候选序列的逐档降级（"第一个不超阈值的候选"= 有效时长，被放弃的跨度 = 剔除）。
       - Get-SendWindows：AI 段候选分组（同 target + 配同一条完成通知的连续发送 = 一轮）。
       - Get-HumanWindow：人段候选分组与降级（同 source 的每一次 建X，终点为本轮真正生效的那次发送）。
@@ -185,32 +186,45 @@ function Get-RoundGap {
     return [int][Math]::Round(($RoundStart - $prevEnd).TotalSeconds)
 }
 
-# ---------- 重建轮：复关系发送 → target=上下文重建 完成通知；人耗时/字数恒 0；轮间间隔照常 ----------
-# 重复发送去重：与讨论/执行轮同口径——配对同一完成通知的重复 复关系 发送合并为一轮（取首次）
-# ThinkThresholdMinutes：认知时长的判定阈值（重建轮人耗时为 0，故认知时长只可能来自 ≤阈值的间隔）
+# ---------- 重建轮：上下文重建完成通知 → 向前配最近一次未被占用的 复关系 发送 ----------
+# 与主轮次的三处不同（这是"重建轮"口径的全部内容）：
+#   起点 = 领走通知的那次发送（不是"发送后找下一条通知"）——动作不产生轮次，闭环才产生轮次
+#   阈值 = 无（不做候选降级；一次重建的正常量级是分钟，不存在需要降级的候选）
+#   认知 = 恒 0（人点完在等 AI 读文件，不是在思考；轮间间隔照常单列）
+# 一条通知只被一次发送领走；配不到发送的通知忽略；配不到通知的发送不产生轮次。
 function Get-RebuildRoundRows {
     param(
-        [array]$Entries,
-        [int]$ThinkThresholdMinutes = 0
+        [array]$Entries
     )
-    $thinkThresholdSec = $ThinkThresholdMinutes * 60
+    $rebuildName = Get-ContextRebuildName
+    $sendIdx = @()
+    for ($i = 0; $i -lt $Entries.Count; $i++) {
+        if (Test-IsRebuildPathAction $Entries[$i].action) { $sendIdx += $i }
+    }
     $rows = @()
-    $pairedNotifKey = $null
-    foreach ($e in $Entries) {
-        if (-not (Test-IsRebuildPathAction $e.action)) { continue }
-        $aiEnd = Get-FirstTargetNotificationAfter -Entries $Entries -FileName (Get-ContextRebuildName) -After $e.time
-        if ($null -ne $aiEnd) {
-            $notifKey = $aiEnd.ToString('yyyyMMddHHmmss')
-            if ($notifKey -eq $pairedNotifKey) { continue }
-            $pairedNotifKey = $notifKey
+    if ($sendIdx.Count -eq 0) { return $rows }
+
+    $used = @{}
+    for ($i = 0; $i -lt $Entries.Count; $i++) {
+        $n = $Entries[$i]
+        if ($n.action -ne '完成通知') { continue }
+        if (-not (Test-TargetMatch -TargetValue $n.target -FileName $rebuildName)) { continue }
+
+        # 向前取最近的一次、还没被别的通知领走的发送
+        $pick = -1
+        foreach ($si in $sendIdx) {
+            if ($used.ContainsKey($si)) { continue }
+            if ($Entries[$si].time -gt $n.time) { continue }
+            if ($pick -lt 0 -or $Entries[$si].time -gt $Entries[$pick].time) { $pick = $si }
         }
-        $aiSec = $null
-        if ($null -ne $aiEnd) { $aiSec = [int][Math]::Round(($aiEnd - $e.time).TotalSeconds) }
+        if ($pick -lt 0) { continue }
+        $used[$pick] = $true
+
+        $e = $Entries[$pick]
+        $aiSec = [int][Math]::Round(($n.time - $e.time).TotalSeconds)
         $rowGapSec = (Get-RoundGap -Entries $Entries -RoundStart $e.time)
-        $rowCognitionSec = 0
-        if ($rowGapSec -le $thinkThresholdSec) { $rowCognitionSec = $rowGapSec }
         $rows += [PSCustomObject][ordered]@{
-            file             = (Get-ContextRebuildName)
+            file             = $rebuildName
             type             = 'rebuild'
             agent            = $e.agent
             sendTime         = $e.time.ToString('yyyy-MM-dd HH:mm:ss')
@@ -218,13 +232,13 @@ function Get-RebuildRoundRows {
             aiSec            = $aiSec
             totalSec         = $aiSec
             gapSec           = $rowGapSec
-            humanCognitionSec = $rowCognitionSec
+            humanCognitionSec = 0
             humanExcludedSec = 0
             aiExcludedSec    = 0
             excludedCount    = 0
             humanChars       = 0
             aiChars          = 0
-            known            = ($null -ne $aiEnd)
+            known            = $true
         }
     }
     return $rows

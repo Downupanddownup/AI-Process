@@ -223,8 +223,8 @@ function Get-ThemeStats {
         }
     }
 
-    # ---------- 重建轮：复关系 → 上下文重建完成通知；人耗时/字数恒 0；按发送时间并入明细 ----------
-    $rebuildRows = @(Get-RebuildRoundRows -Entries $entries -ThinkThresholdMinutes $ThinkThresholdMinutes)
+    # ---------- 重建轮：以完成通知为起点向前配发送；人耗时/认知/字数恒 0；按发送时间并入明细 ----------
+    $rebuildRows = @(Get-RebuildRoundRows -Entries $entries)
     $rebuild = $rebuildRows.Count
     $roundDetail = @($roundDetail + $rebuildRows | Sort-Object sendTime)
 
