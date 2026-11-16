@@ -599,6 +599,7 @@ ShowThemeDetailDialog(path) {
     SplitPath(path, &themeName)
     dirExists := DirExist(path)
     statsExists := FileExist(path "\.aiprocess\统计.md")
+    reqExists := DomainConventions.HasRequirement(path)
 
     dialog := Gui("+Owner" SummaryGui.Hwnd " +ToolWindow", "主题详情")
     dialog.SetFont("s9", "Microsoft YaHei UI")
@@ -625,6 +626,10 @@ ShowThemeDetailDialog(path) {
     viewStatsButton := dialog.Add("Button", "x+8 yp w90 h24", "查看统计")
     viewStatsButton.OnEvent("Click", (*) => EditorOpener.Open(path "\.aiprocess\统计.md"))
     viewStatsButton.Enabled := statsExists
+
+    viewReqButton := dialog.Add("Button", "x+8 yp w80 h24", "查看需求")
+    viewReqButton.OnEvent("Click", (*) => EditorOpener.Open(DomainConventions.RequirementPath(path)))
+    viewReqButton.Enabled := reqExists
 
     closeButton := dialog.Add("Button", "x+8 yp w80 h24 Default", "关闭")
     closeButton.OnEvent("Click", (*) => dialog.Destroy())
