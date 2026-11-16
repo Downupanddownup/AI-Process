@@ -11,7 +11,7 @@ class AgentActionBase {
     ; 异常兜底文案（各行为未覆盖时用这一对）
     FailLogText := "操作失败"
     FailFeedbackText := "操作失败"
-    ; 前置校验未通过（如无 vN、步目无实施文档）时置 true：跳过 AutoHidePanel
+    ; 前置校验未通过（如无 vN、步目无拆分依据）时置 true：跳过 AutoHidePanel
     SkipAutoHide := false
 
     ; 模板方法骨架：守卫 → Execute → 自动隐藏

@@ -145,7 +145,7 @@ class DomainConventions {
         }
         return Format("{:02}", latest + 1)
     }
-    ; 改吧执行结果名：有实施文档 → 已实施.md，否则 v(N+1).md
+    ; 执行结果名：有实施文档 → 已实施.md，否则 v(N+1).md
     static ComputeResultName(dirPath) {
         if FileExist(DomainConventions.ImplDocPath(dirPath)) {
             return DomainConventions.ExecutedFile
