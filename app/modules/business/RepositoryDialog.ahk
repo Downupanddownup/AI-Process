@@ -355,7 +355,7 @@ ShowRepoAddDialog(*) {
     RepoAddEdit := RepoAddDialog.AddEdit("xm y+6 w380 h24")
     RepoAddErrorText := RepoAddDialog.AddText("xm y+4 w380 h18 cRed Hidden", "")
 
-    RepoAddDialog.AddText("xm y+4 w380 h18 c777777", "路径必须以 \need 或 \需求 结尾。")
+    RepoAddDialog.AddText("xm y+4 w380 h18 c777777", DomainConventions.RepoRootRuleHint)
 
     okBtn := RepoAddDialog.AddButton("xm+120 y+8 w72 h24 Default", "确认")
     okBtn.OnEvent("Click", OnRepoAddConfirm)

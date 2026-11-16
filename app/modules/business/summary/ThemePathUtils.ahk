@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 
 ; 从主题路径中提取归属项目名
-; 规则：找 \需求\ 或 \need\，取上一级；兜底取父级目录名
+; 规则：经仓库单源（注册表 → 路径推导），兜底取父级目录名
 ExtractProjectName(path) {
     ; 优先通过仓库管理器查找
     repo := FindRepoByThemePath(path)
@@ -9,18 +9,10 @@ ExtractProjectName(path) {
         return repo["name"]
     }
 
-    ; 以下为原有 fallback 逻辑
-    pathNoDrive := RegExReplace(path, "^[A-Z]:\\", "")
-
-    pos := InStr(pathNoDrive, "\需求\")
-    if (!pos) {
-        pos := InStr(pathNoDrive, "\need\")
-    }
-
-    if (pos) {
-        prefix := SubStr(pathNoDrive, 1, pos - 1)
-        SplitPath(prefix, &projectName)
-        return projectName
+    ; 未注册时按仓库根规则推导
+    repoPath := ExtractRepoPath(path)
+    if (repoPath != "") {
+        return ExtractRepoName(repoPath)
     }
 
     ; 兜底：取主题目录的父级

@@ -15,6 +15,19 @@ class DomainConventions {
     static StepsDir := "实施步骤"
     static DataDir := ".aiprocess"
 
+    ; ==== 仓库约定 ====
+    static RepoSuffixNeed := "need"
+    static RepoSuffixDemand := "需求"
+    static ArchiveDir := "归档"
+    static RepoRootRuleHint := "路径必须以 \need 或 \需求 结尾"
+
+    ; 仓库根：路径以 \need 或 \需求 结尾
+    static IsRepoRootDir(path) {
+        normalized := StrLower(NormalizePath(path))
+        return SubStr(normalized, -5) = "\" DomainConventions.RepoSuffixNeed
+            || SubStr(normalized, -3) = "\" DomainConventions.RepoSuffixDemand
+    }
+
     ; ==== 命名规则（正则） ====
     static VersionFilePattern := "^v(\d+)\.md$"
     static ReplyFilePattern := "^对v(\d+)的回复\.txt$"

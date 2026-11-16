@@ -6,16 +6,8 @@ global DirectoryDialog := ""
 global DirectoryDialogEdit := ""
 
 SetCurrentDirAndOpenRequirement(dirPath) {
-    ; 自动仓库关联：标准路径且在仓库列表中不存在 → 自动添加
-    if (IsStandardRepoPath(dirPath)) {
-        repo := FindRepoByThemePath(dirPath)
-        if (repo = "") {
-            repoPath := ExtractRepoPath(dirPath)
-            if (repoPath != "") {
-                AddRepository(repoPath)
-            }
-        }
-    }
+    ; 自动仓库关联：任意目录向上推导仓库根，未注册则注册
+    EnsureRepoRegistered(dirPath)
 
     SetCurrentDir(NormalizePath(dirPath))
     SaveWindowSession(GetActiveWindowId())
@@ -27,7 +19,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
         RefreshDirectoryStateUI()
     }
 
-    filePath := GetCurrentDir() "\需求.txt"
+    filePath := DomainConventions.RequirementPath(GetCurrentDir())
     existed := FileExist(filePath)
     if (!existed) {
         FileAppend("", filePath, "UTF-8")
@@ -113,6 +105,7 @@ SubmitDirectoryDialog(*) {
         return
     }
 
+    EnsureRepoRegistered(rawPath)
     SetCurrentDir(NormalizePath(rawPath))
     SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
@@ -234,6 +227,7 @@ ReturnToThemeDir(*) {
 ; 切当前目录并刷新面板：需求树双击用的最小链路。
 ; 与「面板设目录」同语义——只切目录、不碰文件（不建 需求.txt）；source 只用于历史索引。
 SetCurrentDirAndRefresh(dirPath, source) {
+    EnsureRepoRegistered(dirPath)
     SetCurrentDir(NormalizePath(dirPath))
     SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()

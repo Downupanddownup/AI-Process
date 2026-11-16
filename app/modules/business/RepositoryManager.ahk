@@ -92,7 +92,7 @@ AddRepository(inputPath) {
     }
 
     if (!IsStandardRepoPath(inputPath)) {
-        return {success: false, error: "路径必须以 \need 或 \需求 结尾"}
+        return {success: false, error: DomainConventions.RepoRootRuleHint}
     }
 
     if (!DirExist(inputPath)) {
@@ -119,11 +119,25 @@ AddRepository(inputPath) {
     return {success: true, error: ""}
 }
 
+; 自动注册：任意目录向上推导仓库根，未注册则注册
+EnsureRepoRegistered(dirPath) {
+    if (dirPath = "") {
+        return
+    }
+    if (FindRepoByThemePath(dirPath) != "") {
+        return
+    }
+    repoPath := ExtractRepoPath(dirPath)
+    if (repoPath != "" && DirExist(repoPath)) {
+        AddRepository(repoPath)
+    }
+}
+
 ExtractRepoName(repoPath) {
     normalized := NormalizePath(repoPath) "\"
 
-    posNeed := InStr(normalized, "\need\", 0)
-    posDemand := InStr(normalized, "\需求\", 0)
+    posNeed := InStr(normalized, "\" DomainConventions.RepoSuffixNeed "\", 0)
+    posDemand := InStr(normalized, "\" DomainConventions.RepoSuffixDemand "\", 0)
 
     pos := Max(posNeed, posDemand)
     if (pos > 0) {
@@ -165,7 +179,7 @@ GetRepoThemes(repoPath) {
 
     Loop Files, repoPath "\*", "D" {
         name := A_LoopFileName
-        if (name = "归档" || name = ".aiprocess") {
+        if (name = DomainConventions.ArchiveDir || name = DomainConventions.DataDir) {
             continue
         }
         themes.Push(name)
@@ -192,17 +206,15 @@ GetRepoName(repoPath) {
 ; ============================================================
 
 IsStandardRepoPath(path) {
-    normalized := NormalizePath(path)
-    normalizedLower := StrLower(normalized)
-    return SubStr(normalizedLower, -5) = "\need" || SubStr(normalizedLower, -3) = "\需求"
+    return DomainConventions.IsRepoRootDir(path)
 }
 
 GetRepoArchiveDir(repoPath) {
-    return NormalizePath(repoPath) "\归档"
+    return NormalizePath(repoPath) "\" DomainConventions.ArchiveDir
 }
 
 IsArchivedTheme(themePath) {
-    return InStr(NormalizePath(themePath), "\归档\") ? true : false
+    return InStr(NormalizePath(themePath), "\" DomainConventions.ArchiveDir "\") ? true : false
 }
 
 ExtractRepoPath(themePath) {

@@ -50,7 +50,7 @@ FindThemeCandidateDirs(rootDir) {
 
     Loop Files, rootDir "\*", "DR" {
         dirPath := A_LoopFileFullPath
-        if (!FileExist(dirPath "\需求.txt")) {
+        if (!DomainConventions.HasRequirement(dirPath)) {
             continue
         }
         if (DomainConventions.IsResultIssueDir(dirPath)) {
