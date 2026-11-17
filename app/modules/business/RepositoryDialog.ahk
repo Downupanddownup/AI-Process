@@ -74,7 +74,12 @@ ShowThemeSelectDialog(*) {
     newThemeBtn := ThemeSelectDialog.AddButton("x+8 yp w128 h26", "新建并切换")
     newThemeBtn.OnEvent("Click", OnNewThemeAndSwitch)
 
-    okBtn := ThemeSelectDialog.AddButton("xm+264 y+14 w80 h26 Default", "确定")
+    openDirBtn := ThemeSelectDialog.AddButton("xm y+14 w80 h26", "打开目录")
+    openDirBtn.OnEvent("Click", OnThemeSelectOpenDir)
+    copyPathBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "复制路径")
+    copyPathBtn.OnEvent("Click", OnThemeSelectCopyPath)
+
+    okBtn := ThemeSelectDialog.AddButton("xm+264 yp w80 h26 Default", "确定")
     okBtn.OnEvent("Click", OnThemeSelectOk)
 
     cancelBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "取消")
@@ -144,17 +149,40 @@ OnAddRepoFromThemeSelect(*) {
 }
 
 OnThemeSelectOk(*) {
-    global ThemeSelectDialog, ThemeSelectThemeList, ThemeSelectCurrentRepo
+    global ThemeSelectDialog
 
-    row := ThemeSelectThemeList.GetNext(0)
-    if (row = 0 || ThemeSelectCurrentRepo = "") {
+    selectedPath := GetSelectedThemePath()
+    if (selectedPath = "") {
         return
     }
 
-    selectedName := ThemeSelectThemeList.GetText(row, 1)
-    selectedPath := ThemeSelectCurrentRepo "\" selectedName
     CloseThemeSelectDialog()
     SetCurrentDirAndOpenRequirement(selectedPath)
+}
+
+; 主题列表选中行的完整路径（无选中/无仓库返回空串）
+GetSelectedThemePath() {
+    global ThemeSelectThemeList, ThemeSelectCurrentRepo
+
+    row := ThemeSelectThemeList.GetNext(0)
+    if (row = 0 || ThemeSelectCurrentRepo = "") {
+        return ""
+    }
+    return ThemeSelectCurrentRepo "\" ThemeSelectThemeList.GetText(row, 1)
+}
+
+OnThemeSelectOpenDir(*) {
+    path := GetSelectedThemePath()
+    if (path != "") {
+        OpenThemeDir(path)
+    }
+}
+
+OnThemeSelectCopyPath(*) {
+    path := GetSelectedThemePath()
+    if (path != "") {
+        A_Clipboard := path
+    }
 }
 
 OnNewThemeAndSwitch(*) {
@@ -243,6 +271,11 @@ ShowRepoSelectDialog(*) {
     addBtn := RepoSelectDialog.AddButton("xm y+10 w90 h26", "新增仓库")
     addBtn.OnEvent("Click", OnAddRepoFromRepoSelect)
 
+    openDirBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "打开目录")
+    openDirBtn.OnEvent("Click", OnRepoSelectOpenDir)
+    copyPathBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "复制路径")
+    copyPathBtn.OnEvent("Click", OnRepoSelectCopyPath)
+
     okBtn := RepoSelectDialog.AddButton("x720 yp w80 h26 Default", "确定")
     okBtn.OnEvent("Click", OnRepoSelectOk)
 
@@ -326,6 +359,20 @@ OnRepoSelectItem(ctrl, item, selected) {
 
 ; 双击路径行：复制选中仓库的完整路径
 OnRepoSelectPathDoubleClick(*) {
+    OnRepoSelectCopyPath()
+}
+
+OnRepoSelectOpenDir(*) {
+    global RepoSelectRepoList
+
+    row := RepoSelectRepoList.GetNext(0)
+    if (row = 0) {
+        return
+    }
+    OpenThemeDir(RepoSelectRepoList.GetText(row, 3))
+}
+
+OnRepoSelectCopyPath(*) {
     global RepoSelectRepoList
 
     row := RepoSelectRepoList.GetNext(0)
