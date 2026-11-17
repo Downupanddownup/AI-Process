@@ -42,6 +42,17 @@ GetWindowStyle(windowId) {
     return WindowStyles[windowId]
 }
 
+; 弹窗列表统一观感：网格线 + 行高（默认行高列表挤成一块，24 逻辑像素起步有呼吸感）
+; 行高用空 ImageList 撑：ListView 无设置行高的消息，行高取图标高度与文本高度的较大者
+; 图标宽 1px 让首列缩进不可见；不加 LVS_SHAREIMAGELISTS，控件销毁时随带销毁 ImageList，不泄漏
+ApplyDialogListStyle(lvCtrl) {
+    lvCtrl.Opt("+Grid")
+    rowHeight := Round(24 * A_ScreenDPI / 96)
+    rowIL := IL_Create(1, 1)
+    DllCall("comctl32\ImageList_SetIconSize", "ptr", rowIL, "int", 1, "int", rowHeight)
+    SendMessage(0x1003, 1, rowIL, lvCtrl.Hwnd)   ; LVM_SETIMAGELIST, LVSIL_SMALL
+}
+
 ; 应用样式到主窗口
 ApplyMainWindowStyle(windowId, mainGui) {
     style := GetWindowStyle(windowId)

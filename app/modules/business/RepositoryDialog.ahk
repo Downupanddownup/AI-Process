@@ -18,6 +18,8 @@ global ThemeSelectCurrentRepo := ""
 global RepoSelectDialog := ""
 global RepoSelectRepoList := ""
 global RepoSelectPathText := ""
+; 列表第 3 列只放中间省略后的显示串，完整路径按行号存这里（复制/打开/确定都用全路径）
+global RepoSelectFullPaths := []
 
 global RepoAddDialog := ""
 global RepoAddEdit := ""
@@ -65,7 +67,8 @@ ShowThemeSelectDialog(*) {
     ThemeSelectDialog.AddText("xm y+12 w696 h20", "主题目录：")
     ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w696 h240 -Multi", ["主题名", "最近活跃"])
     ThemeSelectThemeList.ModifyCol(1, 550)
-    ThemeSelectThemeList.ModifyCol(2, 100)
+    ThemeSelectThemeList.ModifyCol(2, "100 Center")
+    ApplyDialogListStyle(ThemeSelectThemeList)
     ThemeSelectThemeList.OnEvent("DoubleClick", OnThemeSelectOk)
 
     ThemeSelectDialog.AddText("xm y+10 w696 h20", "新主题名：")
@@ -263,8 +266,9 @@ ShowRepoSelectDialog(*) {
     RepoSelectPathText.OnEvent("DoubleClick", OnRepoSelectPathDoubleClick)
     RepoSelectRepoList := RepoSelectDialog.AddListView("xm y+4 w876 h400 -Multi", ["名称", "最近活跃", "路径"])
     RepoSelectRepoList.ModifyCol(1, 180)
-    RepoSelectRepoList.ModifyCol(2, 100)
+    RepoSelectRepoList.ModifyCol(2, "100 Center")
     RepoSelectRepoList.ModifyCol(3, 560)
+    ApplyDialogListStyle(RepoSelectRepoList)
     RepoSelectRepoList.OnEvent("DoubleClick", OnRepoSelectOk)
     RepoSelectRepoList.OnEvent("ItemSelect", OnRepoSelectItem)
 
@@ -288,12 +292,16 @@ ShowRepoSelectDialog(*) {
 }
 
 RefreshRepoSelectList() {
-    global RepoSelectRepoList, Repositories, ThemeSelectCurrentRepo
+    global RepoSelectRepoList, RepoSelectFullPaths, Repositories, ThemeSelectCurrentRepo
 
     if (!RepoSelectRepoList) {
         return
     }
     RepoSelectRepoList.Delete()
+    RepoSelectFullPaths := []
+
+    ; LVM_GETCOLUMNWIDTH 读回物理像素（ModifyCol 是逻辑单位），TruncateToPixelWidth 量的也是物理像素；12px 是单元格内边距
+    pathColWidth := SendMessage(0x101D, 2, 0, RepoSelectRepoList.Hwnd) - 12
 
     ; 仓库活跃时间 = 该仓库主题活跃的最大值（GetRepoThemesWithActivity 已倒序，首项即最新）
     withTime := []
@@ -323,7 +331,9 @@ RefreshRepoSelectList() {
     selectedRow := 0
     for item in sorted {
         dateText := item["lastActiveAt"] != "" ? SubStr(item["lastActiveAt"], 1, 10) : ""
-        RepoSelectRepoList.Add(, item["name"], dateText, item["path"])
+        RepoSelectFullPaths.Push(item["path"])
+        displayPath := TruncateToPixelWidth(item["path"], pathColWidth, RepoSelectRepoList.Hwnd)
+        RepoSelectRepoList.Add(, item["name"], dateText, displayPath)
         if (selectedRow = 0 && ThemeSelectCurrentRepo != ""
             && NormalizePath(item["path"]) = NormalizePath(ThemeSelectCurrentRepo)) {
             selectedRow := A_Index
@@ -337,7 +347,7 @@ RefreshRepoSelectList() {
 
 ; 路径行：显示选中仓库的完整路径（列里截断的在这里看全）
 UpdateRepoSelectPathLine() {
-    global RepoSelectRepoList, RepoSelectPathText
+    global RepoSelectRepoList, RepoSelectFullPaths, RepoSelectPathText
 
     if (!RepoSelectPathText) {
         return
@@ -347,8 +357,7 @@ UpdateRepoSelectPathLine() {
         RepoSelectPathText.Text := "选择一行查看完整路径（双击此行复制）"
         return
     }
-    fullPath := RepoSelectRepoList.GetText(row, 3)
-    RepoSelectPathText.Text := TruncateToWidth(fullPath, RepoSelectPathText.Hwnd)
+    RepoSelectPathText.Text := TruncateToWidth(RepoSelectFullPaths[row], RepoSelectPathText.Hwnd)
 }
 
 OnRepoSelectItem(ctrl, item, selected) {
@@ -363,21 +372,21 @@ OnRepoSelectPathDoubleClick(*) {
 }
 
 OnRepoSelectOpenDir(*) {
-    global RepoSelectRepoList
+    global RepoSelectRepoList, RepoSelectFullPaths
 
     row := RepoSelectRepoList.GetNext(0)
     if (row = 0) {
         return
     }
-    OpenThemeDir(RepoSelectRepoList.GetText(row, 3))
+    OpenThemeDir(RepoSelectFullPaths[row])
 }
 
 OnRepoSelectCopyPath(*) {
-    global RepoSelectRepoList
+    global RepoSelectRepoList, RepoSelectFullPaths
 
     row := RepoSelectRepoList.GetNext(0)
     if (row > 0) {
-        A_Clipboard := RepoSelectRepoList.GetText(row, 3)
+        A_Clipboard := RepoSelectFullPaths[row]
     }
 }
 
@@ -392,14 +401,14 @@ InsertByActivityDesc(sortedList, item) {
 }
 
 OnRepoSelectOk(*) {
-    global RepoSelectDialog, RepoSelectRepoList, ThemeSelectCurrentRepo, ThemeSelectRepoText, ThemeSelectAddRepoBtn
+    global RepoSelectDialog, RepoSelectRepoList, RepoSelectFullPaths, ThemeSelectCurrentRepo, ThemeSelectRepoText, ThemeSelectAddRepoBtn
 
     row := RepoSelectRepoList.GetNext(0)
     if (row = 0) {
         return
     }
 
-    selectedPath := RepoSelectRepoList.GetText(row, 3)
+    selectedPath := RepoSelectFullPaths[row]
     ThemeSelectCurrentRepo := selectedPath
     if (ThemeSelectRepoText) {
         ThemeSelectRepoText.Text := GetRepoName(selectedPath) " ▾"

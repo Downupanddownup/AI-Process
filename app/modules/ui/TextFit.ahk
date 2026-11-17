@@ -65,6 +65,30 @@ TruncateToWidth(text, sourceHwnd) {
     return ellipsis
 }
 
+; 与 TruncateToWidth 同法（中间掐），但上限由调用方按像素显式给——用于可用宽不是控件宽的场景（如 ListView 某列）
+TruncateToPixelWidth(text, maxWidthPx, fontSourceHwnd) {
+    if (text = "" || !fontSourceHwnd || maxWidthPx <= 0) {
+        return text
+    }
+    if (MeasureTextWidth(text, fontSourceHwnd) <= maxWidthPx) {
+        return text
+    }
+
+    ellipsis := "..."
+    length := StrLen(text) - 1
+    while (length > 0) {
+        headLength := Ceil(length / 2)
+        tailLength := length - headLength
+        tail := tailLength > 0 ? SubStr(text, -tailLength) : ""
+        candidate := SubStr(text, 1, headLength) . ellipsis . tail
+        if (MeasureTextWidth(candidate, fontSourceHwnd) <= maxWidthPx) {
+            return candidate
+        }
+        length -= 1
+    }
+    return ellipsis
+}
+
 ; 装得下原样返回；装不下从 text 尾部掐、补省略号，tail（如 "/01"）必留
 ; 与 TruncateToWidth 的分工：那个保头尾、不强求某个后缀活着；这个保头 + 指定后缀必活
 TruncateKeepTail(text, tail, sourceHwnd) {
