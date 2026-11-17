@@ -11,12 +11,12 @@ global ThemeSelectDialog := ""
 global ThemeSelectPathText := ""
 global ThemeSelectRepoText := ""
 global ThemeSelectAddRepoBtn := ""
-global ThemeSelectListBox := ""
+global ThemeSelectThemeList := ""
 global ThemeSelectNewEdit := ""
 global ThemeSelectCurrentRepo := ""
 
 global RepoSelectDialog := ""
-global RepoSelectListBox := ""
+global RepoSelectRepoList := ""
 
 global RepoAddDialog := ""
 global RepoAddEdit := ""
@@ -28,7 +28,7 @@ global RepoAddErrorText := ""
 
 ShowThemeSelectDialog(*) {
     global ThemeSelectDialog, ThemeSelectPathText, ThemeSelectRepoText
-    global ThemeSelectAddRepoBtn, ThemeSelectListBox, ThemeSelectNewEdit
+    global ThemeSelectAddRepoBtn, ThemeSelectThemeList, ThemeSelectNewEdit
     global ThemeSelectCurrentRepo, MainGui
 
     if (ThemeSelectDialog) {
@@ -45,47 +45,51 @@ ShowThemeSelectDialog(*) {
     }
 
     ThemeSelectDialog := Gui(dialogOptions, "设置主题")
-    ThemeSelectDialog.BackColor := "F7F7F7"
+    ThemeSelectDialog.BackColor := GetDialogBackColor()
     ThemeSelectDialog.MarginX := 12
-    ThemeSelectDialog.MarginY := 10
-    ThemeSelectDialog.SetFont("s8", "Microsoft YaHei UI")
+    ThemeSelectDialog.MarginY := 12
+    ThemeSelectDialog.SetFont("s9", "Microsoft YaHei UI")
     ThemeSelectDialog.OnEvent("Close", CloseThemeSelectDialog)
     ThemeSelectDialog.OnEvent("Escape", CloseThemeSelectDialog)
 
-    ThemeSelectDialog.AddText("xm ym w400 h18", "当前主题：")
-    ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w400 h18 c666666")
+    ThemeSelectDialog.AddText("xm ym w616 h20", "当前主题：")
+    ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w616 h20 c666666")
 
-    ThemeSelectDialog.AddText("xm y+12 w60 h18", "选择仓库：")
-    ThemeSelectRepoText := ThemeSelectDialog.AddText("x+0 yp w300 h18 cBlue", "")
+    ThemeSelectDialog.AddText("xm y+12 w60 h20", "选择仓库：")
+    ThemeSelectRepoText := ThemeSelectDialog.AddText("x+0 yp w300 h20 cBlue", "")
     ThemeSelectRepoText.OnEvent("Click", OnRepoTextClick)
-    ThemeSelectAddRepoBtn := ThemeSelectDialog.AddButton("xm y+2 w80 h22 Hidden", "新增仓库")
+    ThemeSelectAddRepoBtn := ThemeSelectDialog.AddButton("xm y+2 w80 h24 Hidden", "新增仓库")
     ThemeSelectAddRepoBtn.OnEvent("Click", OnAddRepoFromThemeSelect)
 
-    ThemeSelectDialog.AddText("xm y+12 w400 h18", "主题目录：")
-    ThemeSelectListBox := ThemeSelectDialog.AddListBox("xm y+2 w400 h160")
+    ThemeSelectDialog.AddText("xm y+12 w616 h20", "主题目录：")
+    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w616 h240 -Multi", ["主题名", "最近活跃"])
+    ThemeSelectThemeList.ModifyCol(1, 470)
+    ThemeSelectThemeList.ModifyCol(2, 100)
+    ThemeSelectThemeList.OnEvent("DoubleClick", OnThemeSelectOk)
 
-    ThemeSelectDialog.AddText("xm y+8 w400 h18", "新主题名：")
-    ThemeSelectNewEdit := ThemeSelectDialog.AddEdit("xm y+2 w320 h24")
+    ThemeSelectDialog.AddText("xm y+10 w616 h20", "新主题名：")
+    ThemeSelectNewEdit := ThemeSelectDialog.AddEdit("xm y+2 w480 h26")
 
-    newThemeBtn := ThemeSelectDialog.AddButton("x+8 yp w72 h24", "新建并切换")
+    newThemeBtn := ThemeSelectDialog.AddButton("x+8 yp w128 h26", "新建并切换")
     newThemeBtn.OnEvent("Click", OnNewThemeAndSwitch)
 
-    okBtn := ThemeSelectDialog.AddButton("xm+130 y+12 w72 h24 Default", "确定")
+    okBtn := ThemeSelectDialog.AddButton("xm+224 y+14 w80 h26 Default", "确定")
     okBtn.OnEvent("Click", OnThemeSelectOk)
 
-    cancelBtn := ThemeSelectDialog.AddButton("x+8 yp w72 h24", "取消")
+    cancelBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "取消")
     cancelBtn.OnEvent("Click", CloseThemeSelectDialog)
 
     RefreshThemeSelectState()
-    ShowThemeSelectAtCenter()
+    ; 省略 x/y：系统屏幕居中，不再相对主面板定位
+    ThemeSelectDialog.Show("w640 h540")
 }
 
 RefreshThemeSelectState() {
     global ThemeSelectPathText, ThemeSelectRepoText, ThemeSelectAddRepoBtn
-    global ThemeSelectListBox, ThemeSelectNewEdit, ThemeSelectCurrentRepo
+    global ThemeSelectThemeList, ThemeSelectNewEdit, ThemeSelectCurrentRepo
 
     currentDir := GetCurrentDir()
-    ThemeSelectPathText.Text := currentDir != "" ? currentDir : "未设置"
+    ThemeSelectPathText.Text := currentDir != "" ? TruncateToWidth(currentDir, ThemeSelectPathText.Hwnd) : "未设置"
 
     ; 确定默认仓库（仅在首次打开或选中无效时推导，避免覆盖用户选择）
     if (ThemeSelectCurrentRepo = "") {
@@ -111,20 +115,19 @@ RefreshThemeSelectState() {
         ThemeSelectAddRepoBtn.Visible := true
     }
 
-    ThemeSelectListBox.Delete()
+    ThemeSelectThemeList.Delete()
     if (ThemeSelectCurrentRepo != "") {
-        themes := GetRepoThemes(ThemeSelectCurrentRepo)
-        selectedIndex := 0
-        idx := 1
-        for name in themes {
-            ThemeSelectListBox.Add([name])
-            if (currentDir != "" && name = ExtractFileName(currentDir)) {
-                selectedIndex := idx
+        themes := GetRepoThemesWithActivity(ThemeSelectCurrentRepo)
+        selectedRow := 0
+        for t in themes {
+            dateText := t["lastActiveAt"] != "" ? SubStr(t["lastActiveAt"], 1, 10) : ""
+            ThemeSelectThemeList.Add(, t["name"], dateText)
+            if (selectedRow = 0 && currentDir != "" && t["name"] = ExtractFileName(currentDir)) {
+                selectedRow := A_Index
             }
-            idx += 1
         }
-        if (selectedIndex > 0) {
-            ThemeSelectListBox.Choose(selectedIndex)
+        if (selectedRow > 0) {
+            ThemeSelectThemeList.Modify(selectedRow, "Select Focus")
         }
     }
 
@@ -140,16 +143,14 @@ OnAddRepoFromThemeSelect(*) {
 }
 
 OnThemeSelectOk(*) {
-    global ThemeSelectDialog, ThemeSelectListBox, ThemeSelectCurrentRepo
+    global ThemeSelectDialog, ThemeSelectThemeList, ThemeSelectCurrentRepo
 
-    selectedName := ThemeSelectListBox.Text
-    if (selectedName = "") {
-        return
-    }
-    if (ThemeSelectCurrentRepo = "") {
+    row := ThemeSelectThemeList.GetNext(0)
+    if (row = 0 || ThemeSelectCurrentRepo = "") {
         return
     }
 
+    selectedName := ThemeSelectThemeList.GetText(row, 1)
     selectedPath := ThemeSelectCurrentRepo "\" selectedName
     CloseThemeSelectDialog()
     SetCurrentDirAndOpenRequirement(selectedPath)
@@ -184,7 +185,7 @@ OnNewThemeAndSwitch(*) {
 
 CloseThemeSelectDialog(*) {
     global ThemeSelectDialog, ThemeSelectPathText, ThemeSelectRepoText
-    global ThemeSelectAddRepoBtn, ThemeSelectListBox, ThemeSelectNewEdit
+    global ThemeSelectAddRepoBtn, ThemeSelectThemeList, ThemeSelectNewEdit
     global ThemeSelectCurrentRepo
 
     if (ThemeSelectDialog) {
@@ -194,24 +195,9 @@ CloseThemeSelectDialog(*) {
     ThemeSelectPathText := ""
     ThemeSelectRepoText := ""
     ThemeSelectAddRepoBtn := ""
-    ThemeSelectListBox := ""
+    ThemeSelectThemeList := ""
     ThemeSelectNewEdit := ""
     ThemeSelectCurrentRepo := ""
-}
-
-ShowThemeSelectAtCenter() {
-    global ThemeSelectDialog, MainGui
-
-    width := 436
-    height := 420
-    if (MainGui) {
-        WinGetPos(&mainX, &mainY, &mainW, &mainH, "ahk_id " MainGui.Hwnd)
-        x := mainX + Floor((mainW - width) / 2)
-        y := mainY + Floor((mainH - height) / 2)
-        ThemeSelectDialog.Show("w" width " h" height " x" x " y" y)
-        return
-    }
-    ThemeSelectDialog.Show("w" width " h" height)
 }
 
 ; ============================================================
@@ -219,7 +205,7 @@ ShowThemeSelectAtCenter() {
 ; ============================================================
 
 ShowRepoSelectDialog(*) {
-    global RepoSelectDialog, RepoSelectListBox, Repositories, MainGui
+    global RepoSelectDialog, RepoSelectRepoList, Repositories, MainGui
 
     if (RepoSelectDialog) {
         RepoSelectDialog.Show()
@@ -235,49 +221,100 @@ ShowRepoSelectDialog(*) {
     }
 
     RepoSelectDialog := Gui(dialogOptions, "选择仓库")
-    RepoSelectDialog.BackColor := "F7F7F7"
+    RepoSelectDialog.BackColor := GetDialogBackColor()
     RepoSelectDialog.MarginX := 12
-    RepoSelectDialog.MarginY := 10
-    RepoSelectDialog.SetFont("s8", "Microsoft YaHei UI")
+    RepoSelectDialog.MarginY := 12
+    RepoSelectDialog.SetFont("s9", "Microsoft YaHei UI")
     RepoSelectDialog.OnEvent("Close", CloseRepoSelectDialog)
     RepoSelectDialog.OnEvent("Escape", CloseRepoSelectDialog)
 
-    RepoSelectDialog.AddText("xm ym w480 h18", "仓库列表：")
-    RepoSelectListBox := RepoSelectDialog.AddListBox("xm y+2 w480 h200")
+    RepoSelectDialog.AddText("xm ym w676 h20", "仓库列表：")
+    RepoSelectRepoList := RepoSelectDialog.AddListView("xm y+2 w676 h320 -Multi", ["名称", "最近活跃", "路径"])
+    RepoSelectRepoList.ModifyCol(1, 160)
+    RepoSelectRepoList.ModifyCol(2, 90)
+    RepoSelectRepoList.ModifyCol(3, 380)
+    RepoSelectRepoList.OnEvent("DoubleClick", OnRepoSelectOk)
 
-    addBtn := RepoSelectDialog.AddButton("xm y+8 w80 h24", "新增仓库")
+    addBtn := RepoSelectDialog.AddButton("xm y+10 w90 h26", "新增仓库")
     addBtn.OnEvent("Click", OnAddRepoFromRepoSelect)
 
-    okBtn := RepoSelectDialog.AddButton("x+200 yp w72 h24 Default", "确定")
+    okBtn := RepoSelectDialog.AddButton("x520 yp w80 h26 Default", "确定")
     okBtn.OnEvent("Click", OnRepoSelectOk)
 
-    cancelBtn := RepoSelectDialog.AddButton("x+8 yp w72 h24", "取消")
+    cancelBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "取消")
     cancelBtn.OnEvent("Click", CloseRepoSelectDialog)
 
     RefreshRepoSelectList()
-    ShowRepoSelectAtCenter()
+    ; 省略 x/y：系统屏幕居中
+    RepoSelectDialog.Show("w700 h420")
 }
 
 RefreshRepoSelectList() {
-    global RepoSelectListBox, Repositories
+    global RepoSelectRepoList, Repositories, ThemeSelectCurrentRepo
 
-    if (!RepoSelectListBox) {
+    if (!RepoSelectRepoList) {
         return
     }
-    RepoSelectListBox.Delete()
+    RepoSelectRepoList.Delete()
+
+    ; 仓库活跃时间 = 该仓库主题活跃的最大值（GetRepoThemesWithActivity 已倒序，首项即最新）
+    withTime := []
+    withoutTime := []
     for repo in Repositories {
-        RepoSelectListBox.Add([repo["path"]])
+        lastActiveAt := ""
+        themes := GetRepoThemesWithActivity(repo["path"])
+        if (themes.Length > 0) {
+            lastActiveAt := themes[1]["lastActiveAt"]
+        }
+        item := Map("name", repo["name"], "path", repo["path"], "lastActiveAt", lastActiveAt)
+        if (lastActiveAt != "") {
+            withTime.Push(item)
+        } else {
+            withoutTime.Push(item)
+        }
+    }
+
+    sorted := []
+    for item in withTime {
+        InsertByActivityDesc(sorted, item)
+    }
+    for item in withoutTime {
+        sorted.Push(item)
+    }
+
+    selectedRow := 0
+    for item in sorted {
+        dateText := item["lastActiveAt"] != "" ? SubStr(item["lastActiveAt"], 1, 10) : ""
+        RepoSelectRepoList.Add(, item["name"], dateText, item["path"])
+        if (selectedRow = 0 && ThemeSelectCurrentRepo != ""
+            && NormalizePath(item["path"]) = NormalizePath(ThemeSelectCurrentRepo)) {
+            selectedRow := A_Index
+        }
+    }
+    if (selectedRow > 0) {
+        RepoSelectRepoList.Modify(selectedRow, "Select Focus")
     }
 }
 
-OnRepoSelectOk(*) {
-    global RepoSelectDialog, RepoSelectListBox, ThemeSelectCurrentRepo, ThemeSelectRepoText, ThemeSelectAddRepoBtn
+; 活跃倒序插入排序（"YYYY-MM-DD HH:MM:SS" 定长字典序）
+; AHK v2 关系运算符不接受字符串（实测抛"Expected a Number"），必须用 StrCompare
+InsertByActivityDesc(sortedList, item) {
+    idx := 1
+    while (idx <= sortedList.Length && StrCompare(sortedList[idx]["lastActiveAt"], item["lastActiveAt"], true) >= 0) {
+        idx++
+    }
+    sortedList.InsertAt(idx, item)
+}
 
-    selectedPath := RepoSelectListBox.Text
-    if (selectedPath = "") {
+OnRepoSelectOk(*) {
+    global RepoSelectDialog, RepoSelectRepoList, ThemeSelectCurrentRepo, ThemeSelectRepoText, ThemeSelectAddRepoBtn
+
+    row := RepoSelectRepoList.GetNext(0)
+    if (row = 0) {
         return
     }
 
+    selectedPath := RepoSelectRepoList.GetText(row, 3)
     ThemeSelectCurrentRepo := selectedPath
     if (ThemeSelectRepoText) {
         ThemeSelectRepoText.Text := GetRepoName(selectedPath) " ▾"
@@ -296,28 +333,13 @@ OnAddRepoFromRepoSelect(*) {
 }
 
 CloseRepoSelectDialog(*) {
-    global RepoSelectDialog, RepoSelectListBox
+    global RepoSelectDialog, RepoSelectRepoList
 
     if (RepoSelectDialog) {
         RepoSelectDialog.Destroy()
         RepoSelectDialog := ""
     }
-    RepoSelectListBox := ""
-}
-
-ShowRepoSelectAtCenter() {
-    global RepoSelectDialog, MainGui
-
-    width := 516
-    height := 320
-    if (MainGui) {
-        WinGetPos(&mainX, &mainY, &mainW, &mainH, "ahk_id " MainGui.Hwnd)
-        x := mainX + Floor((mainW - width) / 2)
-        y := mainY + Floor((mainH - height) / 2)
-        RepoSelectDialog.Show("w" width " h" height " x" x " y" y)
-        return
-    }
-    RepoSelectDialog.Show("w" width " h" height)
+    RepoSelectRepoList := ""
 }
 
 ; ============================================================
@@ -344,27 +366,40 @@ ShowRepoAddDialog(*) {
     }
 
     RepoAddDialog := Gui(dialogOptions, "新增仓库")
-    RepoAddDialog.BackColor := "F7F7F7"
+    RepoAddDialog.BackColor := GetDialogBackColor()
     RepoAddDialog.MarginX := 12
-    RepoAddDialog.MarginY := 10
-    RepoAddDialog.SetFont("s8", "Microsoft YaHei UI")
+    RepoAddDialog.MarginY := 12
+    RepoAddDialog.SetFont("s9", "Microsoft YaHei UI")
     RepoAddDialog.OnEvent("Close", CloseRepoAddDialog)
     RepoAddDialog.OnEvent("Escape", CloseRepoAddDialog)
 
-    RepoAddDialog.AddText("xm ym w380 h18", "请输入仓库路径：")
-    RepoAddEdit := RepoAddDialog.AddEdit("xm y+6 w380 h24")
-    RepoAddErrorText := RepoAddDialog.AddText("xm y+4 w380 h18 cRed Hidden", "")
+    RepoAddDialog.AddText("xm ym w496 h20", "请输入仓库路径：")
+    RepoAddEdit := RepoAddDialog.AddEdit("xm y+6 w398 h26")
+    browseBtn := RepoAddDialog.AddButton("x+8 yp w90 h26", "浏览…")
+    browseBtn.OnEvent("Click", OnRepoAddBrowse)
+    RepoAddErrorText := RepoAddDialog.AddText("xm y+4 w496 h20 cRed Hidden", "")
 
-    RepoAddDialog.AddText("xm y+4 w380 h18 c777777", DomainConventions.RepoRootRuleHint)
+    RepoAddDialog.AddText("xm y+4 w496 h20 c777777", DomainConventions.RepoRootRuleHint)
 
-    okBtn := RepoAddDialog.AddButton("xm+120 y+8 w72 h24 Default", "确认")
+    okBtn := RepoAddDialog.AddButton("xm+154 y+10 w90 h26 Default", "确认")
     okBtn.OnEvent("Click", OnRepoAddConfirm)
 
-    cancelBtn := RepoAddDialog.AddButton("x+8 yp w72 h24", "取消")
+    cancelBtn := RepoAddDialog.AddButton("x+8 yp w90 h26", "取消")
     cancelBtn.OnEvent("Click", CloseRepoAddDialog)
 
-    ShowRepoAddAtCenter()
+    ; 省略 x/y：系统屏幕居中
+    RepoAddDialog.Show("w520 h220")
     RepoAddEdit.Focus()
+}
+
+; 浏览选目录：只填输入框，确认时仍走 AddRepository 的既有校验
+OnRepoAddBrowse(*) {
+    global RepoAddEdit
+
+    selected := DirSelect(, 3, "选择仓库根目录")
+    if (selected != "") {
+        RepoAddEdit.Value := selected
+    }
 }
 
 OnRepoAddConfirm(*) {
@@ -399,19 +434,4 @@ CloseRepoAddDialog(*) {
     }
     RepoAddEdit := ""
     RepoAddErrorText := ""
-}
-
-ShowRepoAddAtCenter() {
-    global RepoAddDialog, MainGui
-
-    width := 416
-    height := 190
-    if (MainGui) {
-        WinGetPos(&mainX, &mainY, &mainW, &mainH, "ahk_id " MainGui.Hwnd)
-        x := mainX + Floor((mainW - width) / 2)
-        y := mainY + Floor((mainH - height) / 2)
-        RepoAddDialog.Show("w" width " h" height " x" x " y" y)
-        return
-    }
-    RepoAddDialog.Show("w" width " h" height)
 }

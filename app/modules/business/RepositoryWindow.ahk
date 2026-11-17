@@ -42,8 +42,8 @@ CreateRepoWindow() {
     ; 左侧列：名称 | 路径（扫视比对用；完整路径看右侧路径行）
     RepoWindow.AddText("Section xm ym w280 h20", "仓库列表")
     RepoWindowRepoList := RepoWindow.AddListView("xs y+4 w280 h444", ["名称", "路径"])
-    RepoWindowRepoList.ModifyCol(1, 150)
-    RepoWindowRepoList.ModifyCol(2, 116)
+    RepoWindowRepoList.ModifyCol(1, 148)
+    RepoWindowRepoList.ModifyCol(2, 110)
     RepoWindowRepoList.OnEvent("ItemSelect", OnRepoWindowSelect)
 
     for repo in Repositories {
@@ -55,7 +55,7 @@ CreateRepoWindow() {
     RepoWindowGuideText := RepoWindow.AddText("xs y+4 w572 h20", "先在左侧选择一个仓库")
     RepoWindowGuideText.OnEvent("DoubleClick", OnRepoPathLineDoubleClick)
     RepoWindowThemeList := RepoWindow.AddListView("xs y+4 w572 h420 Checked -Multi", ["主题名", "最近活跃"])
-    RepoWindowThemeList.ModifyCol(1, 460)
+    RepoWindowThemeList.ModifyCol(1, 440)
     RepoWindowThemeList.ModifyCol(2, 100)
 
     ; 底部按钮
@@ -95,7 +95,6 @@ RefreshRepoThemeList() {
         dateText := t["lastActiveAt"] != "" ? SubStr(t["lastActiveAt"], 1, 10) : ""
         RepoWindowThemeList.Add(, t["name"], dateText)
     }
-    RepoWindowThemeList.ModifyCol(1, "AutoHdr")
 }
 
 ; 路径行：名称 + 完整路径，左列装不下的信息在这里看全
