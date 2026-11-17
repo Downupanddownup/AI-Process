@@ -22,6 +22,17 @@ global ButtonStyle := Map(
     "Border", true
 )
 
+; 弹窗统一底色（值即各弹窗现状，只收编不换色；接入发生在各窗口被改造时）
+global DialogStyle := Map(
+    "BackColor", "F7F7F7"
+)
+
+; 获取弹窗统一底色
+GetDialogBackColor() {
+    global DialogStyle
+    return DialogStyle["BackColor"]
+}
+
 ; 获取指定窗口的样式配置 Map
 GetWindowStyle(windowId) {
     global WindowStyles

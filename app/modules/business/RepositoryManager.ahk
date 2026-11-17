@@ -188,6 +188,41 @@ GetRepoThemes(repoPath) {
     return themes
 }
 
+; 带活跃时间的主题查询：供仓库管理窗口识别列使用
+; 返回 [{name, lastActiveAt}, ...]，按活跃倒序，无数据的排尾（保持目录扫描原序）
+; 不改旧 GetRepoThemes 的返回结构——设置主题弹窗仍在消费它
+GetRepoThemesWithActivity(repoPath) {
+    withTime := []
+    withoutTime := []
+
+    for name in GetRepoThemes(repoPath) {
+        stats := ThemeCost.ReadStats(repoPath "\" name)
+        lastActiveAt := ThemeCost.GetText(stats, "aggregate", "lastActiveAt")
+        item := Map("name", name, "lastActiveAt", lastActiveAt)
+        if (lastActiveAt != "") {
+            withTime.Push(item)
+        } else {
+            withoutTime.Push(item)
+        }
+    }
+
+    ; "YYYY-MM-DD HH:MM:SS" 定长可按字典序比较；插入排序（主题数量级小）
+    ; 注意：AHK v2 的关系运算符不接受字符串，必须用 StrCompare（实测 >= 抛"Expected a Number"）
+    sorted := []
+    for item in withTime {
+        idx := 1
+        while (idx <= sorted.Length && StrCompare(sorted[idx]["lastActiveAt"], item["lastActiveAt"], true) >= 0) {
+            idx++
+        }
+        sorted.InsertAt(idx, item)
+    }
+    for item in withoutTime {
+        sorted.Push(item)
+    }
+
+    return sorted
+}
+
 GetRepoName(repoPath) {
     global Repositories
 
