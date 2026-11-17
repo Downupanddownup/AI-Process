@@ -17,6 +17,7 @@ global ThemeSelectCurrentRepo := ""
 
 global RepoSelectDialog := ""
 global RepoSelectRepoList := ""
+global RepoSelectPathText := ""
 
 global RepoAddDialog := ""
 global RepoAddEdit := ""
@@ -52,8 +53,8 @@ ShowThemeSelectDialog(*) {
     ThemeSelectDialog.OnEvent("Close", CloseThemeSelectDialog)
     ThemeSelectDialog.OnEvent("Escape", CloseThemeSelectDialog)
 
-    ThemeSelectDialog.AddText("xm ym w616 h20", "当前主题：")
-    ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w616 h20 c666666")
+    ThemeSelectDialog.AddText("xm ym w696 h20", "当前主题：")
+    ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w696 h20 c666666")
 
     ThemeSelectDialog.AddText("xm y+12 w60 h20", "选择仓库：")
     ThemeSelectRepoText := ThemeSelectDialog.AddText("x+0 yp w300 h20 cBlue", "")
@@ -61,19 +62,19 @@ ShowThemeSelectDialog(*) {
     ThemeSelectAddRepoBtn := ThemeSelectDialog.AddButton("xm y+2 w80 h24 Hidden", "新增仓库")
     ThemeSelectAddRepoBtn.OnEvent("Click", OnAddRepoFromThemeSelect)
 
-    ThemeSelectDialog.AddText("xm y+12 w616 h20", "主题目录：")
-    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w616 h240 -Multi", ["主题名", "最近活跃"])
-    ThemeSelectThemeList.ModifyCol(1, 470)
+    ThemeSelectDialog.AddText("xm y+12 w696 h20", "主题目录：")
+    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w696 h240 -Multi", ["主题名", "最近活跃"])
+    ThemeSelectThemeList.ModifyCol(1, 550)
     ThemeSelectThemeList.ModifyCol(2, 100)
     ThemeSelectThemeList.OnEvent("DoubleClick", OnThemeSelectOk)
 
-    ThemeSelectDialog.AddText("xm y+10 w616 h20", "新主题名：")
-    ThemeSelectNewEdit := ThemeSelectDialog.AddEdit("xm y+2 w480 h26")
+    ThemeSelectDialog.AddText("xm y+10 w696 h20", "新主题名：")
+    ThemeSelectNewEdit := ThemeSelectDialog.AddEdit("xm y+2 w560 h26")
 
     newThemeBtn := ThemeSelectDialog.AddButton("x+8 yp w128 h26", "新建并切换")
     newThemeBtn.OnEvent("Click", OnNewThemeAndSwitch)
 
-    okBtn := ThemeSelectDialog.AddButton("xm+224 y+14 w80 h26 Default", "确定")
+    okBtn := ThemeSelectDialog.AddButton("xm+264 y+14 w80 h26 Default", "确定")
     okBtn.OnEvent("Click", OnThemeSelectOk)
 
     cancelBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "取消")
@@ -81,7 +82,7 @@ ShowThemeSelectDialog(*) {
 
     RefreshThemeSelectState()
     ; 省略 x/y：系统屏幕居中，不再相对主面板定位
-    ThemeSelectDialog.Show("w640 h540")
+    ThemeSelectDialog.Show("w720 h560")
 }
 
 RefreshThemeSelectState() {
@@ -205,7 +206,7 @@ CloseThemeSelectDialog(*) {
 ; ============================================================
 
 ShowRepoSelectDialog(*) {
-    global RepoSelectDialog, RepoSelectRepoList, Repositories, MainGui
+    global RepoSelectDialog, RepoSelectRepoList, RepoSelectPathText, Repositories, MainGui
 
     if (RepoSelectDialog) {
         RepoSelectDialog.Show()
@@ -228,17 +229,21 @@ ShowRepoSelectDialog(*) {
     RepoSelectDialog.OnEvent("Close", CloseRepoSelectDialog)
     RepoSelectDialog.OnEvent("Escape", CloseRepoSelectDialog)
 
-    RepoSelectDialog.AddText("xm ym w676 h20", "仓库列表：")
-    RepoSelectRepoList := RepoSelectDialog.AddListView("xm y+2 w676 h320 -Multi", ["名称", "最近活跃", "路径"])
-    RepoSelectRepoList.ModifyCol(1, 160)
-    RepoSelectRepoList.ModifyCol(2, 90)
-    RepoSelectRepoList.ModifyCol(3, 380)
+    RepoSelectDialog.AddText("xm ym w876 h20", "仓库列表：")
+    ; 路径行：选中仓库的完整路径（装不下时中间省略，双击复制全路径）
+    RepoSelectPathText := RepoSelectDialog.AddText("xm y+2 w876 h20 c666666", "选择一行查看完整路径（双击此行复制）")
+    RepoSelectPathText.OnEvent("DoubleClick", OnRepoSelectPathDoubleClick)
+    RepoSelectRepoList := RepoSelectDialog.AddListView("xm y+4 w876 h400 -Multi", ["名称", "最近活跃", "路径"])
+    RepoSelectRepoList.ModifyCol(1, 180)
+    RepoSelectRepoList.ModifyCol(2, 100)
+    RepoSelectRepoList.ModifyCol(3, 560)
     RepoSelectRepoList.OnEvent("DoubleClick", OnRepoSelectOk)
+    RepoSelectRepoList.OnEvent("ItemSelect", OnRepoSelectItem)
 
     addBtn := RepoSelectDialog.AddButton("xm y+10 w90 h26", "新增仓库")
     addBtn.OnEvent("Click", OnAddRepoFromRepoSelect)
 
-    okBtn := RepoSelectDialog.AddButton("x520 yp w80 h26 Default", "确定")
+    okBtn := RepoSelectDialog.AddButton("x720 yp w80 h26 Default", "确定")
     okBtn.OnEvent("Click", OnRepoSelectOk)
 
     cancelBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "取消")
@@ -246,7 +251,7 @@ ShowRepoSelectDialog(*) {
 
     RefreshRepoSelectList()
     ; 省略 x/y：系统屏幕居中
-    RepoSelectDialog.Show("w700 h420")
+    RepoSelectDialog.Show("w900 h520")
 }
 
 RefreshRepoSelectList() {
@@ -294,6 +299,39 @@ RefreshRepoSelectList() {
     if (selectedRow > 0) {
         RepoSelectRepoList.Modify(selectedRow, "Select Focus")
     }
+    UpdateRepoSelectPathLine()
+}
+
+; 路径行：显示选中仓库的完整路径（列里截断的在这里看全）
+UpdateRepoSelectPathLine() {
+    global RepoSelectRepoList, RepoSelectPathText
+
+    if (!RepoSelectPathText) {
+        return
+    }
+    row := RepoSelectRepoList.GetNext(0)
+    if (row = 0) {
+        RepoSelectPathText.Text := "选择一行查看完整路径（双击此行复制）"
+        return
+    }
+    fullPath := RepoSelectRepoList.GetText(row, 3)
+    RepoSelectPathText.Text := TruncateToWidth(fullPath, RepoSelectPathText.Hwnd)
+}
+
+OnRepoSelectItem(ctrl, item, selected) {
+    if (selected && item > 0) {
+        UpdateRepoSelectPathLine()
+    }
+}
+
+; 双击路径行：复制选中仓库的完整路径
+OnRepoSelectPathDoubleClick(*) {
+    global RepoSelectRepoList
+
+    row := RepoSelectRepoList.GetNext(0)
+    if (row > 0) {
+        A_Clipboard := RepoSelectRepoList.GetText(row, 3)
+    }
 }
 
 ; 活跃倒序插入排序（"YYYY-MM-DD HH:MM:SS" 定长字典序）
@@ -333,13 +371,14 @@ OnAddRepoFromRepoSelect(*) {
 }
 
 CloseRepoSelectDialog(*) {
-    global RepoSelectDialog, RepoSelectRepoList
+    global RepoSelectDialog, RepoSelectRepoList, RepoSelectPathText
 
     if (RepoSelectDialog) {
         RepoSelectDialog.Destroy()
         RepoSelectDialog := ""
     }
     RepoSelectRepoList := ""
+    RepoSelectPathText := ""
 }
 
 ; ============================================================
@@ -373,22 +412,22 @@ ShowRepoAddDialog(*) {
     RepoAddDialog.OnEvent("Close", CloseRepoAddDialog)
     RepoAddDialog.OnEvent("Escape", CloseRepoAddDialog)
 
-    RepoAddDialog.AddText("xm ym w496 h20", "请输入仓库路径：")
-    RepoAddEdit := RepoAddDialog.AddEdit("xm y+6 w398 h26")
+    RepoAddDialog.AddText("xm ym w616 h20", "请输入仓库路径：")
+    RepoAddEdit := RepoAddDialog.AddEdit("xm y+6 w510 h26")
     browseBtn := RepoAddDialog.AddButton("x+8 yp w90 h26", "浏览…")
     browseBtn.OnEvent("Click", OnRepoAddBrowse)
-    RepoAddErrorText := RepoAddDialog.AddText("xm y+4 w496 h20 cRed Hidden", "")
+    RepoAddErrorText := RepoAddDialog.AddText("xm y+4 w616 h20 cRed Hidden", "")
 
-    RepoAddDialog.AddText("xm y+4 w496 h20 c777777", DomainConventions.RepoRootRuleHint)
+    RepoAddDialog.AddText("xm y+4 w616 h20 c777777", DomainConventions.RepoRootRuleHint)
 
-    okBtn := RepoAddDialog.AddButton("xm+154 y+10 w90 h26 Default", "确认")
+    okBtn := RepoAddDialog.AddButton("xm+214 y+10 w90 h26 Default", "确认")
     okBtn.OnEvent("Click", OnRepoAddConfirm)
 
     cancelBtn := RepoAddDialog.AddButton("x+8 yp w90 h26", "取消")
     cancelBtn.OnEvent("Click", CloseRepoAddDialog)
 
     ; 省略 x/y：系统屏幕居中
-    RepoAddDialog.Show("w520 h220")
+    RepoAddDialog.Show("w640 h240")
     RepoAddEdit.Focus()
 }
 
