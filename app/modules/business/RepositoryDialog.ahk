@@ -21,6 +21,26 @@ global RepoSelectPathText := ""
 ; 列表第 3 列只放中间省略后的显示串，完整路径按行号存这里（复制/打开/确定都用全路径）
 global RepoSelectFullPaths := []
 
+; 可拖拽调整尺寸：Size 事件按客户区差量锚定控件，需持有底部控件引用、当前客户区尺寸和弹性列宽
+global ThemeSelectClientW := 0
+global ThemeSelectClientH := 0
+global ThemeSelectCol1W := 820
+global ThemeSelectNewLabel := ""
+global ThemeSelectNewThemeBtn := ""
+global ThemeSelectOpenDirBtn := ""
+global ThemeSelectCopyPathBtn := ""
+global ThemeSelectOkBtn := ""
+global ThemeSelectCancelBtn := ""
+
+global RepoSelectClientW := 0
+global RepoSelectClientH := 0
+global RepoSelectCol3W := 780
+global RepoSelectAddBtn := ""
+global RepoSelectOpenDirBtn := ""
+global RepoSelectCopyPathBtn := ""
+global RepoSelectOkBtn := ""
+global RepoSelectCancelBtn := ""
+
 global RepoAddDialog := ""
 global RepoAddEdit := ""
 global RepoAddErrorText := ""
@@ -33,6 +53,9 @@ ShowThemeSelectDialog(*) {
     global ThemeSelectDialog, ThemeSelectPathText, ThemeSelectRepoText
     global ThemeSelectAddRepoBtn, ThemeSelectThemeList, ThemeSelectNewEdit
     global ThemeSelectCurrentRepo, MainGui
+    global ThemeSelectClientW, ThemeSelectClientH
+    global ThemeSelectNewLabel, ThemeSelectNewThemeBtn, ThemeSelectOpenDirBtn
+    global ThemeSelectCopyPathBtn, ThemeSelectOkBtn, ThemeSelectCancelBtn
 
     if (ThemeSelectDialog) {
         ThemeSelectDialog.Show()
@@ -42,7 +65,7 @@ ShowThemeSelectDialog(*) {
     }
 
     ownerHwnd := MainGui ? MainGui.Hwnd : 0
-    dialogOptions := "+AlwaysOnTop +ToolWindow"
+    dialogOptions := "+AlwaysOnTop +ToolWindow +Resize"
     if (ownerHwnd) {
         dialogOptions .= " +Owner" ownerHwnd
     }
@@ -52,11 +75,13 @@ ShowThemeSelectDialog(*) {
     ThemeSelectDialog.MarginX := 12
     ThemeSelectDialog.MarginY := 12
     ThemeSelectDialog.SetFont("s9", "Microsoft YaHei UI")
+    ThemeSelectDialog.MinSize := "720x560"
     ThemeSelectDialog.OnEvent("Close", CloseThemeSelectDialog)
     ThemeSelectDialog.OnEvent("Escape", CloseThemeSelectDialog)
+    ThemeSelectDialog.OnEvent("Size", OnThemeSelectSize)
 
-    ThemeSelectDialog.AddText("xm ym w696 h20", "当前主题：")
-    ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w696 h20 c666666")
+    ThemeSelectDialog.AddText("xm ym w936 h20", "当前主题：")
+    ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w936 h20 c666666")
 
     ThemeSelectDialog.AddText("xm y+12 w60 h20", "选择仓库：")
     ThemeSelectRepoText := ThemeSelectDialog.AddText("x+0 yp w300 h20 cBlue", "")
@@ -64,33 +89,78 @@ ShowThemeSelectDialog(*) {
     ThemeSelectAddRepoBtn := ThemeSelectDialog.AddButton("xm y+2 w80 h24 Hidden", "新增仓库")
     ThemeSelectAddRepoBtn.OnEvent("Click", OnAddRepoFromThemeSelect)
 
-    ThemeSelectDialog.AddText("xm y+12 w696 h20", "主题目录：")
-    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w696 h240 -Multi", ["主题名", "最近活跃"])
-    ThemeSelectThemeList.ModifyCol(1, 550)
+    ThemeSelectDialog.AddText("xm y+12 w936 h20", "主题目录：")
+    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w936 h380 -Multi", ["主题名", "最近活跃"])
+    ThemeSelectThemeList.ModifyCol(1, 820)
     ThemeSelectThemeList.ModifyCol(2, "100 Center")
     ApplyDialogListStyle(ThemeSelectThemeList)
     ThemeSelectThemeList.OnEvent("DoubleClick", OnThemeSelectOk)
 
-    ThemeSelectDialog.AddText("xm y+10 w696 h20", "新主题名：")
-    ThemeSelectNewEdit := ThemeSelectDialog.AddEdit("xm y+2 w560 h26")
+    ThemeSelectNewLabel := ThemeSelectDialog.AddText("xm y+10 w936 h20", "新主题名：")
+    ThemeSelectNewEdit := ThemeSelectDialog.AddEdit("xm y+2 w800 h26")
 
-    newThemeBtn := ThemeSelectDialog.AddButton("x+8 yp w128 h26", "新建并切换")
-    newThemeBtn.OnEvent("Click", OnNewThemeAndSwitch)
+    ThemeSelectNewThemeBtn := ThemeSelectDialog.AddButton("x+8 yp w128 h26", "新建并切换")
+    ThemeSelectNewThemeBtn.OnEvent("Click", OnNewThemeAndSwitch)
 
-    openDirBtn := ThemeSelectDialog.AddButton("xm y+14 w80 h26", "打开目录")
-    openDirBtn.OnEvent("Click", OnThemeSelectOpenDir)
-    copyPathBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "复制路径")
-    copyPathBtn.OnEvent("Click", OnThemeSelectCopyPath)
+    ThemeSelectOpenDirBtn := ThemeSelectDialog.AddButton("xm y+14 w80 h26", "打开目录")
+    ThemeSelectOpenDirBtn.OnEvent("Click", OnThemeSelectOpenDir)
+    ThemeSelectCopyPathBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "复制路径")
+    ThemeSelectCopyPathBtn.OnEvent("Click", OnThemeSelectCopyPath)
 
-    okBtn := ThemeSelectDialog.AddButton("xm+264 yp w80 h26 Default", "确定")
-    okBtn.OnEvent("Click", OnThemeSelectOk)
+    ThemeSelectOkBtn := ThemeSelectDialog.AddButton("x780 yp w80 h26 Default", "确定")
+    ThemeSelectOkBtn.OnEvent("Click", OnThemeSelectOk)
 
-    cancelBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "取消")
-    cancelBtn.OnEvent("Click", CloseThemeSelectDialog)
+    ThemeSelectCancelBtn := ThemeSelectDialog.AddButton("x+8 yp w80 h26", "取消")
+    ThemeSelectCancelBtn.OnEvent("Click", CloseThemeSelectDialog)
 
+    ThemeSelectClientW := 960
+    ThemeSelectClientH := 700
     RefreshThemeSelectState()
     ; 省略 x/y：系统屏幕居中，不再相对主面板定位
-    ThemeSelectDialog.Show("w720 h560")
+    ThemeSelectDialog.Show("w960 h700")
+}
+
+; 尺寸变化时按客户区差量锚定：列表和输入框双向拉伸、首列吃掉横向增量、底部控件吸附下缘/右缘
+OnThemeSelectSize(guiObj, minMax, w, h) {
+    global ThemeSelectClientW, ThemeSelectClientH, ThemeSelectCol1W
+    global ThemeSelectPathText, ThemeSelectThemeList, ThemeSelectNewLabel, ThemeSelectNewEdit
+    global ThemeSelectNewThemeBtn, ThemeSelectOpenDirBtn, ThemeSelectCopyPathBtn
+    global ThemeSelectOkBtn, ThemeSelectCancelBtn
+
+    if (minMax = -1 || ThemeSelectClientW = 0) {
+        return
+    }
+    dw := w - ThemeSelectClientW
+    dh := h - ThemeSelectClientH
+    if (dw = 0 && dh = 0) {
+        return
+    }
+    ThemeSelectClientW := w
+    ThemeSelectClientH := h
+
+    ThemeSelectPathText.GetPos(, , &pathW, )
+    ThemeSelectPathText.Move(, , pathW + dw)
+
+    ThemeSelectThemeList.GetPos(, , &listW, &listH)
+    ThemeSelectThemeList.Move(, , listW + dw, listH + dh)
+    ThemeSelectCol1W += dw
+    ThemeSelectThemeList.ModifyCol(1, ThemeSelectCol1W)
+
+    ThemeSelectNewLabel.GetPos(, &labelY, , )
+    ThemeSelectNewLabel.Move(, labelY + dh)
+    ThemeSelectNewEdit.GetPos(&editX, &editY, &editW, )
+    ThemeSelectNewEdit.Move(editX, editY + dh, editW + dw)
+    ThemeSelectNewThemeBtn.GetPos(&newBtnX, &newBtnY, , )
+    ThemeSelectNewThemeBtn.Move(newBtnX + dw, newBtnY + dh)
+
+    ThemeSelectOpenDirBtn.GetPos(, &openY, , )
+    ThemeSelectOpenDirBtn.Move(, openY + dh)
+    ThemeSelectCopyPathBtn.GetPos(, &copyY, , )
+    ThemeSelectCopyPathBtn.Move(, copyY + dh)
+    ThemeSelectOkBtn.GetPos(&okX, &okY, , )
+    ThemeSelectOkBtn.Move(okX + dw, okY + dh)
+    ThemeSelectCancelBtn.GetPos(&cancelX, &cancelY, , )
+    ThemeSelectCancelBtn.Move(cancelX + dw, cancelY + dh)
 }
 
 RefreshThemeSelectState() {
@@ -219,6 +289,9 @@ CloseThemeSelectDialog(*) {
     global ThemeSelectDialog, ThemeSelectPathText, ThemeSelectRepoText
     global ThemeSelectAddRepoBtn, ThemeSelectThemeList, ThemeSelectNewEdit
     global ThemeSelectCurrentRepo
+    global ThemeSelectClientW, ThemeSelectClientH, ThemeSelectCol1W
+    global ThemeSelectNewLabel, ThemeSelectNewThemeBtn, ThemeSelectOpenDirBtn
+    global ThemeSelectCopyPathBtn, ThemeSelectOkBtn, ThemeSelectCancelBtn
 
     if (ThemeSelectDialog) {
         ThemeSelectDialog.Destroy()
@@ -230,6 +303,15 @@ CloseThemeSelectDialog(*) {
     ThemeSelectThemeList := ""
     ThemeSelectNewEdit := ""
     ThemeSelectCurrentRepo := ""
+    ThemeSelectClientW := 0
+    ThemeSelectClientH := 0
+    ThemeSelectCol1W := 820
+    ThemeSelectNewLabel := ""
+    ThemeSelectNewThemeBtn := ""
+    ThemeSelectOpenDirBtn := ""
+    ThemeSelectCopyPathBtn := ""
+    ThemeSelectOkBtn := ""
+    ThemeSelectCancelBtn := ""
 }
 
 ; ============================================================
@@ -238,6 +320,9 @@ CloseThemeSelectDialog(*) {
 
 ShowRepoSelectDialog(*) {
     global RepoSelectDialog, RepoSelectRepoList, RepoSelectPathText, Repositories, MainGui
+    global RepoSelectClientW, RepoSelectClientH
+    global RepoSelectAddBtn, RepoSelectOpenDirBtn, RepoSelectCopyPathBtn
+    global RepoSelectOkBtn, RepoSelectCancelBtn
 
     if (RepoSelectDialog) {
         RepoSelectDialog.Show()
@@ -247,7 +332,7 @@ ShowRepoSelectDialog(*) {
     }
 
     ownerHwnd := MainGui ? MainGui.Hwnd : 0
-    dialogOptions := "+AlwaysOnTop +ToolWindow"
+    dialogOptions := "+AlwaysOnTop +ToolWindow +Resize"
     if (ownerHwnd) {
         dialogOptions .= " +Owner" ownerHwnd
     }
@@ -257,38 +342,89 @@ ShowRepoSelectDialog(*) {
     RepoSelectDialog.MarginX := 12
     RepoSelectDialog.MarginY := 12
     RepoSelectDialog.SetFont("s9", "Microsoft YaHei UI")
+    RepoSelectDialog.MinSize := "900x520"
     RepoSelectDialog.OnEvent("Close", CloseRepoSelectDialog)
     RepoSelectDialog.OnEvent("Escape", CloseRepoSelectDialog)
+    RepoSelectDialog.OnEvent("Size", OnRepoSelectSize)
 
-    RepoSelectDialog.AddText("xm ym w876 h20", "仓库列表：")
+    RepoSelectDialog.AddText("xm ym w1076 h20", "仓库列表：")
     ; 路径行：选中仓库的完整路径（装不下时中间省略，双击复制全路径）
-    RepoSelectPathText := RepoSelectDialog.AddText("xm y+2 w876 h20 c666666", "选择一行查看完整路径（双击此行复制）")
+    RepoSelectPathText := RepoSelectDialog.AddText("xm y+2 w1076 h20 c666666", "选择一行查看完整路径（双击此行复制）")
     RepoSelectPathText.OnEvent("DoubleClick", OnRepoSelectPathDoubleClick)
-    RepoSelectRepoList := RepoSelectDialog.AddListView("xm y+4 w876 h400 -Multi", ["名称", "最近活跃", "路径"])
+    RepoSelectRepoList := RepoSelectDialog.AddListView("xm y+4 w1076 h560 -Multi", ["名称", "最近活跃", "路径"])
     RepoSelectRepoList.ModifyCol(1, 180)
     RepoSelectRepoList.ModifyCol(2, "100 Center")
-    RepoSelectRepoList.ModifyCol(3, 560)
+    RepoSelectRepoList.ModifyCol(3, 780)
     ApplyDialogListStyle(RepoSelectRepoList)
     RepoSelectRepoList.OnEvent("DoubleClick", OnRepoSelectOk)
     RepoSelectRepoList.OnEvent("ItemSelect", OnRepoSelectItem)
 
-    addBtn := RepoSelectDialog.AddButton("xm y+10 w90 h26", "新增仓库")
-    addBtn.OnEvent("Click", OnAddRepoFromRepoSelect)
+    RepoSelectAddBtn := RepoSelectDialog.AddButton("xm y+10 w90 h26", "新增仓库")
+    RepoSelectAddBtn.OnEvent("Click", OnAddRepoFromRepoSelect)
 
-    openDirBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "打开目录")
-    openDirBtn.OnEvent("Click", OnRepoSelectOpenDir)
-    copyPathBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "复制路径")
-    copyPathBtn.OnEvent("Click", OnRepoSelectCopyPath)
+    RepoSelectOpenDirBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "打开目录")
+    RepoSelectOpenDirBtn.OnEvent("Click", OnRepoSelectOpenDir)
+    RepoSelectCopyPathBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "复制路径")
+    RepoSelectCopyPathBtn.OnEvent("Click", OnRepoSelectCopyPath)
 
-    okBtn := RepoSelectDialog.AddButton("x720 yp w80 h26 Default", "确定")
-    okBtn.OnEvent("Click", OnRepoSelectOk)
+    RepoSelectOkBtn := RepoSelectDialog.AddButton("x920 yp w80 h26 Default", "确定")
+    RepoSelectOkBtn.OnEvent("Click", OnRepoSelectOk)
 
-    cancelBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "取消")
-    cancelBtn.OnEvent("Click", CloseRepoSelectDialog)
+    RepoSelectCancelBtn := RepoSelectDialog.AddButton("x+8 yp w80 h26", "取消")
+    RepoSelectCancelBtn.OnEvent("Click", CloseRepoSelectDialog)
 
+    RepoSelectClientW := 1100
+    RepoSelectClientH := 680
     RefreshRepoSelectList()
     ; 省略 x/y：系统屏幕居中
-    RepoSelectDialog.Show("w900 h520")
+    RepoSelectDialog.Show("w1100 h680")
+}
+
+; 尺寸变化时按客户区差量锚定：列表双向拉伸、路径列吃掉横向增量并按新列宽重截显示串、底部控件吸附下缘/右缘
+OnRepoSelectSize(guiObj, minMax, w, h) {
+    global RepoSelectClientW, RepoSelectClientH, RepoSelectCol3W
+    global RepoSelectRepoList, RepoSelectFullPaths, RepoSelectPathText
+    global RepoSelectAddBtn, RepoSelectOpenDirBtn, RepoSelectCopyPathBtn
+    global RepoSelectOkBtn, RepoSelectCancelBtn
+
+    if (minMax = -1 || RepoSelectClientW = 0) {
+        return
+    }
+    dw := w - RepoSelectClientW
+    dh := h - RepoSelectClientH
+    if (dw = 0 && dh = 0) {
+        return
+    }
+    RepoSelectClientW := w
+    RepoSelectClientH := h
+
+    RepoSelectPathText.GetPos(, , &pathW, )
+    RepoSelectPathText.Move(, , pathW + dw)
+
+    RepoSelectRepoList.GetPos(, , &listW, &listH)
+    RepoSelectRepoList.Move(, , listW + dw, listH + dh)
+    RepoSelectCol3W += dw
+    RepoSelectRepoList.ModifyCol(3, RepoSelectCol3W)
+
+    if (dw != 0 && RepoSelectFullPaths.Length > 0) {
+        ; 列宽变了，显示串按新宽重截（ModifyCol 是逻辑单位，量宽是物理像素，乘 DPI 换算）
+        pathColWidth := Round(RepoSelectCol3W * A_ScreenDPI / 96) - 12
+        Loop RepoSelectRepoList.GetCount() {
+            row := A_Index
+            RepoSelectRepoList.Modify(row, "Col3", TruncateToPixelWidth(RepoSelectFullPaths[row], pathColWidth, RepoSelectRepoList.Hwnd))
+        }
+    }
+
+    RepoSelectAddBtn.GetPos(, &addY, , )
+    RepoSelectAddBtn.Move(, addY + dh)
+    RepoSelectOpenDirBtn.GetPos(, &openY, , )
+    RepoSelectOpenDirBtn.Move(, openY + dh)
+    RepoSelectCopyPathBtn.GetPos(, &copyY, , )
+    RepoSelectCopyPathBtn.Move(, copyY + dh)
+    RepoSelectOkBtn.GetPos(&okX, &okY, , )
+    RepoSelectOkBtn.Move(okX + dw, okY + dh)
+    RepoSelectCancelBtn.GetPos(&cancelX, &cancelY, , )
+    RepoSelectCancelBtn.Move(cancelX + dw, cancelY + dh)
 }
 
 RefreshRepoSelectList() {
@@ -428,6 +564,9 @@ OnAddRepoFromRepoSelect(*) {
 
 CloseRepoSelectDialog(*) {
     global RepoSelectDialog, RepoSelectRepoList, RepoSelectPathText
+    global RepoSelectClientW, RepoSelectClientH, RepoSelectCol3W, RepoSelectFullPaths
+    global RepoSelectAddBtn, RepoSelectOpenDirBtn, RepoSelectCopyPathBtn
+    global RepoSelectOkBtn, RepoSelectCancelBtn
 
     if (RepoSelectDialog) {
         RepoSelectDialog.Destroy()
@@ -435,6 +574,15 @@ CloseRepoSelectDialog(*) {
     }
     RepoSelectRepoList := ""
     RepoSelectPathText := ""
+    RepoSelectFullPaths := []
+    RepoSelectClientW := 0
+    RepoSelectClientH := 0
+    RepoSelectCol3W := 780
+    RepoSelectAddBtn := ""
+    RepoSelectOpenDirBtn := ""
+    RepoSelectCopyPathBtn := ""
+    RepoSelectOkBtn := ""
+    RepoSelectCancelBtn := ""
 }
 
 ; ============================================================
