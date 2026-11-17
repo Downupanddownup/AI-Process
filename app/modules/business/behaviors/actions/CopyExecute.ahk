@@ -2,7 +2,7 @@
 
 ; 复执行（AI 型）：复制执行指令并发送 AI（改吧/步目 两策略分支）
 ; 逐行等价迁出（旧件已删）
-; 分支语义：改吧 = 不校验前置；步目 = 实施文档优先，否则使用最新回复；两条策略都由模板自带"打开结果文档"的结束指令，不再追加尾部
+; 分支语义：改吧 = 不校验前置；步目 = 依据三档（实施文档 → 最新回复 → 最新版本文档）；两条策略都由模板自带"打开结果文档"的结束指令，不再追加尾部
 
 class CopyExecute extends AgentActionBase {
     ActionKey := "复执行"
@@ -26,13 +26,10 @@ class CopyExecute extends AgentActionBase {
         if (selectedStrategy = "tweak") {
             content := this.LoadTemplate(strategyMeta["template"])
         } else {
-            ; 步目策略：实施文档优先，否则使用最新回复
-            sourcePath := chain.ImplDocPath()
-            if !FileExist(sourcePath) {
-                sourcePath := chain.LatestReplyPath()
-            }
-            if !FileExist(sourcePath) {
-                ShowFeedback("当前目录下未找到实施文档或最新回复", true)
+            ; 步目策略：依据三档，见 ResolveStepsSourcePath
+            sourcePath := ResolveStepsSourcePath(chain)
+            if (sourcePath = "") {
+                ShowFeedback("步目需要实施文档、最新回复或版本文档作为拆分依据，当前都没有", true)
                 this.SkipAutoHide := true  ; 前置校验未通过：不触发自动隐藏
                 return
             }
@@ -53,4 +50,20 @@ class CopyExecute extends AgentActionBase {
 
         this.Dispatch(content, properties, strategyMeta["feedback"])
     }
+}
+
+; 步目拆分依据三档：实施文档 → 最新回复 → 最新版本文档（讨论停在 AI 侧时按 AI 最新成稿）
+; 三档全无返回空串，判空与提示归调用方
+ResolveStepsSourcePath(chain) {
+    sourcePath := chain.ImplDocPath()
+    if !FileExist(sourcePath) {
+        sourcePath := chain.LatestReplyPath()
+    }
+    if !FileExist(sourcePath) {
+        sourcePath := chain.LatestVersionPath()
+    }
+    if !FileExist(sourcePath) {
+        return ""
+    }
+    return sourcePath
 }
