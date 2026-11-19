@@ -1,4 +1,4 @@
-改吧，请在完成后将执行结果写入 {{resultFilePath}}
+做吧，请在完成后将执行结果写入 {{resultFilePath}}
 
 文件格式请参考：{{resultTemplatePath}}
 
