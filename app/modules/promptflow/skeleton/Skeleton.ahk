@@ -117,6 +117,41 @@ class Skeleton {
         "steps_rules",        ["resultFilePath"]
     )
 
+    ; ============ 四、段文件映射 ============
+    ; 段 id → 骨架目录下的相对路径
+    ; brief 不在表里：它的文件由策略的 Brief 字段决定，路径是 briefs\<policy.Brief>
+    static SegmentFiles := Map(
+        "question_format",    "parts\question_format.txt",
+        "manifest_block",     "parts\manifest_block.txt",
+        "end_open_generated", "ends\open_generated.txt",
+        "end_open_fixed",     "ends\open_fixed.txt",
+        "end_notify",         "ends\notify.txt"
+    )
+
+    ; 骨架数据根：promptflow\data\skeleton
+    ; 本文件在 promptflow\skeleton\ 下，上两级到 promptflow
+    static DataDir {
+        get {
+            codeDir := RegExReplace(A_LineFile, "\\[^\\]+$", "")          ; promptflow\skeleton
+            root := RegExReplace(codeDir, "\\[^\\]+$", "")                ; promptflow
+            return root "\data\skeleton"
+        }
+    }
+
+    ; 某段的文件绝对路径；brief 需传策略
+    static GetSegmentFile(segmentId, policy := "") {
+        if (segmentId = "brief") {
+            if (policy = "" || policy.Brief = "") {
+                throw Error("brief 段需要策略给出 Brief 文件名")
+            }
+            return this.DataDir "\briefs\" policy.Brief
+        }
+        if !this.SegmentFiles.Has(segmentId) {
+            throw Error("骨架里没有这个段的文件：" segmentId)
+        }
+        return this.DataDir "\" this.SegmentFiles[segmentId]
+    }
+
     ; ============ 查询 ============
 
     ; 组合键
