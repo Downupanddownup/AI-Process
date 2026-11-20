@@ -9,6 +9,7 @@ class AssemblerEngine {
     ; 主入口：组合 + 环境 → 整份文本
     static Assemble(actionKey, policyKey, env) {
         act := Action.FromSkeleton(actionKey)
+        act.SelectedPolicy := policyKey
         pol := act.GetPolicy(policyKey)
         if (pol = "") {
             throw Error("动作 " actionKey " 没有策略 " policyKey)
@@ -38,10 +39,15 @@ class AssemblerEngine {
             } else if (seg["kind"] = "slot") {
                 for blockId in recipe.Content {
                     blk := BlockLibrary.Get(blockId, flow.BlocksDir)
+                    ; 块正文末尾可能自带换行，先去掉再拼，否则与分隔符叠成三个换行
+                    body := RTrim(blk.Body, "`r`n")
+                    if (body = "") {
+                        continue
+                    }
                     if (text != "") {
                         text .= "`n`n"
                     }
-                    text .= blk.Body
+                    text .= body
                 }
             } else {
                 throw Error("未知的段类型：" seg["kind"])
