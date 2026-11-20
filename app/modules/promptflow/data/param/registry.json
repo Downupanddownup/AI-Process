@@ -1,4 +1,17 @@
 {
+  "_kinds": {
+    "ref": {
+      "meaning": "参考文献引用",
+      "syntax": "{{ref:<id>}}",
+      "idSource": "参考文档的目录名",
+      "resolvesTo": "该文档 body.md 的绝对路径",
+      "lookupOrder": [
+        "flows/<builtin|custom>/<流程>/references/",
+        "data/skeleton/references/",
+        "data/references/"
+      ]
+    }
+  },
   "filePath": {
     "meaning": "本次要读的输入文件路径，按动作不同指向不同文件",
     "rule": "action.input",

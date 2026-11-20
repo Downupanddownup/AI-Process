@@ -32,6 +32,7 @@ class PromptParam {
     }
 
     ; 加载整份词表：返回 Map(name → PromptParam)
+    ; 跳过以 _ 开头的键（_kinds 是占位符类型定义，不是固定词）
     static LoadAll() {
         path := this.RegistryPath
         if !FileExist(path) {
@@ -45,6 +46,9 @@ class PromptParam {
 
         all := Map()
         for name, item in data {
+            if (SubStr(name, 1, 1) = "_") {
+                continue
+            }
             p := PromptParam()
             p.Name := name
             p.Meaning := item.Has("meaning") ? item["meaning"] : ""
@@ -53,6 +57,20 @@ class PromptParam {
             all[name] := p
         }
         return all
+    }
+
+    ; 占位符类型定义（_kinds 段）：Map(前缀 → 定义 Map)
+    static GetKinds() {
+        path := this.RegistryPath
+        if !FileExist(path) {
+            throw Error("占位词表不存在：" path)
+        }
+        try {
+            data := JSON.Load(FileRead(path, "UTF-8"))
+        } catch as e {
+            throw Error("占位词表解析失败：" path " — " e.Message)
+        }
+        return data.Has("_kinds") ? data["_kinds"] : Map()
     }
 
     ; 按名查；找不到返回空串

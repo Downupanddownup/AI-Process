@@ -11,6 +11,9 @@ class Environment {
     ; 该窗口当前主题目录
     TopicDir := ""
 
+    ; 当前使用的流程 key —— 参考文档查找需要知道"用哪套流程"
+    FlowKey := ""
+
     ; 打开 Markdown 的脚本路径
     OpenMdScriptPath := ""
 
@@ -22,6 +25,7 @@ class Environment {
         e := Environment()
         e.WindowId := m.Has("WindowId") ? m["WindowId"] : ""
         e.TopicDir := m.Has("TopicDir") ? m["TopicDir"] : ""
+        e.FlowKey := m.Has("FlowKey") ? m["FlowKey"] : ""
         e.OpenMdScriptPath := m.Has("OpenMdScriptPath") ? m["OpenMdScriptPath"] : ""
         e.NotificationScriptPath := m.Has("NotificationScriptPath") ? m["NotificationScriptPath"] : ""
         return e

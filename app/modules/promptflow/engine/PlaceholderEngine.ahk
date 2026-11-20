@@ -1,8 +1,10 @@
 #Requires AutoHotkey v2.0
 
 ; 占位引擎：把块文本里的 {{词}} 解释成值
-; 三件事：扫出名字、校验登记、替换并检查残留
-; 核心约束：未登记即报错，残留即报错
+; 两类占位符：
+;   固定词（filePath / windowId …）—— 查词表
+;   引用（{{ref:<id>}}）—— 查 _kinds，再查参考文档库
+; 核心约束：未登记即报错，未知类型即报错，残留即报错
 
 class PlaceholderEngine {
 
@@ -20,22 +22,30 @@ class PlaceholderEngine {
         return names
     }
 
-    ; 校验一段文本里的占位符是否全部登记；不通过即抛错并点名
+    ; 校验一段文本：固定词必须在词表里，引用必须有对应的类型定义
     static Validate(text, sourceId := "") {
         all := PromptParam.LoadAll()
+        kinds := PromptParam.GetKinds()
         missing := []
+        badKind := []
         for name in this.ExtractNames(text) {
+            prefix := this._PrefixOf(name)
+            if (prefix != "") {
+                if !kinds.Has(prefix) {
+                    badKind.Push(prefix)
+                }
+                continue
+            }
             if !PromptParam.IsRegistered(name, all) {
                 missing.Push(name)
             }
         }
+        where := (sourceId = "") ? "" : "（来源：" sourceId "）"
+        if (badKind.Length > 0) {
+            throw Error("未知的占位符类型：" this._Join(badKind) where)
+        }
         if (missing.Length > 0) {
-            list := ""
-            for n in missing {
-                list .= (list = "" ? "" : "、") n
-            }
-            where := (sourceId = "") ? "" : "（来源：" sourceId "）"
-            throw Error("占位符未登记：" list where)
+            throw Error("占位符未登记：" this._Join(missing) where)
         }
         return true
     }
@@ -43,31 +53,55 @@ class PlaceholderEngine {
     ; 替换全部占位符；替换后再扫，有残留即抛错
     static Resolve(text, env, action) {
         all := PromptParam.LoadAll()
+        kinds := PromptParam.GetKinds()
         result := text
 
-        ; 先扫出唯一名字，再逐个全替换——避免边换边扫导致位置漂移
         for name in this.ExtractNames(text) {
-            param := PromptParam.Find(name, all)
-            if (param = "") {
-                throw Error("占位符未登记：" name)
+            prefix := this._PrefixOf(name)
+            if (prefix != "") {
+                if !kinds.Has(prefix) {
+                    throw Error("未知的占位符类型：" prefix)
+                }
+                refId := SubStr(name, StrLen(prefix) + 2)
+                if (prefix = "ref") {
+                    value := ReferenceLibrary.Get(refId, env.FlowKey).BodyPath
+                } else {
+                    throw Error("占位符类型没有实现：" prefix)
+                }
+            } else {
+                param := PromptParam.Find(name, all)
+                if (param = "") {
+                    throw Error("占位符未登记：" name)
+                }
+                value := PromptParamRule.Resolve(param.Rule, env, action)
             }
-            value := PromptParamRule.Resolve(param.Rule, env, action)
             result := StrReplace(result, "{{" name "}}", value)
         }
 
         ; 残留检查
         left := this.ExtractNames(result)
         if (left.Length > 0) {
-            list := ""
-            for n in left {
-                list .= (list = "" ? "" : "、") n
-            }
-            throw Error("占位符替换后仍有残留：" list)
+            throw Error("占位符替换后仍有残留：" this._Join(left))
         }
         return result
     }
 
-    ; 私有：数组包含
+    ; ---- 私有 ----
+
+    ; 名字里含冒号则返回冒号前的类型前缀，否则返回空
+    static _PrefixOf(name) {
+        idx := InStr(name, ":")
+        return (idx > 1) ? SubStr(name, 1, idx - 1) : ""
+    }
+
+    static _Join(arr) {
+        s := ""
+        for x in arr {
+            s .= (s = "" ? "" : "、") x
+        }
+        return s
+    }
+
     static _Has(arr, value) {
         for item in arr {
             if (item = value) {

@@ -23,19 +23,34 @@ class AssemblerEngine {
         comboKey := Skeleton.ComposeKey(actionKey, policyKey)
         recipe := flow.GetRecipe(comboKey)
 
-        ; 按段序拼接
+        ; 按段序拼接：每段去尾换行后，用两个换行连接
+        ; 为什么不直接首尾相接：段文件是从模板按区间切的，但文件最后一段没有尾随空行
+        ; （如 requirement_prompt 的 complexity 段止于文件尾），直接接会把"外部信息"和"行为约束"粘成一行
         full := ""
         for seg in layout {
+            text := ""
             if (seg["kind"] = "block") {
-                full .= this._ReadText(Skeleton.GetSegmentFile(seg["id"], pol))
+                text := this._ReadText(Skeleton.GetSegmentFile(seg["id"], pol))
             } else if (seg["kind"] = "slot") {
                 for blockId in recipe.Content {
                     blk := BlockLibrary.Get(blockId, flow.BlocksDir)
-                    full .= blk.Body
+                    if (text != "") {
+                        text .= "`n`n"
+                    }
+                    text .= blk.Body
                 }
             } else {
                 throw Error("未知的段类型：" seg["kind"])
             }
+
+            text := RTrim(text, "`r`n")
+            if (text = "") {
+                continue
+            }
+            if (full != "") {
+                full .= "`n`n"
+            }
+            full .= text
         }
 
         ; 占位符只替换一次，对整份文本
