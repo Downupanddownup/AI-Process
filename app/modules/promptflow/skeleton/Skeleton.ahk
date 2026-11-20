@@ -107,7 +107,7 @@ class Skeleton {
     ; 段 id → 用到的占位符名。值由占位引擎结合运行环境解释
     ; 块（flow.json 引用的）也在此登记，虽然它们不在 Layouts 里
     static Bindings := Map(
-        "brief",              ["filePath", "nextVersionFile", "nextVersionPath", "scaleSummary"],
+        "brief",              ["filePath", "nextVersionFile", "nextVersionPath", "scaleSummary", "topicDir"],
         "manifest_block",     ["fileManifest"],
         "end_open_generated", ["openMdScript", "windowId"],
         "end_open_fixed",     ["openMdScript", "windowId", "resultFilePath"],
@@ -138,18 +138,34 @@ class Skeleton {
         }
     }
 
-    ; 某段的文件绝对路径；brief 需传策略
-    static GetSegmentFile(segmentId, policy := "") {
-        if (segmentId = "brief") {
-            if (policy = "" || policy.Brief = "") {
-                throw Error("brief 段需要策略给出 Brief 文件名")
-            }
-            return this.DataDir "\briefs\" policy.Brief
-        }
+    ; 某段的文件绝对路径（brief 不在此列——用 GetBriefFile）
+    static GetSegmentFile(segmentId) {
         if !this.SegmentFiles.Has(segmentId) {
-            throw Error("骨架里没有这个段的文件：" segmentId)
+            throw Error("骨架里没有这个段的文件：" segmentId "（brief 段请用 GetBriefFile）")
         }
         return this.DataDir "\" this.SegmentFiles[segmentId]
+    }
+
+    ; 按具体文件名取 brief 路径
+    ; brief 有两档（full / skeleton），选哪档由 AssemblerEngine._PickBrief 决定，不在这里猜
+    static GetBriefFile(briefName) {
+        if (briefName = "") {
+            throw Error("brief 文件名不能为空")
+        }
+        return this.DataDir "\briefs\" briefName
+    }
+
+    ; ============ 五、两档 brief 的切换阈值 ============
+    ; 原在 business/ContextRebuildScalePolicy，属骨架规则（"什么时候换 brief"是骨架定的）
+    static ScalePolicy := Map(
+        "fullReadMaxFileCount", 50,
+        "fullReadMaxTextBytes", 200 * 1024
+    )
+
+    ; 按规模判断该用哪一档；manifest 为 ContextRebuildManifest.Build 的返回
+    static ShouldUseSkeletonBrief(manifest) {
+        return (manifest["FileCount"] > this.ScalePolicy["fullReadMaxFileCount"])
+            || (manifest["TextBytes"] > this.ScalePolicy["fullReadMaxTextBytes"])
     }
 
     ; ============ 查询 ============

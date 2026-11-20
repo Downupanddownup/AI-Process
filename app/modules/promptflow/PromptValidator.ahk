@@ -126,9 +126,27 @@ class PromptValidator {
             if (seg["kind"] != "block") {
                 continue
             }
+
+            ; brief 有两档，两档都查——运行时按规模选，配置错哪一档都要能提前发现
+            if (seg["id"] = "brief") {
+                for briefName in [pol.Brief, pol.BriefAlt] {
+                    if (briefName = "") {
+                        continue
+                    }
+                    path := Skeleton.GetBriefFile(briefName)
+                    if !FileExist(path) {
+                        report.Add(ValidationIssue.Create("missing_segment", comboKey,
+                            "brief 文件不存在：" path, [path]))
+                        continue
+                    }
+                    segmentTexts.Push([FileRead(path, "UTF-8"), path])
+                }
+                continue
+            }
+
             path := ""
             try {
-                path := Skeleton.GetSegmentFile(seg["id"], pol)
+                path := Skeleton.GetSegmentFile(seg["id"])
             } catch as e {
                 report.Add(ValidationIssue.Create("missing_segment", comboKey, e.Message))
                 continue

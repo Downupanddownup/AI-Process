@@ -30,7 +30,11 @@ class AssemblerEngine {
         for seg in layout {
             text := ""
             if (seg["kind"] = "block") {
-                text := this._ReadText(Skeleton.GetSegmentFile(seg["id"], pol))
+                if (seg["id"] = "brief") {
+                    text := this._ReadText(Skeleton.GetBriefFile(this._PickBrief(pol, env)))
+                } else {
+                    text := this._ReadText(Skeleton.GetSegmentFile(seg["id"]))
+                }
             } else if (seg["kind"] = "slot") {
                 for blockId in recipe.Content {
                     blk := BlockLibrary.Get(blockId, flow.BlocksDir)
@@ -55,6 +59,15 @@ class AssemblerEngine {
 
         ; 占位符只替换一次，对整份文本
         return PlaceholderEngine.Resolve(full, env, act)
+    }
+
+    ; 两档 brief 二选一：没有 briefAlt 就直接用 brief，有则按规模选
+    static _PickBrief(pol, env) {
+        if (pol.BriefAlt = "") {
+            return pol.Brief
+        }
+        manifest := ContextRebuildManifest.Build(env.TopicDir)
+        return Skeleton.ShouldUseSkeletonBrief(manifest) ? pol.BriefAlt : pol.Brief
     }
 
     ; 读文本；不存在即抛错，不静默

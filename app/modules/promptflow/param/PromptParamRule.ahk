@@ -27,10 +27,11 @@ class PromptParamRule {
             return this._ResultTemplate(action)
         }
         if (rule = "manifest.summary") {
-            return ContextRebuildManifest.Build(env.TopicDir)["Summary"]
+            ; RTrim：规则的值会插在段中间，末尾换行会与拼装的分隔符叠成多一个空行
+            return RTrim(ContextRebuildManifest.Build(env.TopicDir)["Summary"], "`r`n")
         }
         if (rule = "manifest.text") {
-            return ContextRebuildManifest.Build(env.TopicDir)["ManifestText"]
+            return RTrim(ContextRebuildManifest.Build(env.TopicDir)["ManifestText"], "`r`n")
         }
         if (rule = "config.openMdScript") {
             return env.OpenMdScriptPath
@@ -40,6 +41,9 @@ class PromptParamRule {
         }
         if (rule = "window.active") {
             return (env.WindowId != "") ? env.WindowId : GetActiveWindowId()
+        }
+        if (rule = "window.topicDir") {
+            return env.TopicDir
         }
         throw Error("未知的占位规则：" rule)
     }

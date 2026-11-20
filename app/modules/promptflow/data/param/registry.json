@@ -61,5 +61,10 @@
     "meaning": "当前窗口编号",
     "rule": "window.active",
     "source": "Environment.WindowId"
+  },
+  "topicDir": {
+    "meaning": "当前主题目录的绝对路径（不含文件名）",
+    "rule": "window.topicDir",
+    "source": "Environment.TopicDir"
   }
 }
