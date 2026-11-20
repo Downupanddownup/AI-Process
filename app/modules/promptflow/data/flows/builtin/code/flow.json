@@ -1,0 +1,34 @@
+{
+  "key": "code",
+  "name": "代码开发",
+  "readonly": true,
+  "recipes": {
+    "复需求|single": {
+      "content": ["complexity", "no_modify", "content_quality", "question_rules"]
+    },
+    "复回复|direct": {
+      "content": ["no_modify", "content_quality"]
+    },
+    "复回复|impl": {
+      "content": ["impl_four_sections", "impl_principles", "no_modify", "content_quality"]
+    },
+    "质检码|single": {
+      "content": ["quality_check_body", "no_modify"]
+    },
+    "复盘|defense": {
+      "content": ["defense_body", "no_modify"]
+    },
+    "复盘|tech": {
+      "content": ["review_tech_body", "no_modify"]
+    },
+    "复执行|tweak": {
+      "content": ["result_format"]
+    },
+    "复执行|steps_dir": {
+      "content": ["steps_rules", "result_format"]
+    },
+    "复关系|auto": {
+      "content": ["no_modify"]
+    }
+  }
+}
