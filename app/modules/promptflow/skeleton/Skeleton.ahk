@@ -105,12 +105,16 @@ class Skeleton {
 
     ; ============ 三、参数绑定 ============
     ; 段 id → 用到的占位符名。值由占位引擎结合运行环境解释
+    ; 块（flow.json 引用的）也在此登记，虽然它们不在 Layouts 里
     static Bindings := Map(
-        "brief",              ["filePath", "nextVersionFile", "scaleSummary"],
+        "brief",              ["filePath", "nextVersionFile", "nextVersionPath", "scaleSummary"],
         "manifest_block",     ["fileManifest"],
-        "end_open_generated", ["scriptPath", "windowId"],
-        "end_open_fixed",     ["scriptPath", "windowId", "resultFilePath"],
-        "end_notify",         ["scriptPath", "windowId"]
+        "end_open_generated", ["openMdScript", "windowId"],
+        "end_open_fixed",     ["openMdScript", "windowId", "resultFilePath"],
+        "end_notify",         ["notifyScript", "windowId"],
+        ; 块级声明（Skeleton 不拼它们，但校验器需要知道它们用哪些占位符）
+        "result_format",      ["resultTemplatePath"],
+        "steps_rules",        ["resultFilePath"]
     )
 
     ; ============ 查询 ============

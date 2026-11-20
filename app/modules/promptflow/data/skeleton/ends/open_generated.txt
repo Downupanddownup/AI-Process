@@ -1,3 +1,3 @@
 结束指令：若本轮生成 Markdown 文件，保存后立即执行以下命令打开，随后结束回复。
 
-powershell -ExecutionPolicy Bypass -File "{{scriptPath}}" -FilePath "<Markdown文件绝对路径>" -WindowId "{{windowId}}"
+powershell -ExecutionPolicy Bypass -File "{{openMdScript}}" -FilePath "<Markdown文件绝对路径>" -WindowId "{{windowId}}"
