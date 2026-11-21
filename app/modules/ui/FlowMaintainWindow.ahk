@@ -36,7 +36,7 @@ ShowFlowMaintainWindow(flowKey := "") {
     ; 布局说明：AHK 的 "x+8" 是"上一个控件的右边缘 +8"，不是"左边 +8"。
     ; 所以"标题 → 其下控件"一律用 xp（与上一个同左边缘），
     ; 只有"跨列"时才用 x+8（相对上一列的右边缘）。
-    opts := "+MinSize1100x680"
+    opts := "+MinSize1300x700"
     ; 按来源绑 owner：从设置主题弹窗打开就绑它，从托盘打开就绑主面板。
     ; 子窗口永远在父窗口之上，层级自然对——不用 AlwaysOnTop（那会盖住别的程序）。
     if (IsSet(ThemeSelectDialog) && ThemeSelectDialog) {
@@ -55,30 +55,30 @@ ShowFlowMaintainWindow(flowKey := "") {
 
     ; 左列（x=12..232）
     FMWin.AddText("xm ym w220 h18", "流程")
-    FMWinFlowList := FMWin.AddListView("xp y+2 w220 h540 -Multi", ["流程", "类型"])
+    FMWinFlowList := FMWin.AddListView("xp y+2 w220 h620 -Multi", ["流程", "类型"])
     FMWinFlowList.ModifyCol(1, 140)
     FMWinFlowList.ModifyCol(2, "70 Center")
     ApplyDialogListStyle(FMWinFlowList)
     FMWinFlowList.OnEvent("ItemSelect", OnFMFlowSelect)
 
     ; 中列（x=240..600）：x+8 是相对左列表右边缘
-    FMWin.AddText("x+8 ym w360 h18", "组合与块（选中一行看右边预览）")
-    FMWinComboList := FMWin.AddListView("xp y+2 w360 h540 -Multi", ["组合", "块"])
+    FMWin.AddText("x+8 ym w500 h18", "组合与块（选中一行看右边预览）")
+    FMWinComboList := FMWin.AddListView("xp y+2 w500 h620 -Multi", ["组合", "块"])
     FMWinComboList.ModifyCol(1, 130)
-    FMWinComboList.ModifyCol(2, 210)
+    FMWinComboList.ModifyCol(2, 370)
     ApplyDialogListStyle(FMWinComboList)
     FMWinComboList.OnEvent("ItemSelect", OnFMComboSelect)
 
     ; 右列（x=608..1168）：x+8 是相对中列表右边缘
-    FMWinDemoLabel := FMWin.AddText("x+8 ym w560 h18 cGray", "")
-    FMWinPreview := FMWin.AddEdit("xp y+2 w560 h384 +ReadOnly +VScroll", "")
+    FMWinDemoLabel := FMWin.AddText("x+8 ym w640 h18 cGray", "")
+    FMWinPreview := FMWin.AddEdit("xp y+2 w640 h464 +ReadOnly +VScroll", "")
 
     ; 右列下半：校验结果
-    FMWin.AddText("xp y+6 w560 h18", "校验结果（点一条定位到左边）")
-    FMWinIssueList := FMWin.AddListView("xp y+2 w560 h130 -Multi", ["类型", "位置", "说明"])
+    FMWin.AddText("xp y+6 w640 h18", "校验结果（点一条定位到左边）")
+    FMWinIssueList := FMWin.AddListView("xp y+2 w640 h130 -Multi", ["类型", "位置", "说明"])
     FMWinIssueList.ModifyCol(1, 120)
     FMWinIssueList.ModifyCol(2, 150)
-    FMWinIssueList.ModifyCol(3, 270)
+    FMWinIssueList.ModifyCol(3, 350)
     ApplyDialogListStyle(FMWinIssueList)
     FMWinIssueList.OnEvent("ItemSelect", OnFMIssueSelect)
 
@@ -88,11 +88,11 @@ ShowFlowMaintainWindow(flowKey := "") {
     CheckBtn := FMWin.AddButton("x+8 yp w100 h26", "重新校验")
     CheckBtn.OnEvent("Click", OnFMCheck)
     FMWinHint := FMWin.AddText("x+12 yp+4 w700 h20 cGray", "")
-    CloseBtn := FMWin.AddButton("x1060 yp w80 h26", "关闭")
+    CloseBtn := FMWin.AddButton("x1308 yp w80 h26", "关闭")
     CloseBtn.OnEvent("Click", CloseFlowMaintainWindow)
 
     RefreshFMFlowList(flowKey)
-    FMWin.Show("w1180 h700")
+    FMWin.Show("w1400 h740")
 }
 
 CloseFlowMaintainWindow(*) {
