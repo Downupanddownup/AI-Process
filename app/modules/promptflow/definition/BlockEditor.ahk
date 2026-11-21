@@ -53,6 +53,25 @@ class BlockEditor {
         BlockLibrary.ClearCache()
     }
 
+    ; 写正文：只动 body.txt，不动 meta.json
+    static UpdateBody(flowKey, blockId, text) {
+        flow := this._WritableFlow(flowKey)
+
+        dirPath := flow.BlocksDir "\" blockId
+        if !DirExist(dirPath)
+            throw Error("块不存在：" blockId)
+
+        try {
+            f := FileOpen(dirPath "\body.txt", "w", "UTF-8-RAW")
+            f.Write(text)
+            f.Close()
+        } catch as e {
+            throw Error("写入块正文失败：" dirPath " — " e.Message)
+        }
+
+        BlockLibrary.ClearCache()
+    }
+
     ; 删除：被本流程任何组合引用就拦下，消息里点名组合
     static Delete(flowKey, blockId) {
         flow := this._WritableFlow(flowKey)
@@ -111,8 +130,11 @@ class BlockEditor {
             throw Error("块名称不能为空")
         if (Trim(purpose) = "")
             throw Error("块说明不能为空")
-        if !this._HasValue(this.KindValues, kind)
-            throw Error("未知分类：" kind)
+        ; 分类只是给人看的标签：八类作建议，允许自由新增
+        if (Trim(kind) = "")
+            throw Error("块分类不能为空")
+        if (StrLen(Trim(kind)) > 12)
+            throw Error("块分类过长（最多 12 字）：" kind)
     }
 
     ; 固定字段序、两空格、末尾换行——与 data/blocks/*/meta.json 一致
