@@ -220,7 +220,7 @@ OnFMFlowSelect(*) {
         return
     }
 
-    ; 内置流程只读：改名 / 删除置灰，不给入口比点了再报错好
+    ; 内置流程只读：改名 / 删除 / 管理私有块 / 选块 置灰，不给入口比点了再报错好
     UpdateFMWriteButtons(true, flow.Readonly)
 
     for comboKey in Skeleton.GetAllComboKeys() {
@@ -299,6 +299,18 @@ OnFMSelectBlock(*) {
 
     if (FMWinCurFlow = "")
         return
+
+    ; 双击那条路绕开了按钮置灰，所以守卫必须在这里再判一次
+    try {
+        if (FlowLibrary.Get(FMWinCurFlow).Readonly) {
+            SetFMHint("内置流程只读，块顺序不可修改")
+            return
+        }
+    } catch as e {
+        SetFMHint("流程读不出来：" e.Message)
+        return
+    }
+
     row := FMWinComboList.GetNext(0)
     if (row = 0 || row > FMWinCombos.Length)
         return
@@ -486,15 +498,17 @@ BuildFMEnv(flowKey) {
 
 ; ---- 新建 / 改名 / 删除（02）----
 
-; 内置流程只读：改名 / 删除置灰；新建始终可用（列表为空时也能建第一个）
+; 内置流程只读：改名 / 删除 / 管理私有块 / 选块 都置灰；新建始终可用（列表为空时也能建第一个）
 UpdateFMWriteButtons(hasFlow, isBuiltin) {
-    global FMWinRenameBtn, FMWinDeleteBtn, FMWinBlocksBtn
+    global FMWinRenameBtn, FMWinDeleteBtn, FMWinBlocksBtn, FMWinSelectBtn
     if (FMWinRenameBtn)
         FMWinRenameBtn.Enabled := hasFlow && !isBuiltin
     if (FMWinDeleteBtn)
         FMWinDeleteBtn.Enabled := hasFlow && !isBuiltin
     if (FMWinBlocksBtn)
         FMWinBlocksBtn.Enabled := hasFlow && !isBuiltin
+    if (FMWinSelectBtn)
+        FMWinSelectBtn.Enabled := hasFlow && !isBuiltin
 }
 
 SetFMHint(text) {
