@@ -194,7 +194,8 @@ OnFMFlowSelect(*) {
         }
 
         FMWinCombos.Push(Map("combo", comboKey, "blocks", blockIds, "text", blockNames))
-        FMWinComboList.Add(, comboKey, blockNames)
+        ; 显示名与面板一致：有 label 用"动作 · label"，没有就只用动作名
+        FMWinComboList.Add(, ComboDisplayName(comboKey), blockNames)
     }
 
     if (FMWinCombos.Length > 0) {
@@ -332,6 +333,24 @@ ResolveIssueTarget(issue, flowKey) {
 }
 
 ; ---- 环境 ----
+
+; 组合键 → 与面板一致的显示名
+; 面板规则：有 label 就显示 label（答辩/技炼/改吧/步目/实），没有就显示动作名
+ComboDisplayName(comboKey) {
+    parts := StrSplit(comboKey, "|")
+    if (parts.Length < 2) {
+        return comboKey
+    }
+    actKey := parts[1]
+    polKey := parts[2]
+    try {
+        pol := Action.FromSkeleton(actKey).GetPolicy(polKey)
+        if (pol && pol.Label != "") {
+            return actKey " · " pol.Label
+        }
+    }
+    return actKey
+}
 
 ; 预览固定用演示主题：不随当前主题变，同一流程永远同一份预览
 PreviewTopicDir() {
