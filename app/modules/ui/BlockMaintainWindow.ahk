@@ -326,7 +326,7 @@ OnBMEdit(*) {
 }
 
 OnBMDelete(*) {
-    global BMPrivateList, BMPrivateIds, BMChanged, BMFlowKey, BMPrivateList
+    global BMPrivateList, BMPrivateIds, BMChanged, BMFlowKey, BMWin
 
     row := BMPrivateList.GetNext(0)
     if (row = 0 || row > BMPrivateIds.Length)
@@ -334,8 +334,14 @@ OnBMDelete(*) {
     id := BMPrivateIds[row]
     name := BMPrivateList.GetText(row, 1)
 
+    ; 确认框必须绑到块窗口，否则它会被窗口盖住（层级低、看起来"点了没反应"）
+    ownerHwnd := GuiAlive(BMWin) ? BMWin.Hwnd : 0
+    opts := "Icon! YesNo Default2"
+    if (ownerHwnd)
+        opts .= " Owner" ownerHwnd
+
     if (MsgBox("确定删除块「" name "」吗？`n`n目录：" id "`n此操作不可撤销。",
-            "删除块", "Icon! YesNo Default2") != "Yes")
+            "删除块", opts) != "Yes")
         return
 
     neighbor := ""

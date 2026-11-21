@@ -162,6 +162,9 @@ CloseFlowMaintainWindow(*) {
 RefreshFMFlowList(preferKey := "") {
     global FMWinFlowList, FMWinFlowKeys, FMWinDemoLabel
 
+    if (!FMWinFlowList)
+        return
+
     FMWinFlowList.Delete()
     FMWinFlowKeys := []
     selectedRow := 0
@@ -336,6 +339,10 @@ OnFMPrivateBlocks(*) {
     comboKey := (row > 0 && row <= FMWinCombos.Length) ? FMWinCombos[row]["combo"] : ""
 
     if (!ShowBlockMaintainWindow(FMWinCurFlow))
+        return
+
+    ; 块窗口是模态等待期间，维护窗口可能已被关掉（owner 连带销毁）
+    if (!GuiAlive(FMWin))
         return
 
     RefreshFMFlowList(FMWinCurFlow)
