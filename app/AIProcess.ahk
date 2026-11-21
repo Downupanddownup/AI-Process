@@ -44,6 +44,32 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\services\ActionGuard.ahk
 #Include %A_ScriptDir%\modules\business\services\ThemeStats.ahk
 #Include %A_ScriptDir%\modules\business\services\ThemeCost.ahk
+; promptflow 子系统：10.2 起面板要显示流程简称，需要流程库。
+; 整包引入而不是挑依赖链——#Warn 是静态分析，任何一处类引用缺失都会在启动时报，
+; 手工挑必然漏（PromptFlow 引用 BlockLibrary、BlockLibrary 引用 PromptBlock…）。
+; 这些文件只有类定义、无顶层调用，全引入无副作用；完整接入（走新入口的开关）仍是 09 的事。
+#Include %A_ScriptDir%\modules\promptflow\skeleton\Skeleton.ahk
+#Include %A_ScriptDir%\modules\promptflow\skeleton\ActionRecipe.ahk
+#Include %A_ScriptDir%\modules\promptflow\action\ActionPolicy.ahk
+#Include %A_ScriptDir%\modules\promptflow\action\Action.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\PromptBlock.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\BlockLibrary.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\ReferenceDoc.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\ReferenceLibrary.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\ValidationIssue.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\ValidationReport.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\PromptFlow.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\FlowLibrary.ahk
+#Include %A_ScriptDir%\modules\promptflow\param\PromptParam.ahk
+#Include %A_ScriptDir%\modules\promptflow\param\PromptParamRule.ahk
+#Include %A_ScriptDir%\modules\promptflow\engine\PlaceholderEngine.ahk
+#Include %A_ScriptDir%\modules\promptflow\engine\AssemblerEngine.ahk
+#Include %A_ScriptDir%\modules\promptflow\engine\FlowEngine.ahk
+#Include %A_ScriptDir%\modules\promptflow\runtime\Environment.ahk
+#Include %A_ScriptDir%\modules\promptflow\runtime\StartPhase.ahk
+#Include %A_ScriptDir%\modules\promptflow\PromptAssembler.ahk
+#Include %A_ScriptDir%\modules\promptflow\PromptValidator.ahk
+#Include %A_ScriptDir%\modules\business\services\FlowResolver.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActionBase.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CreateRequirement.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRequirement.ahk

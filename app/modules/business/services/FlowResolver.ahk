@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 
-; 场景解析：这个主题该用哪套流程
+; 流程解析：这个主题该用哪套流程
 ;
-; 数据源：<主题目录>\.aiprocess\scenario.txt —— 一行纯文本，内容是流程 key
+; 数据源：<主题目录>\.aiprocess\flow.txt —— 一行纯文本，内容是流程 key
 ; 四种状态互斥：
 ;   ok             文件存在且流程存在
 ;   default        文件不存在或为空 → 用默认流程
@@ -12,15 +12,15 @@
 ; 一条硬约束：绝不静默回落。只有"文件不存在/为空"才回默认；
 ; "写了但流程不存在"必须报 missing，否则主题会悄悄换流程，用户查不到原因。
 
-class ScenarioResolver {
+class FlowResolver {
 
-    ; 场景文件名（放在 .aiprocess 下）
-    static FileName := "scenario.txt"
+    ; 流程选择文件名（放在 .aiprocess 下）
+    static FileName := "flow.txt"
 
     ; 解析某主题用哪套流程
     ; 返回 Map("status", …, "flowKey", …)
     static Resolve(topicDir) {
-        key := this._ReadScenario(topicDir)
+        key := this._ReadFlow(topicDir)
 
         ; 文件不存在或为空 → 默认
         if (key = "") {
@@ -39,7 +39,7 @@ class ScenarioResolver {
         return Map("status", "ok", "flowKey", key)
     }
 
-    ; 写场景到主题的 .aiprocess\scenario.txt
+    ; 写流程选择到主题的 .aiprocess\flow.txt
     ; 目录不存在时自己建（走 DomainConventions.EnsureDataDir）
     static Write(topicDir, flowKey) {
         dataDir := DomainConventions.EnsureDataDir(topicDir)
@@ -76,9 +76,21 @@ class ScenarioResolver {
         }
     }
 
-    ; 读 scenario.txt；不存在或空白返回空串。
+    ; 主题的流程简称；流程缺失时返回「缺失」
+    ; 面板与主题列表两处显示共用它——避免两处对同一主题给出不同答案
+    static ShortNameOf(topicDir) {
+        r := this.Resolve(topicDir)
+        if (r["status"] = "ok" || r["status"] = "default") {
+            try {
+                return FlowLibrary.Get(r["flowKey"]).ShortName
+            }
+        }
+        return "缺失"
+    }
+
+    ; 读 flow.txt；不存在或空白返回空串。
     ; 先 FileExist 再 FileRead——直接读不存在的文件会抛错。
-    static _ReadScenario(topicDir) {
+    static _ReadFlow(topicDir) {
         if (topicDir = "") {
             return ""
         }

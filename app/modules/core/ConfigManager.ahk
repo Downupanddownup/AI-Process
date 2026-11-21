@@ -320,7 +320,7 @@ EnsureIniUtf16Bom(filePath) {
 }
 ; ===== 流程默认值（[PromptFlow] 节）=====
 
-; 新建顶级主题 / 未设 scenario.txt 的主题，默认用哪套流程
+; 新建顶级主题 / 未设 flow.txt 的主题，默认用哪套流程
 GetDefaultFlowKey() {
     global SettingsFile
     v := Trim(IniRead(SettingsFile, "PromptFlow", "DefaultFlowKey", "code"))

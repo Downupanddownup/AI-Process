@@ -132,13 +132,17 @@ CloseDirectoryDialog(*) {
 
 
 UpdateCurrentPathDisplay() {
-    global CurrentPathText, CurrentDirStateMark, CurrentPathHwnd
+    global CurrentPathText, CurrentDirStateMark, CurrentPathHwnd, FlowNameText
     currentDir := GetCurrentDir()
     if currentDir = "" {
+        FlowNameText.Text := ""
         CurrentPathText.Text := "未设置"
         CurrentDirStateMark.Text := ""
         return
     }
+
+    ; 流程简称（26 px，约 2 个汉字）：与主题列表的「流程」列共用同一个取法
+    FlowNameText.Text := TruncateKeepTail(FlowResolver.ShortNameOf(currentDir), "", FlowNameText.Hwnd)
 
     dirName := ExtractFileName(currentDir)
     if (dirName = "") {

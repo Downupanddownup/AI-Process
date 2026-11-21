@@ -15,6 +15,10 @@ global ThemeSelectThemeList := ""
 global ThemeSelectNewEdit := ""
 global ThemeSelectCurrentRepo := ""
 
+; 切流程弹窗
+global FlowSwitchDialog := ""
+global FlowSwitchList := ""
+
 global RepoSelectDialog := ""
 global RepoSelectRepoList := ""
 global RepoSelectPathText := ""
@@ -24,7 +28,7 @@ global RepoSelectFullPaths := []
 ; 可拖拽调整尺寸：Size 事件按客户区差量锚定控件，需持有底部控件引用、当前客户区尺寸和弹性列宽
 global ThemeSelectClientW := 0
 global ThemeSelectClientH := 0
-global ThemeSelectCol1W := 820
+global ThemeSelectCol1W := 640
 global ThemeSelectNewLabel := ""
 global ThemeSelectNewThemeBtn := ""
 global ThemeSelectOpenDirBtn := ""
@@ -83,16 +87,21 @@ ShowThemeSelectDialog(*) {
     ThemeSelectDialog.AddText("xm ym w936 h20", "当前主题：")
     ThemeSelectPathText := ThemeSelectDialog.AddText("xm y+2 w936 h20 c666666")
 
-    ThemeSelectDialog.AddText("xm y+12 w60 h20", "选择仓库：")
+    ; 切换当前主题的流程：只读当前值，改只在流程维护里做
+    ThemeSelectFlowBtn := ThemeSelectDialog.AddButton("xm y+4 w120 h24", "切换流程…")
+    ThemeSelectFlowBtn.OnEvent("Click", ShowFlowSwitchDialog)
+
+    ThemeSelectDialog.AddText("xm y+8 w60 h20", "选择仓库：")
     ThemeSelectRepoText := ThemeSelectDialog.AddText("x+0 yp w300 h20 cBlue", "")
     ThemeSelectRepoText.OnEvent("Click", OnRepoTextClick)
     ThemeSelectAddRepoBtn := ThemeSelectDialog.AddButton("xm y+2 w80 h24 Hidden", "新增仓库")
     ThemeSelectAddRepoBtn.OnEvent("Click", OnAddRepoFromThemeSelect)
 
     ThemeSelectDialog.AddText("xm y+12 w936 h20", "主题目录：")
-    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w936 h380 -Multi", ["主题名", "最近活跃"])
-    ThemeSelectThemeList.ModifyCol(1, 820)
-    ThemeSelectThemeList.ModifyCol(2, "100 Center")
+    ThemeSelectThemeList := ThemeSelectDialog.AddListView("xm y+2 w936 h380 -Multi", ["主题名", "流程", "最近活跃"])
+    ThemeSelectThemeList.ModifyCol(1, 640)
+    ThemeSelectThemeList.ModifyCol(2, "140 Center")
+    ThemeSelectThemeList.ModifyCol(3, "100 Center")
     ApplyDialogListStyle(ThemeSelectThemeList)
     ThemeSelectThemeList.OnEvent("DoubleClick", OnThemeSelectOk)
 
@@ -118,6 +127,127 @@ ShowThemeSelectDialog(*) {
     RefreshThemeSelectState()
     ; 省略 x/y：系统屏幕居中，不再相对主面板定位
     ThemeSelectDialog.Show("w960 h700")
+}
+
+; ============================================================
+; 切流程弹窗：改当前主题用哪套流程
+; ============================================================
+
+; 只改"当前主题"的流程，不动别的主题
+ShowFlowSwitchDialog(*) {
+    global FlowSwitchDialog, FlowSwitchList, ThemeSelectDialog
+
+    currentDir := GetCurrentDir()
+    if (currentDir = "") {
+        ShowFeedback("请先设置当前主题目录", true)
+        return
+    }
+
+    ownerHwnd := ThemeSelectDialog ? ThemeSelectDialog.Hwnd : 0
+    if (FlowSwitchDialog) {
+        FlowSwitchDialog.Show()
+        WinActivate("ahk_id " FlowSwitchDialog.Hwnd)
+        RefreshFlowSwitchList()
+        return
+    }
+
+    opts := "+AlwaysOnTop +ToolWindow"
+    if (ownerHwnd) {
+        opts .= " +Owner" ownerHwnd
+    }
+    FlowSwitchDialog := Gui(opts, "切换流程")
+    FlowSwitchDialog.BackColor := GetDialogBackColor()
+    FlowSwitchDialog.MarginX := 12
+    FlowSwitchDialog.MarginY := 12
+    FlowSwitchDialog.SetFont("s9", "Microsoft YaHei UI")
+    FlowSwitchDialog.OnEvent("Close", CloseFlowSwitchDialog)
+    FlowSwitchDialog.OnEvent("Escape", CloseFlowSwitchDialog)
+
+    FlowSwitchDialog.AddText("xm ym w420 h20", "当前主题：")
+    FlowSwitchDialog.AddText("xm y+2 w420 h20 c666666", currentDir)
+    FlowSwitchDialog.AddText("xm y+10 w420 h20", "选择流程：")
+    FlowSwitchList := FlowSwitchDialog.AddListView("xm y+2 w420 h240 -Multi", ["流程", "全称", "标识"])
+    FlowSwitchList.ModifyCol(1, 120)
+    FlowSwitchList.ModifyCol(2, 180)
+    FlowSwitchList.ModifyCol(3, 100)
+    ApplyDialogListStyle(FlowSwitchList)
+    FlowSwitchList.OnEvent("DoubleClick", OnFlowSwitchOk)
+
+    ; 03 才实现流程维护窗口，这里先禁用
+    MaintainBtn := FlowSwitchDialog.AddButton("xm y+10 w120 h26", "维护流程…")
+    MaintainBtn.Enabled := false
+    MaintainBtn.OnEvent("Click", (*) => 0)
+
+    OkBtn := FlowSwitchDialog.AddButton("x232 yp w90 h26 Default", "确定")
+    OkBtn.OnEvent("Click", OnFlowSwitchOk)
+    CancelBtn := FlowSwitchDialog.AddButton("x+8 yp w90 h26", "取消")
+    CancelBtn.OnEvent("Click", CloseFlowSwitchDialog)
+
+    RefreshFlowSwitchList()
+    FlowSwitchDialog.Show()
+}
+
+RefreshFlowSwitchList() {
+    global FlowSwitchList
+
+    FlowSwitchList.Delete()
+    currentKey := FlowResolver.Resolve(GetCurrentDir())["flowKey"]
+    selectedRow := 0
+
+    for key in FlowLibrary.ListKeys() {
+        try {
+            f := FlowLibrary.Get(key)
+            shortName := f.ShortName
+            fullName := f.Name
+        } catch {
+            shortName := key
+            fullName := key
+        }
+        FlowSwitchList.Add(, shortName, fullName, key)
+        if (key = currentKey && selectedRow = 0) {
+            selectedRow := A_Index
+        }
+    }
+
+    if (selectedRow > 0) {
+        FlowSwitchList.Modify(selectedRow, "Select Focus")
+    }
+}
+
+CloseFlowSwitchDialog(*) {
+    global FlowSwitchDialog
+    if (FlowSwitchDialog) {
+        FlowSwitchDialog.Hide()
+    }
+}
+
+OnFlowSwitchOk(*) {
+    global FlowSwitchList, FlowSwitchDialog, ThemeSelectDialog
+
+    row := FlowSwitchList.GetNext(0)
+    if (row = 0) {
+        return
+    }
+    pickedKey := FlowSwitchList.GetText(row, 3)
+
+    currentDir := GetCurrentDir()
+    cur := FlowResolver.Resolve(currentDir)
+    curKey := cur["flowKey"]
+
+    ; 切到同一个：不写、不记日志
+    if (pickedKey != curKey) {
+        FlowResolver.Write(currentDir, pickedKey)
+        LogActivity("流程切换", curKey " → " pickedKey,
+            Map("from", curKey, "to", pickedKey,
+                "window", GetActiveWindowId(), "topicDir", currentDir))
+    }
+
+    CloseFlowSwitchDialog()
+    ; 面板与主题列表同步刷新
+    UpdateCurrentPathDisplay()
+    if (ThemeSelectDialog) {
+        RefreshThemeSelectState()
+    }
 }
 
 ; 尺寸变化时按客户区差量锚定：列表和输入框双向拉伸、首列吃掉横向增量、底部控件吸附下缘/右缘
@@ -200,7 +330,7 @@ RefreshThemeSelectState() {
         selectedRow := 0
         for t in themes {
             dateText := t["lastActiveAt"] != "" ? SubStr(t["lastActiveAt"], 1, 10) : ""
-            ThemeSelectThemeList.Add(, t["name"], dateText)
+            ThemeSelectThemeList.Add(, t["name"], t["flowShort"], dateText)
             if (selectedRow = 0 && currentDir != "" && t["name"] = ExtractFileName(currentDir)) {
                 selectedRow := A_Index
             }
@@ -305,7 +435,7 @@ CloseThemeSelectDialog(*) {
     ThemeSelectCurrentRepo := ""
     ThemeSelectClientW := 0
     ThemeSelectClientH := 0
-    ThemeSelectCol1W := 820
+    ThemeSelectCol1W := 640
     ThemeSelectNewLabel := ""
     ThemeSelectNewThemeBtn := ""
     ThemeSelectOpenDirBtn := ""

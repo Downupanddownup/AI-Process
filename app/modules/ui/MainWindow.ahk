@@ -3,6 +3,8 @@
 ; 主面板 GUI
 
 global CurrentPathText := ""
+global FlowNameText := ""
+global FlowNameTextHwnd := 0
 global CurrentPathHwnd := 0
 global CurrentDirStateMark := ""
 global ReplyImplementationTailCheckbox := ""
@@ -29,7 +31,7 @@ global MainGui := ""
 global HoverTooltipVisible := false
 
 CreateMainGui() {
-    global MainGui, CurrentPathText, CurrentPathHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
+    global MainGui, CurrentPathText, CurrentPathHwnd, FlowNameText, FlowNameTextHwnd, CurrentDirStateMark, ReplyImplementationTailCheckbox, BindAgentWindowButton, UnbindAgentWindowButton, AppConfig
     global AgentNameText, AgentNameTextHwnd
     global SetDirectoryButton, ReturnParentButton, CreateIssueButton, NewThemeButton
     global DomainTreeButton
@@ -71,8 +73,13 @@ CreateMainGui() {
     AgentNameTextHwnd := AgentNameText.Hwnd
     rowY += actionButtonHeight + actionGap
 
-    ; R1 目录行：目录名 + 设目录/返（两按钮同坐标，靠显隐切换"原地变身"）
-    CurrentPathText := MainGui.AddText("xm y" (rowY + 2) " w126 h18 +0x200", "未设置")
+    ; R1 目录行：流程简称 + 目录名 + 设目录/返（两按钮同坐标，靠显隐切换"原地变身"）
+    ; 两段文字合起来 126 px（26 + 4 + 96），与原来单控件同宽，右侧按钮坐标不动
+    FlowNameText := MainGui.AddText("xm y" (rowY + 2) " w26 h18 +0x200", "")
+    FlowNameText.SetFont("c1A6FC4")
+    FlowNameText.OnEvent("Click", ShowThemeSelectDialog)
+    FlowNameTextHwnd := FlowNameText.Hwnd
+    CurrentPathText := MainGui.AddText("x+4 yp w96 h18 +0x200", "未设置")
     CurrentPathText.OnEvent("Click", ShowThemeSelectDialog)
     CurrentPathHwnd := CurrentPathText.Hwnd
     CurrentDirStateMark := MainGui.AddText("x+0 yp w0 h18 Hidden", "")

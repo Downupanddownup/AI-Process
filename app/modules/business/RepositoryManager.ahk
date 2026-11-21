@@ -198,7 +198,9 @@ GetRepoThemesWithActivity(repoPath) {
     for name in GetRepoThemes(repoPath) {
         stats := ThemeCost.ReadStats(repoPath "\" name)
         lastActiveAt := ThemeCost.GetText(stats, "aggregate", "lastActiveAt")
-        item := Map("name", name, "lastActiveAt", lastActiveAt)
+        ; 流程简称：与面板共用 FlowResolver.ShortNameOf，两处显示不会不一致
+        flowShort := FlowResolver.ShortNameOf(repoPath "\" name)
+        item := Map("name", name, "flowShort", flowShort, "lastActiveAt", lastActiveAt)
         if (lastActiveAt != "") {
             withTime.Push(item)
         } else {
