@@ -88,6 +88,30 @@ class FlowResolver {
         return "缺失"
     }
 
+    ; 三个窗口里，哪个的当前主题正在用这套流程 → 窗口号；没有 → 0
+    ; 读不出该窗口的配置 → 负的窗口号（无法确认，按"可能在用"处理）
+    ; 比对 Resolve 出来的 flowKey：ok 与 default 都有值；
+    ; 已坏掉的主题（missing）也算"在用"——此时流程目录已不在，删除会直接失败，不会误删
+    static IsUsedByAnyWindow(flowKey) {
+        if (flowKey = "")
+            return 0
+        loop 3 {
+            dir := GetSession(A_Index, "CurrentDir")
+            if (Trim(dir) = "")
+                continue
+            try {
+                r := this.Resolve(dir)
+            } catch {
+                ; 读不出来就无法确认是否在用。删流程不可逆，按"可能在用"处理：
+                ; 返回负窗口号，由调用方提示"先修配置"
+                return -A_Index
+            }
+            if (r["flowKey"] = flowKey)
+                return A_Index
+        }
+        return 0
+    }
+
     ; 读 flow.txt；不存在或空白返回空串。
     ; 先 FileExist 再 FileRead——直接读不存在的文件会抛错。
     static _ReadFlow(topicDir) {

@@ -20,11 +20,19 @@ global FMWinIssues := []
 global FMWinFlowKeys := []
 global FMWinCombos := []
 global FMWinCurFlow := ""
+global FMWinNewBtn := ""
+global FMWinRenameBtn := ""
+global FMWinDeleteBtn := ""
+global FMNewDialog := "", FMNewName := "", FMNewShort := "", FMNewKey := ""
+global FMNewCopy := "", FMNewBlank := "", FMNewHint := "", FMNewOk := ""
+global FMRenameDialog := "", FMRenameName := "", FMRenameShort := ""
+global FMRenameHint := "", FMRenameOk := ""
 
 ; 只 include 一次，重复调用只是 Show + 刷新
 ShowFlowMaintainWindow(flowKey := "") {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn
 
     if (FMWin) {
         FMWin.Show()
@@ -55,11 +63,21 @@ ShowFlowMaintainWindow(flowKey := "") {
 
     ; 左列（x=12..232）
     FMWin.AddText("xm ym w220 h18", "流程")
-    FMWinFlowList := FMWin.AddListView("xp y+2 w220 h620 -Multi", ["流程", "类型"])
+    ; 列表让出一行给「新建 / 改名 / 删除」：620 → 588，列底仍是 652
+    FMWinFlowList := FMWin.AddListView("xp y+2 w220 h588 -Multi", ["流程", "类型"])
     FMWinFlowList.ModifyCol(1, 140)
     FMWinFlowList.ModifyCol(2, "70 Center")
     ApplyDialogListStyle(FMWinFlowList)
     FMWinFlowList.OnEvent("ItemSelect", OnFMFlowSelect)
+
+    ; 三个按钮贴着左列对象：12 + 68 + 8 + 68 + 8 + 68 = 232，与列表同宽
+    FMWinNewBtn := FMWin.AddButton("xp y+6 w68 h26", "新建")
+    FMWinNewBtn.OnEvent("Click", OnFMNew)
+    FMWinRenameBtn := FMWin.AddButton("x+8 yp w68 h26", "改名")
+    FMWinRenameBtn.OnEvent("Click", OnFMRename)
+    FMWinDeleteBtn := FMWin.AddButton("x+8 yp w68 h26", "删除")
+    FMWinDeleteBtn.OnEvent("Click", OnFMDelete)
+    UpdateFMWriteButtons(false, true)
 
     ; 中列（x=240..600）：x+8 是相对左列表右边缘
     FMWin.AddText("x+8 ym w500 h18", "组合与块（选中一行看右边预览）")
@@ -98,6 +116,7 @@ ShowFlowMaintainWindow(flowKey := "") {
 CloseFlowMaintainWindow(*) {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn
 
     ; 销毁 + 置空：只 Hide 的话变量会悬空，下次 Show 报 "Gui has no window"
     if (FMWin) {
@@ -114,6 +133,9 @@ CloseFlowMaintainWindow(*) {
     FMWinFlowKeys := []
     FMWinCombos := []
     FMWinCurFlow := ""
+    FMWinNewBtn := ""
+    FMWinRenameBtn := ""
+    FMWinDeleteBtn := ""
 }
 
 ; ---- 左列表 ----
@@ -151,6 +173,8 @@ OnFMFlowSelect(*) {
 
     row := FMWinFlowList.GetNext(0)
     if (row = 0 || row > FMWinFlowKeys.Length) {
+        FMWinCurFlow := ""
+        UpdateFMWriteButtons(false, true)
         return
     }
     flowKey := FMWinFlowKeys[row]
@@ -170,8 +194,12 @@ OnFMFlowSelect(*) {
     } catch as e {
         FMWinHint.Text := "流程读不出来：" e.Message
         FMWinPreview.Value := ""
+        UpdateFMWriteButtons(false, true)
         return
     }
+
+    ; 内置流程只读：改名 / 删除置灰，不给入口比点了再报错好
+    UpdateFMWriteButtons(true, flow.Readonly)
 
     for comboKey in Skeleton.GetAllComboKeys() {
         parts := StrSplit(comboKey, "|")
@@ -367,4 +395,302 @@ BuildFMEnv(flowKey) {
     env.OpenMdScriptPath := AppConfig["OpenMdScriptPath"]
     env.NotificationScriptPath := AppConfig["NotificationScriptPath"]
     return env
+}
+
+; ---- 新建 / 改名 / 删除（02）----
+
+; 内置流程只读：改名 / 删除置灰；新建始终可用（列表为空时也能建第一个）
+UpdateFMWriteButtons(hasFlow, isBuiltin) {
+    global FMWinRenameBtn, FMWinDeleteBtn
+    if (FMWinRenameBtn)
+        FMWinRenameBtn.Enabled := hasFlow && !isBuiltin
+    if (FMWinDeleteBtn)
+        FMWinDeleteBtn.Enabled := hasFlow && !isBuiltin
+}
+
+SetFMHint(text) {
+    global FMWinHint
+    if (FMWinHint)
+        FMWinHint.Text := text
+}
+
+; 删除前查三档：只读 → 默认流程 → 窗口占用。顺序从便宜到贵
+FlowDeletionBlockedReason(flowKey) {
+    try {
+        flow := FlowLibrary.Get(flowKey)
+    } catch as e {
+        return e.Message
+    }
+    if (flow.Readonly)
+        return "内置流程不可删除"
+    if (flowKey = GetDefaultFlowKey())
+        return "它是默认流程，删除后新主题都会指向不存在的流程"
+    winId := FlowResolver.IsUsedByAnyWindow(flowKey)
+    if (winId < 0)
+        return "窗口 " (-winId) " 的流程配置读不出来，无法确认是否在用；先修好它再删"
+    if (winId)
+        return "窗口 " winId " 的当前主题正在使用该流程"
+    return ""
+}
+
+; ---- 新建弹窗 ----
+
+OnFMNew(*) {
+    ShowFMNewDialog()
+}
+
+ShowFMNewDialog() {
+    global FMWin, FMNewDialog, FMNewName, FMNewShort, FMNewKey
+    global FMNewCopy, FMNewBlank, FMNewHint, FMNewOk
+
+    if (FMNewDialog) {
+        FMNewDialog.Show()
+        WinActivate("ahk_id " FMNewDialog.Hwnd)
+        return
+    }
+
+    opts := "+AlwaysOnTop +ToolWindow"
+    if (FMWin)
+        opts .= " +Owner" FMWin.Hwnd
+
+    d := Gui(opts, "新建流程")
+    d.BackColor := GetDialogBackColor()
+    d.MarginX := 12
+    d.MarginY := 12
+    d.SetFont("s9", "Microsoft YaHei UI")
+    d.OnEvent("Close", CloseFMNewDialog)
+    d.OnEvent("Escape", CloseFMNewDialog)
+
+    d.AddText("xm ym w68 h20", "流程名称")
+    FMNewName := d.AddEdit("x+8 yp w296 h24")
+    d.AddText("xm y+10 w68 h20", "流程简称")
+    FMNewShort := d.AddEdit("x+8 yp w296 h24")
+    d.AddText("xm y+10 w68 h20", "流程标识")
+    FMNewKey := d.AddEdit("x+8 yp w296 h24")
+
+    d.AddText("xm y+12 w68 h20", "起点")
+    FMNewCopy := d.AddRadio("x+8 yp w240 h20 Checked", "从内置流程复制（code）")
+    FMNewBlank := d.AddRadio("x+8 y+2 w240 h20", "空白流程")
+
+    FMNewHint := d.AddText("xm y+8 w372 h34 cRed", "")
+    FMNewOk := d.AddButton("x212 y+6 w80 h26 Default", "确定")
+    FMNewOk.OnEvent("Click", OnFMNewOk)
+    btnCancel := d.AddButton("x+8 yp w80 h26", "取消")
+    btnCancel.OnEvent("Click", CloseFMNewDialog)
+
+    FMNewName.OnEvent("Change", (*) => UpdateFMNewState())
+    FMNewShort.OnEvent("Change", (*) => UpdateFMNewState())
+    FMNewKey.OnEvent("Change", (*) => UpdateFMNewState())
+
+    FMNewDialog := d
+    UpdateFMNewState()
+    d.Show("w396 h286")
+}
+
+CloseFMNewDialog(*) {
+    global FMNewDialog, FMNewName, FMNewShort, FMNewKey
+    global FMNewCopy, FMNewBlank, FMNewHint, FMNewOk
+
+    if (FMNewDialog) {
+        FMNewDialog.Destroy()
+        FMNewDialog := ""
+    }
+    FMNewName := ""
+    FMNewShort := ""
+    FMNewKey := ""
+    FMNewCopy := ""
+    FMNewBlank := ""
+    FMNewHint := ""
+    FMNewOk := ""
+}
+
+UpdateFMNewState() {
+    global FMNewName, FMNewShort, FMNewKey, FMNewHint, FMNewOk
+
+    name := Trim(FMNewName.Value)
+    short := Trim(FMNewShort.Value)
+    key := Trim(FMNewKey.Value)
+
+    msg := ""
+    if (name = "")
+        msg := "请填流程名称"
+    else if (short = "")
+        msg := "请填流程简称"
+    else if (key = "")
+        msg := "请填流程标识"
+    else
+        msg := FlowEditor.ValidateKey(key)
+
+    FMNewHint.Text := msg
+    FMNewOk.Enabled := (msg = "")
+}
+
+OnFMNewOk(*) {
+    global FMNewName, FMNewShort, FMNewKey, FMNewBlank, FMNewHint
+
+    name := Trim(FMNewName.Value)
+    short := Trim(FMNewShort.Value)
+    key := Trim(FMNewKey.Value)
+
+    try {
+        FlowEditor.Create("code", key, name, short, FMNewBlank.Value)
+    } catch as e {
+        FMNewHint.Text := e.Message
+        return
+    }
+
+    CloseFMNewDialog()
+    RefreshFMFlowList(key)
+    SetFMHint("已创建：" name)
+}
+
+; ---- 改名弹窗 ----
+
+OnFMRename(*) {
+    global FMWin, FMWinCurFlow, FMRenameDialog, FMRenameName, FMRenameShort
+    global FMRenameKeyText, FMRenameHint, FMRenameOk
+
+    if (FMWinCurFlow = "")
+        return
+    try {
+        flow := FlowLibrary.Get(FMWinCurFlow)
+    } catch as e {
+        MsgBox(e.Message, "改名", "Icon! Owner" FMWin.Hwnd)
+        return
+    }
+    if (flow.Readonly)
+        return
+
+    if (FMRenameDialog) {
+        FMRenameDialog.Show()
+        WinActivate("ahk_id " FMRenameDialog.Hwnd)
+        return
+    }
+
+    opts := "+AlwaysOnTop +ToolWindow"
+    if (FMWin)
+        opts .= " +Owner" FMWin.Hwnd
+
+    d := Gui(opts, "改名")
+    d.BackColor := GetDialogBackColor()
+    d.MarginX := 12
+    d.MarginY := 12
+    d.SetFont("s9", "Microsoft YaHei UI")
+    d.OnEvent("Close", CloseFMRenameDialog)
+    d.OnEvent("Escape", CloseFMRenameDialog)
+
+    d.AddText("xm ym w68 h20", "流程名称")
+    FMRenameName := d.AddEdit("x+8 yp w280 h24")
+    FMRenameName.Value := flow.Name
+    d.AddText("xm y+10 w68 h20", "流程简称")
+    FMRenameShort := d.AddEdit("x+8 yp w280 h24")
+    FMRenameShort.Value := flow.ShortName
+    d.AddText("xm y+10 w68 h20", "流程标识")
+    FMRenameKeyText := d.AddText("x+8 yp w280 h20 cGray", flow.Key)
+
+    FMRenameHint := d.AddText("xm y+8 w352 h30 cRed", "")
+    FMRenameOk := d.AddButton("x192 y+6 w80 h26 Default", "确定")
+    FMRenameOk.OnEvent("Click", OnFMRenameOk)
+    btnCancel := d.AddButton("x+8 yp w80 h26", "取消")
+    btnCancel.OnEvent("Click", CloseFMRenameDialog)
+
+    FMRenameName.OnEvent("Change", (*) => UpdateFMRenameState())
+    FMRenameShort.OnEvent("Change", (*) => UpdateFMRenameState())
+
+    FMRenameDialog := d
+    UpdateFMRenameState()
+    d.Show("w376 h230")
+}
+
+CloseFMRenameDialog(*) {
+    global FMRenameDialog, FMRenameName, FMRenameShort, FMRenameKeyText
+    global FMRenameHint, FMRenameOk
+
+    if (FMRenameDialog) {
+        FMRenameDialog.Destroy()
+        FMRenameDialog := ""
+    }
+    FMRenameName := ""
+    FMRenameShort := ""
+    FMRenameKeyText := ""
+    FMRenameHint := ""
+    FMRenameOk := ""
+}
+
+UpdateFMRenameState() {
+    global FMRenameName, FMRenameShort, FMRenameHint, FMRenameOk
+
+    name := Trim(FMRenameName.Value)
+    short := Trim(FMRenameShort.Value)
+
+    msg := ""
+    if (name = "")
+        msg := "请填流程名称"
+    else if (short = "")
+        msg := "请填流程简称"
+
+    FMRenameHint.Text := msg
+    FMRenameOk.Enabled := (msg = "")
+}
+
+OnFMRenameOk(*) {
+    global FMWinCurFlow, FMRenameName, FMRenameShort, FMRenameHint
+
+    flowKey := FMWinCurFlow
+    name := Trim(FMRenameName.Value)
+    short := Trim(FMRenameShort.Value)
+
+    try {
+        FlowEditor.Rename(flowKey, name, short)
+    } catch as e {
+        FMRenameHint.Text := e.Message
+        return
+    }
+
+    CloseFMRenameDialog()
+    RefreshFMFlowList(flowKey)
+    SetFMHint("已保存：" name)
+}
+
+; ---- 删除 ----
+
+OnFMDelete(*) {
+    global FMWin, FMWinCurFlow, FMWinFlowList, FMWinFlowKeys
+
+    if (FMWinCurFlow = "")
+        return
+    try {
+        flow := FlowLibrary.Get(FMWinCurFlow)
+    } catch as e {
+        MsgBox(e.Message, "删除流程", "Icon! Owner" FMWin.Hwnd)
+        return
+    }
+
+    reason := FlowDeletionBlockedReason(FMWinCurFlow)
+    if (reason != "") {
+        MsgBox(reason, "不能删除", "Icon! Owner" FMWin.Hwnd)
+        return
+    }
+
+    if (MsgBox("确定删除流程「" flow.Name "」吗？`n`n将删除整个目录：`n" flow.Dir
+            . "`n`n此操作不可撤销。", "删除流程", "Icon! YesNo Default2 Owner" FMWin.Hwnd) != "Yes")
+        return
+
+    ; 删之前先记下相邻项：删完选中它，而不是跳回第一行
+    row := FMWinFlowList.GetNext(0)
+    nextKey := ""
+    if (row < FMWinFlowKeys.Length)
+        nextKey := FMWinFlowKeys[row + 1]
+    else if (row > 1)
+        nextKey := FMWinFlowKeys[row - 1]
+
+    try {
+        FlowEditor.Delete(FMWinCurFlow)
+    } catch as e {
+        MsgBox("删除失败：" e.Message, "删除流程", "Iconx Owner" FMWin.Hwnd)
+        return
+    }
+
+    RefreshFMFlowList(nextKey)
+    SetFMHint("已删除：" flow.Name)
 }
