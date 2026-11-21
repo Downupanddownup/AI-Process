@@ -61,6 +61,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\promptflow\definition\ValidationReport.ahk
 #Include %A_ScriptDir%\modules\promptflow\definition\PromptFlow.ahk
 #Include %A_ScriptDir%\modules\promptflow\definition\FlowLibrary.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\FlowEditor.ahk
 #Include %A_ScriptDir%\modules\promptflow\param\PromptParam.ahk
 #Include %A_ScriptDir%\modules\promptflow\param\PromptParamRule.ahk
 #Include %A_ScriptDir%\modules\promptflow\engine\PlaceholderEngine.ahk
