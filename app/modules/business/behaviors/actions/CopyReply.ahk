@@ -22,21 +22,25 @@ class CopyReply extends AgentActionBase {
         nextVersionFile := "v" chain.NextVersion() ".md"  ; 裸文件名（不是全路径）
         implChecked := GetSession(GetActiveWindowId(), "AppendImplementationTail")
 
-        if (implChecked) {
-            content := this.LoadTemplate("reply_prompt_impl_tail.txt")
-            content := StrReplace(content, "{{filePath}}", currentReplyFile)
+        if (PromptSource.Enabled()) {
+            content := PromptSource.Build("复回复", implChecked ? "impl" : "direct")
         } else {
-            content := this.LoadTemplate("reply_prompt.txt")
-            content := StrReplace(content, "{{filePath}}", currentReplyFile)
-            content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
-        }
+            if (implChecked) {
+                content := this.LoadTemplate("reply_prompt_impl_tail.txt")
+                content := StrReplace(content, "{{filePath}}", currentReplyFile)
+            } else {
+                content := this.LoadTemplate("reply_prompt.txt")
+                content := StrReplace(content, "{{filePath}}", currentReplyFile)
+                content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
+            }
 
-        content := PromptElements.NoModify(content)
-        content := PromptElements.ContentQuality(content)  ; 普通/勾实两分支共用此行，均生效
-        if (!implChecked) {
-            content := PromptElements.QuestionTemplate(content)
+            content := PromptElements.NoModify(content)
+            content := PromptElements.ContentQuality(content)  ; 普通/勾实两分支共用此行，均生效
+            if (!implChecked) {
+                content := PromptElements.QuestionTemplate(content)
+            }
+            content := PromptElements.OpenMd(content)
         }
-        content := PromptElements.OpenMd(content)
 
         properties := Map()
         properties["source"] := "对v" chain.LatestVersion "的回复.txt"

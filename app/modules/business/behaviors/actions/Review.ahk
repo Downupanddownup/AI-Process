@@ -18,11 +18,17 @@ class Review extends AgentActionBase {
         }
         nextVersionFile := "v" chain.NextVersion() ".md"   ; 裸文件名（对齐复回复口径）
         mode := ReviewModeRegistry.GetMeta(ReviewModeRegistry.GetSelected())
-        content := this.LoadTemplate(mode["template"])
-        content := StrReplace(content, "{{nextVersionFile}}", chain.Dir "\" nextVersionFile)  ; 绝对路径：复盘无输入文件可锚定，裸文件名会让 AI 猜错目录
-        content := PromptElements.NoModify(content)
-        content := PromptElements.QuestionTemplate(content)
-        content := PromptElements.OpenMd(content)
+
+        if (PromptSource.Enabled()) {
+            content := PromptSource.Build("复盘", ReviewModeRegistry.GetSelected())
+        } else {
+            content := this.LoadTemplate(mode["template"])
+            content := StrReplace(content, "{{nextVersionFile}}", chain.Dir "\" nextVersionFile)  ; 绝对路径：复盘无输入文件可锚定，裸文件名会让 AI 猜错目录
+            content := PromptElements.NoModify(content)
+            content := PromptElements.QuestionTemplate(content)
+            content := PromptElements.OpenMd(content)
+        }
+
         properties := Map("target", nextVersionFile, "复盘模式", mode["label"])
         this.Dispatch(content, properties, mode["feedback"])
     }

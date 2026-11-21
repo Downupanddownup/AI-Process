@@ -23,26 +23,36 @@ class CopyExecute extends AgentActionBase {
             resultTemplateFile := "execute\steps_result_doc.md"
         }
 
-        if (selectedStrategy = "tweak") {
-            content := this.LoadTemplate(strategyMeta["template"])
-        } else {
-            ; 步目策略：依据三档，见 ResolveStepsSourcePath
+        ; 步目：依据三档（实施文档 → 最新回复 → 最新版本文档）
+        ; 这条守卫老新两条路都需要，所以留在分叉之前——否则新路径会走 _StepsSource 的 throw，
+        ; 被 Run 兜底成"执行提示词复制失败"，且面板会被自动隐藏
+        sourcePath := ""
+        if (selectedStrategy != "tweak") {
             sourcePath := ResolveStepsSourcePath(chain)
             if (sourcePath = "") {
                 ShowFeedback("步目需要实施文档、最新回复或版本文档作为拆分依据，当前都没有", true)
                 this.SkipAutoHide := true  ; 前置校验未通过：不触发自动隐藏
                 return
             }
-            content := this.LoadTemplate(strategyMeta["template"])
-            content := StrReplace(content, "{{filePath}}", sourcePath)
         }
 
-        ; 两条策略共有：结果文档路径 / 结果模板路径 / 打开脚本 / 窗口号
-        this.EnsureTemplate(resultTemplateFile)
-        content := StrReplace(content, "{{resultFilePath}}", chain.Dir "\" resultName)
-        content := StrReplace(content, "{{resultTemplatePath}}", TemplateDir "\" resultTemplateFile)
-        content := StrReplace(content, "{{openMdScriptPath}}", AppConfig["OpenMdScriptPath"])
-        content := StrReplace(content, "{{windowId}}", GetActiveWindowId())
+        if (PromptSource.Enabled()) {
+            content := PromptSource.Build("复执行", selectedStrategy)
+        } else {
+            if (selectedStrategy = "tweak") {
+                content := this.LoadTemplate(strategyMeta["template"])
+            } else {
+                content := this.LoadTemplate(strategyMeta["template"])
+                content := StrReplace(content, "{{filePath}}", sourcePath)
+            }
+
+            ; 两条策略共有：结果文档路径 / 结果模板路径 / 打开脚本 / 窗口号
+            this.EnsureTemplate(resultTemplateFile)
+            content := StrReplace(content, "{{resultFilePath}}", chain.Dir "\" resultName)
+            content := StrReplace(content, "{{resultTemplatePath}}", TemplateDir "\" resultTemplateFile)
+            content := StrReplace(content, "{{openMdScriptPath}}", AppConfig["OpenMdScriptPath"])
+            content := StrReplace(content, "{{windowId}}", GetActiveWindowId())
+        }
 
         ; 结果 md 的 target：统计靠它把这一轮纳入轮次明细（两条策略一致）
         properties := Map("执行策略", strategyMeta["label"])

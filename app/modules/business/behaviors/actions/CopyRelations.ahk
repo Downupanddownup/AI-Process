@@ -10,9 +10,13 @@ class CopyRelations extends AgentActionBase {
     FailFeedbackText := "文件关系说明复制失败"
 
     Execute() {
-        content := ContextRebuildPromptBuilder.Build(GetCurrentDir())
-        content := PromptElements.NoModify(content)
-        content := PromptElements.ContextRelationTail(content)
+        if (PromptSource.Enabled()) {
+            content := PromptSource.Build("复关系", "auto")
+        } else {
+            content := ContextRebuildPromptBuilder.Build(GetCurrentDir())
+            content := PromptElements.NoModify(content)
+            content := PromptElements.ContextRelationTail(content)
+        }
         this.Dispatch(content, Map("target", "上下文重建"), "文件关系说明已复制")
     }
 }

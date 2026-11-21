@@ -12,13 +12,19 @@ class CopyRequirement extends AgentActionBase {
 
     Execute() {
         chain := VersionChain.Of(GetCurrentDir())
-        content := this.LoadTemplate("requirement_prompt.txt")
-        content := StrReplace(content, "{{filePath}}", chain.RequirementPath())
-        content := PromptElements.NoModify(content)
-        content := PromptElements.ContentQuality(content)
-        content := PromptElements.QuestionRules(content)
-        content := PromptElements.QuestionTemplate(content)
-        content := PromptElements.OpenMd(content)
+
+        if (PromptSource.Enabled()) {
+            content := PromptSource.Build("复需求", "single")
+        } else {
+            content := this.LoadTemplate("requirement_prompt.txt")
+            content := StrReplace(content, "{{filePath}}", chain.RequirementPath())
+            content := PromptElements.NoModify(content)
+            content := PromptElements.ContentQuality(content)
+            content := PromptElements.QuestionRules(content)
+            content := PromptElements.QuestionTemplate(content)
+            content := PromptElements.OpenMd(content)
+        }
+
         this.Dispatch(content, Map("target", "v1.md", "source", DomainConventions.RequirementFile), "需求提示词已复制")
     }
 }
