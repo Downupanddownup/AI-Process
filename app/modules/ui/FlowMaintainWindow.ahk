@@ -23,6 +23,7 @@ global FMWinCurFlow := ""
 global FMWinNewBtn := ""
 global FMWinRenameBtn := ""
 global FMWinDeleteBtn := ""
+global FMWinSelectBtn := ""
 global FMNewDialog := "", FMNewName := "", FMNewShort := "", FMNewKey := ""
 global FMNewCopy := "", FMNewBlank := "", FMNewHint := "", FMNewOk := ""
 global FMRenameDialog := "", FMRenameName := "", FMRenameShort := ""
@@ -32,7 +33,7 @@ global FMRenameHint := "", FMRenameOk := ""
 ShowFlowMaintainWindow(flowKey := "") {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
-    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn
 
     if (FMWin) {
         if (GuiAlive(FMWin)) {
@@ -84,16 +85,22 @@ ShowFlowMaintainWindow(flowKey := "") {
     FMWinDeleteBtn.OnEvent("Click", OnFMDelete)
     UpdateFMWriteButtons(false, true)
 
-    ; 中列（x=240..600）：x+8 是相对左列表右边缘
+    ; 中列（x=240..740）：x+8 是相对左列表右边缘
     FMWin.AddText("x+8 ym w500 h18", "组合与块（选中一行看右边预览）")
-    FMWinComboList := FMWin.AddListView("xp y+2 w500 h620 -Multi", ["组合", "块"])
+    ; 与左列对称：列表让出一行给「选块…」：620 → 588，列底仍是 652
+    FMWinComboList := FMWin.AddListView("xp y+2 w500 h588 -Multi", ["组合", "块"])
     FMWinComboList.ModifyCol(1, 130)
     FMWinComboList.ModifyCol(2, 370)
     ApplyDialogListStyle(FMWinComboList)
     FMWinComboList.OnEvent("ItemSelect", OnFMComboSelect)
+    FMWinComboList.OnEvent("DoubleClick", OnFMSelectBlock)
 
-    ; 右列（x=608..1168）：x+8 是相对中列表右边缘
-    FMWinDemoLabel := FMWin.AddText("x+8 ym w640 h18 cGray", "")
+    FMWinSelectBtn := FMWin.AddButton("xp y+6 w100 h26", "选块…")
+    FMWinSelectBtn.OnEvent("Click", OnFMSelectBlock)
+
+    ; 右列（x=748..1388）：这里必须写绝对 x，因为上一个控件是「选块…」按钮，
+    ; 用 x+8 会贴到按钮右边（曾经的三列错位就是这么来的）
+    FMWinDemoLabel := FMWin.AddText("x748 ym w640 h18 cGray", "")
     FMWinPreview := FMWin.AddEdit("xp y+2 w640 h464 +ReadOnly +VScroll", "")
 
     ; 右列下半：校验结果
@@ -121,7 +128,7 @@ ShowFlowMaintainWindow(flowKey := "") {
 CloseFlowMaintainWindow(*) {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
-    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn
 
     ; 销毁 + 置空：只 Hide 的话变量会悬空，下次 Show 报 "Gui has no window"。
     ; 窗口可能已被 owner 连带销毁，那时 Hwnd 读取会抛错，所以先判活。
@@ -142,6 +149,7 @@ CloseFlowMaintainWindow(*) {
     FMWinNewBtn := ""
     FMWinRenameBtn := ""
     FMWinDeleteBtn := ""
+    FMWinSelectBtn := ""
 }
 
 ; ---- 左列表 ----
@@ -272,6 +280,25 @@ OnFMRefresh(manual := true) {
     } catch as e {
         FMWinPreview.Value := "预览失败：" e.Message
         FMWinHint.Text := "预览失败"
+    }
+}
+
+; ---- 选块（03）----
+
+; 中列「选块…」或双击组合行：给该组合挑块、排序、写回
+OnFMSelectBlock(*) {
+    global FMWinCurFlow, FMWinCombos, FMWinComboList
+
+    if (FMWinCurFlow = "")
+        return
+    row := FMWinComboList.GetNext(0)
+    if (row = 0 || row > FMWinCombos.Length)
+        return
+
+    comboKey := FMWinCombos[row]["combo"]
+    if (ShowFlowBlockPicker(FMWinCurFlow, comboKey)) {
+        OnFMRefresh(true)
+        SetFMHint("已保存：" ComboDisplayName(comboKey) " 的块顺序")
     }
 }
 
