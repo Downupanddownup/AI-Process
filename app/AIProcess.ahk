@@ -76,6 +76,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\promptflow\PromptAssembler.ahk
 #Include %A_ScriptDir%\modules\promptflow\PromptValidator.ahk
 #Include %A_ScriptDir%\modules\business\services\FlowResolver.ahk
+#Include %A_ScriptDir%\modules\business\services\PromptSource.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActionBase.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CreateRequirement.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRequirement.ahk
@@ -108,6 +109,8 @@ if (!EnsureSingleInstance()) {
 
 EnsureDefaultFiles()
 LoadConfig()
+Environment.SetFlowKeyProvider(FlowKeyOf)   ; 注入流程解析：business → promptflow 单向
+Environment.InitAll()                        ; 三个窗口各一份常驻运行环境
 InitFileToolManager()
 if (!IsWindowPositionValid(AppConfig["WindowPosX"], AppConfig["WindowPosY"])) {
     ClearSavedWindowPosition()

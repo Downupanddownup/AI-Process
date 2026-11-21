@@ -8,6 +8,8 @@ class PromptParamRule {
 
     ; 规则入口：rule 为标识符，env 为运行环境，action 为当前动作
     static Resolve(rule, env, action) {
+        global AppConfig
+
         if (rule = "action.input") {
             return this._ActionInput(env, action)
         }
@@ -33,11 +35,12 @@ class PromptParamRule {
         if (rule = "manifest.text") {
             return RTrim(ContextRebuildManifest.Build(env.TopicDir)["ManifestText"], "`r`n")
         }
+        ; 两个脚本路径是配置常量，不属于运行环境；与 config.resultTemplate 读 TemplateDir 同款
         if (rule = "config.openMdScript") {
-            return env.OpenMdScriptPath
+            return AppConfig["OpenMdScriptPath"]
         }
         if (rule = "config.notifyScript") {
-            return env.NotificationScriptPath
+            return AppConfig["NotificationScriptPath"]
         }
         if (rule = "window.active") {
             return (env.WindowId != "") ? env.WindowId : GetActiveWindowId()

@@ -477,13 +477,10 @@ PreviewTopicDir() {
 }
 
 BuildFMEnv(flowKey) {
-    global AppConfig
     env := Environment()
     env.TopicDir := PreviewTopicDir()
     env.WindowId := GetActiveWindowId()
     env.FlowKey := flowKey
-    env.OpenMdScriptPath := AppConfig["OpenMdScriptPath"]
-    env.NotificationScriptPath := AppConfig["NotificationScriptPath"]
     return env
 }
 

@@ -336,3 +336,22 @@ SetDefaultFlowKey(key) {
     }
     return SafeIniWrite(key, SettingsFile, "PromptFlow", "DefaultFlowKey")
 }
+
+; ===== 新拼装开关（[PromptFlow] 节）=====
+
+; 是否走新拼装。缺键 / 读失败 → false：不配置即等同未接入，任何环境都能安全启动
+GetUseNewAssembler() {
+    global SettingsFile
+    try {
+        v := Trim(IniRead(SettingsFile, "PromptFlow", "UseNewAssembler", "0"))
+    } catch {
+        return false
+    }
+    return (v = "1")
+}
+
+; 写开关；settings.ini 是 UTF-16 LE 带 BOM，必须走 SafeIniWrite
+SetUseNewAssembler(enabled) {
+    global SettingsFile
+    return SafeIniWrite(enabled ? "1" : "0", SettingsFile, "PromptFlow", "UseNewAssembler")
+}
