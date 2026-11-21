@@ -163,12 +163,13 @@ ShowFlowSwitchDialog(*) {
     FlowSwitchDialog.OnEvent("Close", CloseFlowSwitchDialog)
     FlowSwitchDialog.OnEvent("Escape", CloseFlowSwitchDialog)
 
-    FlowSwitchDialog.AddText("xm ym w420 h20", "当前主题：")
-    FlowSwitchDialog.AddText("xm y+2 w420 h20 c666666", currentDir)
-    FlowSwitchDialog.AddText("xm y+10 w420 h20", "选择流程：")
-    FlowSwitchList := FlowSwitchDialog.AddListView("xm y+2 w420 h240 -Multi", ["流程", "全称", "标识"])
+    FlowSwitchDialog.AddText("xm ym w536 h20", "当前主题：")
+    ; 路径可能很长：给三行高度并显式 Wrap，否则换行后第二行会被 h20 裁掉
+    FlowSwitchDialog.AddText("xm y+2 w536 h48 c666666 +Wrap", currentDir)
+    FlowSwitchDialog.AddText("xm y+10 w536 h20", "选择流程：")
+    FlowSwitchList := FlowSwitchDialog.AddListView("xm y+2 w536 h240 -Multi", ["流程", "全称", "标识"])
     FlowSwitchList.ModifyCol(1, 120)
-    FlowSwitchList.ModifyCol(2, 180)
+    FlowSwitchList.ModifyCol(2, 296)
     FlowSwitchList.ModifyCol(3, 100)
     ApplyDialogListStyle(FlowSwitchList)
     FlowSwitchList.OnEvent("DoubleClick", OnFlowSwitchOk)
@@ -178,7 +179,7 @@ ShowFlowSwitchDialog(*) {
     MaintainBtn.Enabled := false
     MaintainBtn.OnEvent("Click", (*) => 0)
 
-    OkBtn := FlowSwitchDialog.AddButton("x232 yp w90 h26 Default", "确定")
+    OkBtn := FlowSwitchDialog.AddButton("x348 yp w90 h26 Default", "确定")
     OkBtn.OnEvent("Click", OnFlowSwitchOk)
     CancelBtn := FlowSwitchDialog.AddButton("x+8 yp w90 h26", "取消")
     CancelBtn.OnEvent("Click", CloseFlowSwitchDialog)
@@ -215,10 +216,15 @@ RefreshFlowSwitchList() {
 }
 
 CloseFlowSwitchDialog(*) {
-    global FlowSwitchDialog
+    global FlowSwitchDialog, FlowSwitchList
+    ; 必须 Destroy + 置空：Gui.Close 事件处理器执行完后窗口仍会被销毁，
+    ; 只 Hide 不置空的话，变量指向已销毁的 Gui，下次 Show() 报 "Gui has no window"。
+    ; 同 CloseThemeSelectDialog 的做法。
     if (FlowSwitchDialog) {
-        FlowSwitchDialog.Hide()
+        FlowSwitchDialog.Destroy()
+        FlowSwitchDialog := ""
     }
+    FlowSwitchList := ""
 }
 
 OnFlowSwitchOk(*) {
