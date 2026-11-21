@@ -20,9 +20,15 @@ class AssemblerEngine {
             throw Error("组合不在骨架里：" Skeleton.ComposeKey(actionKey, policyKey))
         }
 
-        flow := FlowLibrary.GetDefault()
+        ; 用运行环境里的流程：预览可以直接指定"按哪套流程拼"；
+        ; 没指定才回默认流程（09 接入后，真实发送也会先解析主题配置再填 env.FlowKey）
+        flow := (env.FlowKey != "") ? FlowLibrary.Get(env.FlowKey) : FlowLibrary.GetDefault()
+        ; 组合未配置时按"空挂点"处理：预览要能看出骨架长什么样；
+        ; 真要拦，是 07 校验器的 combo_unconfigured（warn），不是拼装时崩掉
         comboKey := Skeleton.ComposeKey(actionKey, policyKey)
-        recipe := flow.GetRecipe(comboKey)
+        blockIds := []
+        if flow.Recipes.Has(comboKey)
+            blockIds := flow.GetRecipe(comboKey).Content
 
         ; 按段序拼接：每段去尾换行后，用两个换行连接
         ; 为什么不直接首尾相接：段文件是从模板按区间切的，但文件最后一段没有尾随空行
@@ -37,7 +43,7 @@ class AssemblerEngine {
                     text := this._ReadText(Skeleton.GetSegmentFile(seg["id"]))
                 }
             } else if (seg["kind"] = "slot") {
-                for blockId in recipe.Content {
+                for blockId in blockIds {
                     blk := BlockLibrary.Get(blockId, flow.BlocksDir)
                     ; 块正文末尾可能自带换行，先去掉再拼，否则与分隔符叠成三个换行
                     body := RTrim(blk.Body, "`r`n")

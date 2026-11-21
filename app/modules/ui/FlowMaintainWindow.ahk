@@ -297,6 +297,15 @@ OnFMSelectBlock(*) {
 
     comboKey := FMWinCombos[row]["combo"]
     if (ShowFlowBlockPicker(FMWinCurFlow, comboKey)) {
+        ; 保存后必须重建中列：块名文字是选流程时的快照，不重建就会一直显示旧配置
+        RefreshFMFlowList(FMWinCurFlow)
+        for idx, item in FMWinCombos {
+            if (item["combo"] = comboKey) {
+                FMWinComboList.Modify(idx, "Select Focus")
+                OnFMComboSelect()
+                break
+            }
+        }
         OnFMRefresh(true)
         SetFMHint("已保存：" ComboDisplayName(comboKey) " 的块顺序")
     }
