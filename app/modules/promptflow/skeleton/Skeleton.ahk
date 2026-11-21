@@ -113,7 +113,6 @@ class Skeleton {
         "end_open_fixed",     ["openMdScript", "windowId", "resultFilePath"],
         "end_notify",         ["notifyScript", "windowId"],
         ; 块级声明（Skeleton 不拼它们，但校验器需要知道它们用哪些占位符）
-        "result_format",      ["resultTemplatePath"],
         "steps_rules",        ["resultFilePath"]
     )
 

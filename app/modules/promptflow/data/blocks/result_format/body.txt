@@ -1,2 +1,0 @@
-文件格式请参考：{{resultTemplatePath}}
-

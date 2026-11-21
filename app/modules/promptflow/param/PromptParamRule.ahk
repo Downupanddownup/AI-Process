@@ -25,9 +25,6 @@ class PromptParamRule {
             chain := VersionChain.Of(env.TopicDir)
             return chain.Dir "\" chain.ResultName()
         }
-        if (rule = "config.resultTemplate") {
-            return this._ResultTemplate(action)
-        }
         if (rule = "manifest.summary") {
             ; RTrim：规则的值会插在段中间，末尾换行会与拼装的分隔符叠成多一个空行
             return RTrim(ContextRebuildManifest.Build(env.TopicDir)["Summary"], "`r`n")
@@ -35,7 +32,7 @@ class PromptParamRule {
         if (rule = "manifest.text") {
             return RTrim(ContextRebuildManifest.Build(env.TopicDir)["ManifestText"], "`r`n")
         }
-        ; 两个脚本路径是配置常量，不属于运行环境；与 config.resultTemplate 读 TemplateDir 同款
+        ; 两个脚本路径是配置常量，不属于运行环境；规则直接读 AppConfig
         if (rule = "config.openMdScript") {
             return AppConfig["OpenMdScriptPath"]
         }
@@ -90,17 +87,5 @@ class PromptParamRule {
             return p
         }
         throw Error("步目需要实施文档、最新回复或版本文档作为拆分依据，当前都没有")
-    }
-
-    ; 结果文档模板：tweak 用 result_doc.md，steps_dir 用 steps_result_doc.md
-    static _ResultTemplate(action) {
-        global TemplateDir
-        if (action.Key != "复执行") {
-            throw Error("动作 " action.Key " 不使用 resultTemplatePath 占位符")
-        }
-        if (action.SelectedPolicy = "steps_dir") {
-            return TemplateDir "\execute\steps_result_doc.md"
-        }
-        return TemplateDir "\execute\result_doc.md"
     }
 }

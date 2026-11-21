@@ -23,10 +23,10 @@
       "content": ["review_tech_body", "no_modify"]
     },
     "复执行|tweak": {
-      "content": ["result_format"]
+      "content": ["format_doc"]
     },
     "复执行|steps_dir": {
-      "content": ["steps_rules", "result_format"]
+      "content": ["steps_rules", "format_steps"]
     },
     "复关系|auto": {
       "content": ["no_modify"]

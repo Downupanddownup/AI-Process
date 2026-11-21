@@ -32,11 +32,6 @@
     "rule": "chain.resultPath",
     "source": "TopicDir + VersionChain.ResultName()"
   },
-  "resultTemplatePath": {
-    "meaning": "结果文档的格式模板路径，供 AI 参考写法",
-    "rule": "config.resultTemplate",
-    "source": "TemplateDir：result_doc.md 或 steps_result_doc.md"
-  },
   "scaleSummary": {
     "meaning": "主题目录的规模摘要：文件数、可读文本量、二进制文件数",
     "rule": "manifest.summary",
