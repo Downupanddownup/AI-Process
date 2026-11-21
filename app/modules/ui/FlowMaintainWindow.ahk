@@ -478,8 +478,10 @@ ShowFMNewDialog() {
     FMNewKey := d.AddEdit("x+8 yp w296 h24")
 
     d.AddText("xm y+12 w68 h20", "起点")
-    FMNewCopy := d.AddRadio("x+8 yp w240 h20 Checked", "从内置流程复制（code）")
-    FMNewBlank := d.AddRadio("x+8 y+2 w240 h20", "空白流程")
+    ; 单选组与上面三个输入框左对齐（x88），不能用 x+8——那是"上一个控件的右边缘 +8"，
+    ; 会跑到输入框右边、超出窗口（曾导致"空白流程"被裁掉）
+    FMNewCopy := d.AddRadio("x88 yp w296 h20 Checked", "从内置流程复制（code）")
+    FMNewBlank := d.AddRadio("x88 y+2 w296 h20", "空白流程")
 
     FMNewHint := d.AddText("xm y+8 w372 h34 cRed", "")
     FMNewOk := d.AddButton("x212 y+6 w80 h26 Default", "确定")
@@ -611,7 +613,7 @@ OnFMRename(*) {
 
     FMRenameDialog := d
     UpdateFMRenameState()
-    d.Show("w376 h230")
+    d.Show("w380 h230")
 }
 
 CloseFMRenameDialog(*) {
@@ -706,5 +708,6 @@ OnFMDelete(*) {
     RefreshFMFlowList(nextKey)
     SetFMHint("已删除：" flow.Name)
 }
+
 
 
