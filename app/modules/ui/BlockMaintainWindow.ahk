@@ -353,6 +353,12 @@ OnBMDelete(*) {
     try {
         BlockEditor.Delete(BMFlowKey, id)
     } catch as e {
+        ; 被引用时不能用状态行打发：确认过却什么都没发生，等于坏交互
+        ownerHwnd := GuiAlive(BMWin) ? BMWin.Hwnd : 0
+        opts := "Icon!"
+        if (ownerHwnd)
+            opts .= " Owner" ownerHwnd
+        MsgBox(e.Message, "不能删除", opts)
         SetBMStatus(e.Message)
         return
     }
