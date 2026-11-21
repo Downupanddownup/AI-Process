@@ -23,6 +23,7 @@ global FBPKindCombo := ""
 global FBPScopeCombo := ""
 global FBPCountText := ""
 global FBPLeftList := ""
+global FBPDetail := ""
 global FBPRightList := ""
 global FBPSyncBtn := ""
 global FBPUpBtn := ""
@@ -63,14 +64,14 @@ ShowFlowBlockPicker(flowKey, comboKey) {
     }
 
     BuildFlowBlockPicker()
-    FBPWin.Show("w872 h564")
+    FBPWin.Show("w872 h580")
     WinWaitClose("ahk_id " FBPWin.Hwnd)
     return FBPResult
 }
 
 BuildFlowBlockPicker() {
     global FBPWin, FBPKeyEdit, FBPKindCombo, FBPScopeCombo, FBPCountText
-    global FBPLeftList, FBPRightList, FBPSyncBtn, FBPUpBtn, FBPDownBtn, FBPRemoveBtn
+    global FBPLeftList, FBPDetail, FBPRightList, FBPSyncBtn, FBPUpBtn, FBPDownBtn, FBPRemoveBtn
     global FBPStatus, FMWin, FBPFlowKey, FBPComboKey
 
     opts := "+AlwaysOnTop +ToolWindow"
@@ -98,7 +99,7 @@ BuildFlowBlockPicker() {
     FBPCountText := d.AddText("x+16 yp w120 h22 cGray", "")
 
     ; 左列：候选（先开复选框样式，再添行；顺序反了会丢勾选框）
-    FBPLeftList := d.AddListView("xm y+8 w520 h440 -Multi", ["名称", "类别", "归属", "说明"])
+    FBPLeftList := d.AddListView("xm y+8 w520 h400 -Multi", ["名称", "类别", "归属", "说明"])
     SendMessage(LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES, FBPLeftList.Hwnd)
     FBPLeftList.ModifyCol(1, 170)
     FBPLeftList.ModifyCol(2, 90)
@@ -106,20 +107,24 @@ BuildFlowBlockPicker() {
     FBPLeftList.ModifyCol(4, 196)
     ApplyDialogListStyle(FBPLeftList)
     FBPLeftList.OnEvent("DoubleClick", OnFBPToggleRow)
+    FBPLeftList.OnEvent("ItemSelect", OnFBPLeftSelect)
+
+    ; 说明全文：ListView 单元格不换行，长说明只能在这里看全
+    FBPDetail := d.AddEdit("xm y+4 w520 h48 +ReadOnly +Multi +VScroll", "")
 
     FBPSyncBtn := d.AddButton("xm y+6 w140 h26", "同步到选中区 →")
     FBPSyncBtn.OnEvent("Click", OnFBPSync)
 
     ; 右列：选中区（顺序）
     d.AddText("x540 y44 w320 h18", "选中区（顺序即拼装顺序）")
-    FBPRightList := d.AddListView("x540 y+2 w320 h418 -Multi", ["序号", "名称"])
+    FBPRightList := d.AddListView("x540 y+2 w320 h436 -Multi", ["序号", "名称"])
     FBPRightList.ModifyCol(1, 40)
     FBPRightList.ModifyCol(2, 276)
     ApplyDialogListStyle(FBPRightList)
     FBPRightList.OnEvent("Click", OnFBPRightClick)
     FBPRightList.OnEvent("ItemSelect", OnFBPRightClick)
 
-    FBPUpBtn := d.AddButton("x540 y+6 w90 h26", "上移")
+    FBPUpBtn := d.AddButton("x540 y506 w90 h26", "上移")
     FBPUpBtn.OnEvent("Click", OnFBPUp)
     FBPDownBtn := d.AddButton("x+8 yp w90 h26", "下移")
     FBPDownBtn.OnEvent("Click", OnFBPDown)
@@ -127,8 +132,8 @@ BuildFlowBlockPicker() {
     FBPRemoveBtn.OnEvent("Click", OnFBPRemove)
 
     ; 底部
-    FBPStatus := d.AddText("xm y+10 w660 h20 cGray", "")
-    btnOk := d.AddButton("x688 y526 w80 h26 Default", "确定")
+    FBPStatus := d.AddText("x12 y542 w660 h20 cGray", "")
+    btnOk := d.AddButton("x688 y542 w80 h26 Default", "确定")
     btnOk.OnEvent("Click", OnFBPOk)
     btnCancel := d.AddButton("x+8 yp w80 h26", "取消")
     btnCancel.OnEvent("Click", CloseFlowBlockPicker)
@@ -146,7 +151,7 @@ BuildFlowBlockPicker() {
 
 CloseFlowBlockPicker(*) {
     global FBPWin, FBPKeyEdit, FBPKindCombo, FBPScopeCombo, FBPCountText
-    global FBPLeftList, FBPRightList, FBPSyncBtn, FBPUpBtn, FBPDownBtn, FBPRemoveBtn
+    global FBPLeftList, FBPDetail, FBPRightList, FBPSyncBtn, FBPUpBtn, FBPDownBtn, FBPRemoveBtn
     global FBPStatus, FBPVisible, FBPCandidates
 
     if (GuiAlive(FBPWin)) {
@@ -158,6 +163,7 @@ CloseFlowBlockPicker(*) {
     FBPScopeCombo := ""
     FBPCountText := ""
     FBPLeftList := ""
+    FBPDetail := ""
     FBPRightList := ""
     FBPSyncBtn := ""
     FBPUpBtn := ""
@@ -276,6 +282,28 @@ RefreshFBPLeft() {
     }
 
     FBPCountText.Text := "候选 " FBPVisible.Length " 个"
+
+    ; 选中首行并顺手把说明全文显示出来；没有候选就清空
+    if (FBPVisible.Length > 0) {
+        FBPLeftList.Modify(1, "Select Focus")
+        OnFBPLeftSelect()
+    } else if (FBPDetail) {
+        FBPDetail.Value := ""
+    }
+}
+
+; 说明全文：ListView 单元格不换行，只能靠这块只读文本
+OnFBPLeftSelect(*) {
+    global FBPLeftList, FBPVisible, FBPDetail
+
+    if (!FBPDetail)
+        return
+    row := FBPLeftList.GetNext(0)
+    if (row = 0 || row > FBPVisible.Length) {
+        FBPDetail.Value := ""
+        return
+    }
+    FBPDetail.Value := FBPVisible[row]["purpose"]
 }
 
 ; 读左列可见行的勾选，写回意图表（被筛掉的行保留原意图）
@@ -450,4 +478,6 @@ HasFBPValue(arr, value) {
     }
     return false
 }
+
+
 

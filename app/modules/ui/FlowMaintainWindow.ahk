@@ -70,9 +70,10 @@ ShowFlowMaintainWindow(flowKey := "") {
     ; 左列（x=12..232）
     FMWin.AddText("xm ym w220 h18", "流程")
     ; 列表让出一行给「新建 / 改名 / 删除」：620 → 588，列底仍是 652
+    ; 维护窗口是编辑场景：显示全称，不用面板那套固定宽简称
     FMWinFlowList := FMWin.AddListView("xp y+2 w220 h588 -Multi", ["流程", "类型"])
-    FMWinFlowList.ModifyCol(1, 140)
-    FMWinFlowList.ModifyCol(2, "70 Center")
+    FMWinFlowList.ModifyCol(1, 150)
+    FMWinFlowList.ModifyCol(2, "60 Center")
     ApplyDialogListStyle(FMWinFlowList)
     FMWinFlowList.OnEvent("ItemSelect", OnFMFlowSelect)
 
@@ -163,7 +164,7 @@ RefreshFMFlowList(preferKey := "") {
 
     for item in FlowLibrary.ListFlows() {
         FMWinFlowKeys.Push(item["key"])
-        FMWinFlowList.Add(, item["shortName"], item["readonly"] ? "内置" : "自定义")
+        FMWinFlowList.Add(, item["name"], item["readonly"] ? "内置" : "自定义")
         if (preferKey != "" && item["key"] = preferKey && selectedRow = 0) {
             selectedRow := A_Index
         }
