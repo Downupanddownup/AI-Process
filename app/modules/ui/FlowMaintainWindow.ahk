@@ -35,10 +35,14 @@ ShowFlowMaintainWindow(flowKey := "") {
     global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn
 
     if (FMWin) {
-        FMWin.Show()
-        WinActivate("ahk_id " FMWin.Hwnd)
-        RefreshFMFlowList(flowKey != "" ? flowKey : FMWinCurFlow)
-        return
+        if (GuiAlive(FMWin)) {
+            FMWin.Show()
+            WinActivate("ahk_id " FMWin.Hwnd)
+            RefreshFMFlowList(flowKey != "" ? flowKey : FMWinCurFlow)
+            return
+        }
+        ; owner 被销毁时，这个窗口会跟着没掉，但变量还悬着——清掉重建
+        CloseFlowMaintainWindow()
     }
 
     ; 布局说明：AHK 的 "x+8" 是"上一个控件的右边缘 +8"，不是"左边 +8"。
@@ -47,9 +51,10 @@ ShowFlowMaintainWindow(flowKey := "") {
     opts := "+MinSize1300x700"
     ; 按来源绑 owner：从设置主题弹窗打开就绑它，从托盘打开就绑主面板。
     ; 子窗口永远在父窗口之上，层级自然对——不用 AlwaysOnTop（那会盖住别的程序）。
-    if (IsSet(ThemeSelectDialog) && ThemeSelectDialog) {
+    ; owner 可能是已销毁的旧引用，必须判活，否则读 Hwnd 就抛错。
+    if (IsSet(ThemeSelectDialog) && GuiAlive(ThemeSelectDialog)) {
         opts .= " +Owner" ThemeSelectDialog.Hwnd
-    } else if (IsSet(MainGui) && MainGui) {
+    } else if (IsSet(MainGui) && GuiAlive(MainGui)) {
         opts .= " +Owner" MainGui.Hwnd
     }
 
@@ -118,11 +123,12 @@ CloseFlowMaintainWindow(*) {
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
     global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn
 
-    ; 销毁 + 置空：只 Hide 的话变量会悬空，下次 Show 报 "Gui has no window"
-    if (FMWin) {
-        FMWin.Destroy()
-        FMWin := ""
+    ; 销毁 + 置空：只 Hide 的话变量会悬空，下次 Show 报 "Gui has no window"。
+    ; 窗口可能已被 owner 连带销毁，那时 Hwnd 读取会抛错，所以先判活。
+    if (GuiAlive(FMWin)) {
+        try FMWin.Destroy()
     }
+    FMWin := ""
     FMWinFlowList := ""
     FMWinComboList := ""
     FMWinPreview := ""
@@ -444,13 +450,16 @@ ShowFMNewDialog() {
     global FMNewCopy, FMNewBlank, FMNewHint, FMNewOk
 
     if (FMNewDialog) {
-        FMNewDialog.Show()
-        WinActivate("ahk_id " FMNewDialog.Hwnd)
-        return
+        if (GuiAlive(FMNewDialog)) {
+            FMNewDialog.Show()
+            WinActivate("ahk_id " FMNewDialog.Hwnd)
+            return
+        }
+        CloseFMNewDialog()
     }
 
     opts := "+AlwaysOnTop +ToolWindow"
-    if (FMWin)
+    if (GuiAlive(FMWin))
         opts .= " +Owner" FMWin.Hwnd
 
     d := Gui(opts, "新建流程")
@@ -491,10 +500,10 @@ CloseFMNewDialog(*) {
     global FMNewDialog, FMNewName, FMNewShort, FMNewKey
     global FMNewCopy, FMNewBlank, FMNewHint, FMNewOk
 
-    if (FMNewDialog) {
-        FMNewDialog.Destroy()
-        FMNewDialog := ""
+    if (GuiAlive(FMNewDialog)) {
+        try FMNewDialog.Destroy()
     }
+    FMNewDialog := ""
     FMNewName := ""
     FMNewShort := ""
     FMNewKey := ""
@@ -562,13 +571,16 @@ OnFMRename(*) {
         return
 
     if (FMRenameDialog) {
-        FMRenameDialog.Show()
-        WinActivate("ahk_id " FMRenameDialog.Hwnd)
-        return
+        if (GuiAlive(FMRenameDialog)) {
+            FMRenameDialog.Show()
+            WinActivate("ahk_id " FMRenameDialog.Hwnd)
+            return
+        }
+        CloseFMRenameDialog()
     }
 
     opts := "+AlwaysOnTop +ToolWindow"
-    if (FMWin)
+    if (GuiAlive(FMWin))
         opts .= " +Owner" FMWin.Hwnd
 
     d := Gui(opts, "改名")
@@ -606,10 +618,10 @@ CloseFMRenameDialog(*) {
     global FMRenameDialog, FMRenameName, FMRenameShort, FMRenameKeyText
     global FMRenameHint, FMRenameOk
 
-    if (FMRenameDialog) {
-        FMRenameDialog.Destroy()
-        FMRenameDialog := ""
+    if (GuiAlive(FMRenameDialog)) {
+        try FMRenameDialog.Destroy()
     }
+    FMRenameDialog := ""
     FMRenameName := ""
     FMRenameShort := ""
     FMRenameKeyText := ""
@@ -694,3 +706,5 @@ OnFMDelete(*) {
     RefreshFMFlowList(nextKey)
     SetFMHint("已删除：" flow.Name)
 }
+
+

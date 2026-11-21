@@ -62,13 +62,17 @@ ShowThemeSelectDialog(*) {
     global ThemeSelectCopyPathBtn, ThemeSelectOkBtn, ThemeSelectCancelBtn
 
     if (ThemeSelectDialog) {
-        ThemeSelectDialog.Show()
-        WinActivate("ahk_id " ThemeSelectDialog.Hwnd)
-        RefreshThemeSelectState()
-        return
+        if (GuiAlive(ThemeSelectDialog)) {
+            ThemeSelectDialog.Show()
+            WinActivate("ahk_id " ThemeSelectDialog.Hwnd)
+            RefreshThemeSelectState()
+            return
+        }
+        ; 已被父窗口带走：清掉死引用再重建
+        CloseThemeSelectDialog()
     }
 
-    ownerHwnd := MainGui ? MainGui.Hwnd : 0
+    ownerHwnd := GuiAlive(MainGui) ? MainGui.Hwnd : 0
     dialogOptions := "+AlwaysOnTop +ToolWindow +Resize"
     if (ownerHwnd) {
         dialogOptions .= " +Owner" ownerHwnd
@@ -143,12 +147,16 @@ ShowFlowSwitchDialog(*) {
         return
     }
 
-    ownerHwnd := ThemeSelectDialog ? ThemeSelectDialog.Hwnd : 0
+    ownerHwnd := GuiAlive(ThemeSelectDialog) ? ThemeSelectDialog.Hwnd : 0
     if (FlowSwitchDialog) {
-        FlowSwitchDialog.Show()
-        WinActivate("ahk_id " FlowSwitchDialog.Hwnd)
-        RefreshFlowSwitchList()
-        return
+        if (GuiAlive(FlowSwitchDialog)) {
+            FlowSwitchDialog.Show()
+            WinActivate("ahk_id " FlowSwitchDialog.Hwnd)
+            RefreshFlowSwitchList()
+            return
+        }
+        ; 设置主题弹窗被关掉时，这个子窗口会被连带销毁，变量却还悬着
+        CloseFlowSwitchDialog()
     }
 
     opts := "+AlwaysOnTop +ToolWindow"
@@ -218,11 +226,11 @@ CloseFlowSwitchDialog(*) {
     global FlowSwitchDialog, FlowSwitchList
     ; 必须 Destroy + 置空：Gui.Close 事件处理器执行完后窗口仍会被销毁，
     ; 只 Hide 不置空的话，变量指向已销毁的 Gui，下次 Show() 报 "Gui has no window"。
-    ; 同 CloseThemeSelectDialog 的做法。
-    if (FlowSwitchDialog) {
-        FlowSwitchDialog.Destroy()
-        FlowSwitchDialog := ""
+    ; 被 owner 连带销毁时窗口已死、Destroy 会跳过；变量照样要置空。
+    if (GuiAlive(FlowSwitchDialog)) {
+        try FlowSwitchDialog.Destroy()
     }
+    FlowSwitchDialog := ""
     FlowSwitchList := ""
 }
 
@@ -262,7 +270,7 @@ OnFlowSwitchOk(*) {
     CloseFlowSwitchDialog()
     ; 面板与主题列表同步刷新
     UpdateCurrentPathDisplay()
-    if (ThemeSelectDialog) {
+    if (GuiAlive(ThemeSelectDialog)) {
         RefreshThemeSelectState()
     }
 }
@@ -440,10 +448,10 @@ CloseThemeSelectDialog(*) {
     global ThemeSelectNewLabel, ThemeSelectNewThemeBtn, ThemeSelectOpenDirBtn
     global ThemeSelectCopyPathBtn, ThemeSelectOkBtn, ThemeSelectCancelBtn
 
-    if (ThemeSelectDialog) {
-        ThemeSelectDialog.Destroy()
-        ThemeSelectDialog := ""
+    if (GuiAlive(ThemeSelectDialog)) {
+        try ThemeSelectDialog.Destroy()
     }
+    ThemeSelectDialog := ""
     ThemeSelectPathText := ""
     ThemeSelectRepoText := ""
     ThemeSelectAddRepoBtn := ""
@@ -472,13 +480,16 @@ ShowRepoSelectDialog(*) {
     global RepoSelectOkBtn, RepoSelectCancelBtn
 
     if (RepoSelectDialog) {
-        RepoSelectDialog.Show()
-        WinActivate("ahk_id " RepoSelectDialog.Hwnd)
-        RefreshRepoSelectList()
-        return
+        if (GuiAlive(RepoSelectDialog)) {
+            RepoSelectDialog.Show()
+            WinActivate("ahk_id " RepoSelectDialog.Hwnd)
+            RefreshRepoSelectList()
+            return
+        }
+        CloseRepoSelectDialog()
     }
 
-    ownerHwnd := MainGui ? MainGui.Hwnd : 0
+    ownerHwnd := GuiAlive(MainGui) ? MainGui.Hwnd : 0
     dialogOptions := "+AlwaysOnTop +ToolWindow +Resize"
     if (ownerHwnd) {
         dialogOptions .= " +Owner" ownerHwnd
@@ -715,10 +726,10 @@ CloseRepoSelectDialog(*) {
     global RepoSelectAddBtn, RepoSelectOpenDirBtn, RepoSelectCopyPathBtn
     global RepoSelectOkBtn, RepoSelectCancelBtn
 
-    if (RepoSelectDialog) {
-        RepoSelectDialog.Destroy()
-        RepoSelectDialog := ""
+    if (GuiAlive(RepoSelectDialog)) {
+        try RepoSelectDialog.Destroy()
     }
+    RepoSelectDialog := ""
     RepoSelectRepoList := ""
     RepoSelectPathText := ""
     RepoSelectFullPaths := []
@@ -740,16 +751,19 @@ ShowRepoAddDialog(*) {
     global RepoAddDialog, RepoAddEdit, RepoAddErrorText, MainGui
 
     if (RepoAddDialog) {
-        RepoAddEdit.Value := ""
-        RepoAddErrorText.Text := ""
-        RepoAddErrorText.Visible := false
-        RepoAddDialog.Show()
-        WinActivate("ahk_id " RepoAddDialog.Hwnd)
-        RepoAddEdit.Focus()
-        return
+        if (GuiAlive(RepoAddDialog)) {
+            RepoAddEdit.Value := ""
+            RepoAddErrorText.Text := ""
+            RepoAddErrorText.Visible := false
+            RepoAddDialog.Show()
+            WinActivate("ahk_id " RepoAddDialog.Hwnd)
+            RepoAddEdit.Focus()
+            return
+        }
+        CloseRepoAddDialog()
     }
 
-    ownerHwnd := MainGui ? MainGui.Hwnd : 0
+    ownerHwnd := GuiAlive(MainGui) ? MainGui.Hwnd : 0
     dialogOptions := "+AlwaysOnTop +ToolWindow"
     if (ownerHwnd) {
         dialogOptions .= " +Owner" ownerHwnd
@@ -800,7 +814,7 @@ OnRepoAddConfirm(*) {
     if (result.success) {
         newRepoPath := NormalizePath(rawPath)
         CloseRepoAddDialog()
-        if (RepoSelectDialog) {
+        if (GuiAlive(RepoSelectDialog)) {
             RefreshRepoSelectList()
         } else {
             ThemeSelectCurrentRepo := newRepoPath
@@ -818,10 +832,10 @@ OnRepoAddConfirm(*) {
 CloseRepoAddDialog(*) {
     global RepoAddDialog, RepoAddEdit, RepoAddErrorText
 
-    if (RepoAddDialog) {
-        RepoAddDialog.Destroy()
-        RepoAddDialog := ""
+    if (GuiAlive(RepoAddDialog)) {
+        try RepoAddDialog.Destroy()
     }
+    RepoAddDialog := ""
     RepoAddEdit := ""
     RepoAddErrorText := ""
 }
