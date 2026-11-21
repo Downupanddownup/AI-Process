@@ -1,0 +1,14 @@
+{
+  "key": "explore",
+  "name": "探索",
+  "shortName": "探索",
+  "readonly": false,
+  "recipes": {
+    "复需求|single": { "content": ["intent_read", "content_quality", "question_rules", "no_modify"] },
+    "复回复|direct": { "content": ["round_anchor", "content_quality", "no_modify"] },
+    "质检码|single": { "content": ["falsify", "no_modify"] },
+    "复回复|impl":   { "content": ["settle", "no_modify"] },
+    "复执行|tweak":  { "content": ["apply_list"] },
+    "复关系|auto":   { "content": ["no_modify"] }
+  }
+}
