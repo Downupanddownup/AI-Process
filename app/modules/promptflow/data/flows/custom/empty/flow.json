@@ -1,0 +1,11 @@
+{
+  "key": "empty",
+  "name": "基础流程",
+  "shortName": "基础",
+  "readonly": false,
+  "recipes": {
+    "复执行|steps_dir": {
+      "content": ["steps_rules", "format_steps"]
+    }
+  }
+}
