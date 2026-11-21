@@ -22,6 +22,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\ui\FlowMaintainWindow.ahk
 #Include %A_ScriptDir%\modules\ui\FlowBlockPicker.ahk
 #Include %A_ScriptDir%\modules\ui\BlockMaintainWindow.ahk
+#Include %A_ScriptDir%\modules\ui\ReferenceMaintainWindow.ahk
 #Include %A_ScriptDir%\modules\business\FileToolManager.ahk
 #Include %A_ScriptDir%\modules\business\QuestionCollector.ahk
 #Include %A_ScriptDir%\modules\business\DirectoryManager.ahk
@@ -66,6 +67,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\promptflow\definition\JsonConfigWriter.ahk
 #Include %A_ScriptDir%\modules\promptflow\definition\FlowEditor.ahk
 #Include %A_ScriptDir%\modules\promptflow\definition\BlockEditor.ahk
+#Include %A_ScriptDir%\modules\promptflow\definition\ReferenceEditor.ahk
 #Include %A_ScriptDir%\modules\promptflow\param\PromptParam.ahk
 #Include %A_ScriptDir%\modules\promptflow\param\PromptParamRule.ahk
 #Include %A_ScriptDir%\modules\promptflow\engine\PlaceholderEngine.ahk

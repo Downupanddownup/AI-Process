@@ -17,6 +17,9 @@ class PromptFlow {
     ; 私有块目录
     BlocksDir := ""
 
+    ; 流程内参考文档目录
+    ReferencesDir := ""
+
     ; 组合键 → ActionRecipe
     Recipes := Map()
 
@@ -36,6 +39,7 @@ class PromptFlow {
         f := PromptFlow()
         f.Dir := dirPath
         f.BlocksDir := dirPath "\blocks"
+        f.ReferencesDir := dirPath "\references"
         f.Key := data.Has("key") ? data["key"] : ""
         f.Name := data.Has("name") ? data["name"] : ""
         f.ShortName := data.Has("shortName") ? data["shortName"] : f.Name

@@ -121,6 +121,8 @@ ShowFlowMaintainWindow(flowKey := "") {
     CheckBtn.OnEvent("Click", OnFMCheck)
     FMWinBlocksBtn := FMWin.AddButton("x+8 yp w120 h26", "管理私有块")
     FMWinBlocksBtn.OnEvent("Click", OnFMPrivateBlocks)
+    FMWinRefsBtn := FMWin.AddButton("x+8 yp w110 h26", "参考文档")
+    FMWinRefsBtn.OnEvent("Click", OnFMReferences)
     FMWinHint := FMWin.AddText("x+12 yp+4 w700 h20 cGray", "")
     CloseBtn := FMWin.AddButton("x1308 yp w80 h26", "关闭")
     CloseBtn.OnEvent("Click", CloseFlowMaintainWindow)
@@ -332,6 +334,21 @@ OnFMSelectBlock(*) {
 }
 
 ; ---- 私有块（05.2）----
+
+; 打开参考文档维护窗口；内置流程也允许进（整窗只读，能看不能改）
+OnFMReferences(*) {
+    global FMWinCurFlow
+
+    if (FMWinCurFlow = "")
+        return
+    try {
+        FlowLibrary.Get(FMWinCurFlow)
+    } catch {
+        return
+    }
+
+    ShowReferenceMaintainWindow(FMWinCurFlow)
+}
 
 ; 打开块维护窗口；有改动才重建中列与预览（块名会变）
 OnFMPrivateBlocks(*) {
