@@ -47,3 +47,4 @@ Desktop.ini
 /app/powershell/notification/.cache/
 /需求/
 /.kimiCode/
+/app/modules/promptflow/data/flows/custom/test/
