@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 
 ; 复盘（AI 型）：复制出题提示词并发送 AI，产出 v(N+1).md（题面）
-; 组成 = 模式模板 + 不修改 → 提问模板 → 打开md（顺序即业务，与质检码同构）；评价在下一轮「复回复」
+; 提示词由 PromptSource 统一拼装；本类只负责守卫、properties 与发送。评价在下一轮「复回复」
 
 class Review extends AgentActionBase {
     ActionKey := "复盘"
@@ -19,15 +19,7 @@ class Review extends AgentActionBase {
         nextVersionFile := "v" chain.NextVersion() ".md"   ; 裸文件名（对齐复回复口径）
         mode := ReviewModeRegistry.GetMeta(ReviewModeRegistry.GetSelected())
 
-        if (PromptSource.Enabled()) {
-            content := PromptSource.Build("复盘", ReviewModeRegistry.GetSelected())
-        } else {
-            content := this.LoadTemplate(mode["template"])
-            content := StrReplace(content, "{{nextVersionFile}}", chain.Dir "\" nextVersionFile)  ; 绝对路径：复盘无输入文件可锚定，裸文件名会让 AI 猜错目录
-            content := PromptElements.NoModify(content)
-            content := PromptElements.QuestionTemplate(content)
-            content := PromptElements.OpenMd(content)
-        }
+        content := PromptSource.Build("复盘", ReviewModeRegistry.GetSelected())
 
         properties := Map("target", nextVersionFile, "复盘模式", mode["label"])
         this.Dispatch(content, properties, mode["feedback"])

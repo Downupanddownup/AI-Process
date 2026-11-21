@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 
-; 领域行为公共基类：Run 骨架 + 技术机制（LoadTemplate / Dispatch / OpenInTool）
+; 领域行为公共基类：Run 骨架 + 技术机制（Dispatch / OpenInTool）
 ; 原则：动作骨架用继承，外部能力用组合；业务组成留行为类，技术机制才外包
 
 class AgentActionBase {
@@ -33,27 +33,6 @@ class AgentActionBase {
     ; 变化点：由子类实现
     Execute() {
         throw Error("Execute 必须由子类实现")
-    }
-
-    ; ---- 纯技术：模板加载 ----
-    LoadTemplate(fileName) {
-        global TemplateDir
-        path := TemplateDir "\" fileName
-        if !FileExist(path) {
-            LogError("模板文件不存在：" path)
-            throw Error("模板文件不存在：" path)
-        }
-        return FileRead(path, "UTF-8")
-    }
-
-    ; ---- 纯技术：模板存在性检查（只检查不读取） ----
-    EnsureTemplate(fileName) {
-        global TemplateDir
-        path := TemplateDir "\" fileName
-        if !FileExist(path) {
-            LogError("模板文件不存在：" path)
-            throw Error("模板文件不存在：" path)
-        }
     }
 
     ; ---- 纯技术：剪贴板 → 日志 → 反馈 → 发 Agent（保持旧调用顺序） ----

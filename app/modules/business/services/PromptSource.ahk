@@ -1,14 +1,11 @@
 #Requires AutoHotkey v2.0
 
 ; 新拼装的唯一入口：动作×策略 → 整份提示词
-; 只做三件事：读开关、解析流程、调 PromptAssembler
+; 只做两件事：解析流程、调 PromptAssembler
 ; 依赖方向：business → promptflow（promptflow 不反向依赖本文件所在的层）
 ; 失败不回落：解析错、拼装错一律抛出，由 AgentActionBase.Run 的统一兜底处理
 
 class PromptSource {
-
-    ; 开关是否打开。缺键 / 读失败 → false
-    static Enabled() => GetUseNewAssembler()
 
     ; 整份提示词
     static Build(actionKey, policyKey) {

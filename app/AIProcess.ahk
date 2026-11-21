@@ -38,10 +38,8 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\services\DomainConventions.ahk
 #Include %A_ScriptDir%\modules\business\services\ContextRebuildManifest.ahk
 #Include %A_ScriptDir%\modules\business\services\ContextRebuildScalePolicy.ahk
-#Include %A_ScriptDir%\modules\business\services\ContextRebuildPromptBuilder.ahk
 #Include %A_ScriptDir%\modules\business\services\DomainTree.ahk
 #Include %A_ScriptDir%\modules\business\services\VersionChain.ahk
-#Include %A_ScriptDir%\modules\business\services\PromptElements.ahk
 #Include %A_ScriptDir%\modules\business\services\EditorOpener.ahk
 #Include %A_ScriptDir%\modules\business\services\ExecuteStrategyRegistry.ahk
 #Include %A_ScriptDir%\modules\business\services\ReviewModeRegistry.ahk
@@ -72,9 +70,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\promptflow\param\PromptParamRule.ahk
 #Include %A_ScriptDir%\modules\promptflow\engine\PlaceholderEngine.ahk
 #Include %A_ScriptDir%\modules\promptflow\engine\AssemblerEngine.ahk
-#Include %A_ScriptDir%\modules\promptflow\engine\FlowEngine.ahk
 #Include %A_ScriptDir%\modules\promptflow\runtime\Environment.ahk
-#Include %A_ScriptDir%\modules\promptflow\runtime\StartPhase.ahk
 #Include %A_ScriptDir%\modules\promptflow\PromptAssembler.ahk
 #Include %A_ScriptDir%\modules\promptflow\PromptValidator.ahk
 #Include %A_ScriptDir%\modules\business\services\FlowResolver.ahk

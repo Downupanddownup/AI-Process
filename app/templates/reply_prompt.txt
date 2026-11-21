@@ -1,1 +1,0 @@
-这是一个回复文件，请查看：{{filePath}}，并创建 {{nextVersionFile}} 作为回应。

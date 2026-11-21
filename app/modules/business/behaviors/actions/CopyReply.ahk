@@ -1,8 +1,7 @@
 #Requires AutoHotkey v2.0
 
-; 复回复（AI 型）：复制回复提示词并发送 AI（分 普通/勾实 两分支）
-; 逐行等价迁出（旧件已删）
-; 分支语义：勾「实」→ 实施文档模板、尾部无提问模板段；普通 → 回复模板、尾部含提问模板段
+; 复回复（AI 型）：复制回复提示词并发送 AI（分 普通 / 勾实 两分支）
+; 提示词由 PromptSource 统一拼装；本类只负责守卫、properties 与发送
 
 class CopyReply extends AgentActionBase {
     ActionKey := "复回复"
@@ -18,29 +17,10 @@ class CopyReply extends AgentActionBase {
             return
         }
 
-        currentReplyFile := chain.LatestReplyPath()
         nextVersionFile := "v" chain.NextVersion() ".md"  ; 裸文件名（不是全路径）
         implChecked := GetSession(GetActiveWindowId(), "AppendImplementationTail")
 
-        if (PromptSource.Enabled()) {
-            content := PromptSource.Build("复回复", implChecked ? "impl" : "direct")
-        } else {
-            if (implChecked) {
-                content := this.LoadTemplate("reply_prompt_impl_tail.txt")
-                content := StrReplace(content, "{{filePath}}", currentReplyFile)
-            } else {
-                content := this.LoadTemplate("reply_prompt.txt")
-                content := StrReplace(content, "{{filePath}}", currentReplyFile)
-                content := StrReplace(content, "{{nextVersionFile}}", nextVersionFile)
-            }
-
-            content := PromptElements.NoModify(content)
-            content := PromptElements.ContentQuality(content)  ; 普通/勾实两分支共用此行，均生效
-            if (!implChecked) {
-                content := PromptElements.QuestionTemplate(content)
-            }
-            content := PromptElements.OpenMd(content)
-        }
+        content := PromptSource.Build("复回复", implChecked ? "impl" : "direct")
 
         properties := Map()
         properties["source"] := "对v" chain.LatestVersion "的回复.txt"
