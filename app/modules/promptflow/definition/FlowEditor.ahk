@@ -152,20 +152,12 @@ class FlowEditor {
     ; 序列化 + 原子写 + 写后自检
     static _WriteRaw(dirPath, data) {
         target := dirPath "\flow.json"
-        tmp := target ".tmp"
         try {
             text := this._DumpFlow(data)
-            f := FileOpen(tmp, "w", "UTF-8-RAW")
-            f.Write(text)
-            f.Close()
-
-            ; 自检：读回来必须和内存里那份一致，才允许覆盖
-            back := JSON.Load(FileRead(tmp, "UTF-8"))
-            this._Verify(data, back)
-            FileMove(tmp, target, 1)
+            ; 写文件交给公共件；结构校验仍在这里（读回 JSON 再逐字段比）
+            JsonConfigWriter.WriteAtomic(target, text,
+                (backText) => this._Verify(data, JSON.Load(backText)))
         } catch as e {
-            if FileExist(tmp)
-                FileDelete(tmp)
             throw Error("写入 flow.json 失败：" target " — " e.Message)
         }
     }
