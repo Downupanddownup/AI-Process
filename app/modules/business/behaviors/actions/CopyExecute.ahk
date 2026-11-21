@@ -19,7 +19,7 @@ class CopyExecute extends AgentActionBase {
 
         ; 步目：依据三档（实施文档 → 最新回复 → 最新版本文档）
         ; 守卫必须在发送前：不满足时提示并保留面板，而不是让拼装抛错后被打包成"执行失败"
-        if (selectedStrategy != "tweak" && ResolveStepsSourcePath(chain) = "") {
+        if (selectedStrategy != "tweak" && chain.StepsSource() = "") {
             ShowFeedback("步目需要实施文档、最新回复或版本文档作为拆分依据，当前都没有", true)
             this.SkipAutoHide := true  ; 前置校验未通过：不触发自动隐藏
             return
@@ -33,20 +33,4 @@ class CopyExecute extends AgentActionBase {
 
         this.Dispatch(content, properties, strategyMeta["feedback"])
     }
-}
-
-; 步目拆分依据三档：实施文档 → 最新回复 → 最新版本文档（讨论停在 AI 侧时按 AI 最新成稿）
-; 三档全无返回空串，判空与提示归调用方
-ResolveStepsSourcePath(chain) {
-    sourcePath := chain.ImplDocPath()
-    if !FileExist(sourcePath) {
-        sourcePath := chain.LatestReplyPath()
-    }
-    if !FileExist(sourcePath) {
-        sourcePath := chain.LatestVersionPath()
-    }
-    if !FileExist(sourcePath) {
-        return ""
-    }
-    return sourcePath
 }

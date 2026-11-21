@@ -47,4 +47,19 @@ class VersionChain {
     ResultName() {
         return DomainConventions.ComputeResultName(this.Dir)
     }
+
+    ; 步目依据三档：实施文档 → 最新回复 → 最新版本；全无返回空串
+    ; 守卫（判空提示）与占位规则（取值）都调它——同一规则只留这一份实现
+    StepsSource() {
+        p := this.ImplDocPath()
+        if FileExist(p)
+            return p
+        p := this.LatestReplyPath()
+        if FileExist(p)
+            return p
+        p := this.LatestVersionPath()
+        if FileExist(p)
+            return p
+        return ""
+    }
 }

@@ -66,26 +66,12 @@ class PromptParamRule {
 
         ; 复执行 步目：三档依据（实施文档 → 最新回复 → 最新版本文档）
         if (action.Key = "复执行") {
-            return this._StepsSource(chain)
+            src := chain.StepsSource()
+            if (src = "")
+                throw Error("步目需要实施文档、最新回复或版本文档作为拆分依据，当前都没有")
+            return src
         }
 
         throw Error("动作 " action.Key " 不使用 filePath 占位符")
-    }
-
-    ; 步目拆分依据三档；三档全无则报错
-    static _StepsSource(chain) {
-        p := chain.ImplDocPath()
-        if FileExist(p) {
-            return p
-        }
-        p := chain.LatestReplyPath()
-        if FileExist(p) {
-            return p
-        }
-        p := chain.LatestVersionPath()
-        if FileExist(p) {
-            return p
-        }
-        throw Error("步目需要实施文档、最新回复或版本文档作为拆分依据，当前都没有")
     }
 }
