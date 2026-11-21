@@ -318,3 +318,21 @@ EnsureIniUtf16Bom(filePath) {
         ; 忽略转换失败
     }
 }
+; ===== 流程默认值（[PromptFlow] 节）=====
+
+; 新建顶级主题 / 未设 scenario.txt 的主题，默认用哪套流程
+GetDefaultFlowKey() {
+    global SettingsFile
+    v := Trim(IniRead(SettingsFile, "PromptFlow", "DefaultFlowKey", "code"))
+    return (v = "") ? "code" : v
+}
+
+; 写默认流程；settings.ini 是 UTF-16 LE 带 BOM 且会被 PowerShell 侧并发读写，
+; 必须走 SafeIniWrite，不能直接 IniWrite
+SetDefaultFlowKey(key) {
+    global SettingsFile
+    if (key = "") {
+        return false
+    }
+    return SafeIniWrite(key, SettingsFile, "PromptFlow", "DefaultFlowKey")
+}

@@ -7,6 +7,8 @@ class PromptFlow {
 
     Key := ""
     Name := ""
+    ; 简称：面板上固定宽度显示用；缺省等于 Name
+    ShortName := ""
     Readonly := false
 
     ; 流程目录绝对路径
@@ -36,6 +38,7 @@ class PromptFlow {
         f.BlocksDir := dirPath "\blocks"
         f.Key := data.Has("key") ? data["key"] : ""
         f.Name := data.Has("name") ? data["name"] : ""
+        f.ShortName := data.Has("shortName") ? data["shortName"] : f.Name
         f.Readonly := readonly
 
         if data.Has("recipes") {

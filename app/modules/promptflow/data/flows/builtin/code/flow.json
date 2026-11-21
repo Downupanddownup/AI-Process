@@ -1,6 +1,7 @@
 {
   "key": "code",
   "name": "代码开发",
+  "shortName": "代码",
   "readonly": true,
   "recipes": {
     "复需求|single": {

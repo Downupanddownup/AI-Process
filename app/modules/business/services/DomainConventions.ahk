@@ -79,6 +79,22 @@ class DomainConventions {
     static HasRequirement(dirPath) {
         return FileExist(DomainConventions.RequirementPath(dirPath)) ? true : false
     }
+    ; 主题私有数据目录（.aiprocess）的绝对路径；不保证存在
+    ; 读场景、读统计这类"只要路径"的场合用它——不该因为读就建目录
+    static DataDirPath(dirPath) {
+        return dirPath "\" DomainConventions.DataDir
+    }
+
+    ; 确保主题私有数据目录存在，返回路径
+    ; 只有"要往里写"的场合才用它
+    static EnsureDataDir(dirPath) {
+        p := DomainConventions.DataDirPath(dirPath)
+        if !DirExist(p) {
+            DirCreate(p)
+        }
+        return p
+    }
+
     ; 统计单元：含 .aiprocess 的目录（有自己统计的目录）。术语见 约定.md 第一章。
     ; 与"对话域"不同：对话域判的是"能不能作为主题加载"，统计单元判的是"有没有自己的统计"。
     static IsStatUnit(dirPath) {
