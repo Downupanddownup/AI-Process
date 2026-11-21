@@ -41,6 +41,24 @@ class FlowLibrary {
         return keys
     }
 
+    ; 全部流程的摘要信息，内置在前
+    ; → [{key, name, shortName, readonly}, ...]
+    ; 不动 ListKeys()——02 的切流程弹窗在用它
+    static ListFlows() {
+        result := []
+        for key in this.ListKeys() {
+            try {
+                f := this.Get(key)
+                result.Push(Map(
+                    "key", f.Key,
+                    "name", f.Name,
+                    "shortName", f.ShortName,
+                    "readonly", f.Readonly))
+            }
+        }
+        return result
+    }
+
     ; 按 key 取流程。先内置、后自定义；同名以内置为准
     static Get(flowKey) {
         builtinPath := this.BuiltinRoot "\" flowKey

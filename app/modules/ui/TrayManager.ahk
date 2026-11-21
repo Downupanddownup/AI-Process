@@ -8,6 +8,7 @@ CreateTray() {
     A_TrayMenu.Add("经验总结", ShowSummaryWindow)
     A_TrayMenu.Add("需求成本", ShowCostWindow)
     A_TrayMenu.Add("仓库管理", (*) => ShowRepoWindow())
+    A_TrayMenu.Add("流程维护", (*) => ShowFlowMaintainWindow())
     A_TrayMenu.Add("配置", ShowConfigDialog)
     A_TrayMenu.Add("退出", ExitApplication)
     A_TrayMenu.Default := "显示"

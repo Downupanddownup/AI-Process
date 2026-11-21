@@ -174,10 +174,9 @@ ShowFlowSwitchDialog(*) {
     ApplyDialogListStyle(FlowSwitchList)
     FlowSwitchList.OnEvent("DoubleClick", OnFlowSwitchOk)
 
-    ; 03 才实现流程维护窗口，这里先禁用
+    ; 流程维护窗口（03）
     MaintainBtn := FlowSwitchDialog.AddButton("xm y+10 w120 h26", "维护流程…")
-    MaintainBtn.Enabled := false
-    MaintainBtn.OnEvent("Click", (*) => 0)
+    MaintainBtn.OnEvent("Click", OnOpenFlowMaintain)
 
     OkBtn := FlowSwitchDialog.AddButton("x348 yp w90 h26 Default", "确定")
     OkBtn.OnEvent("Click", OnFlowSwitchOk)
@@ -225,6 +224,18 @@ CloseFlowSwitchDialog(*) {
         FlowSwitchDialog := ""
     }
     FlowSwitchList := ""
+}
+
+; 从切流程弹窗进流程维护：带着当前选中的流程
+OnOpenFlowMaintain(*) {
+    global FlowSwitchList
+
+    flowKey := ""
+    row := FlowSwitchList ? FlowSwitchList.GetNext(0) : 0
+    if (row > 0) {
+        flowKey := FlowSwitchList.GetText(row, 3)
+    }
+    ShowFlowMaintainWindow(flowKey)
 }
 
 OnFlowSwitchOk(*) {
