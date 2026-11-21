@@ -118,6 +118,37 @@ class BlockEditor {
 
     ; ---- 私有 ----
 
+    ; 块正文里的引用校验：空串=通过；否则返回一句可直接显示的中文
+    ; 只查引用（{{ref:<id>}}），固定词归 07 校验器——两套校验各有各的时机，别混
+    static ValidateRefs(flowKey, text) {
+        ; 1) 未闭合：每出现一个 {{ 就该有一个完整的 {{…}} 与之配对
+        openCount := (StrLen(text) - StrLen(StrReplace(text, "{{", ""))) / 2
+        complete := 0
+        pos := 1
+        while RegExMatch(text, "\{\{[^}\r\n]*\}\}", &m, pos) {
+            complete++
+            pos := m.Pos + m.Len
+        }
+        if (openCount != complete)
+            return "正文里有未闭合的占位符（{{ 与 }} 数量不匹配），请补全或删除"
+
+        ; 2) 逐个查 {{ref:<id>}}：id 不能为空，且必须在本流程下可见
+        missing := []
+        pos := 1
+        while RegExMatch(text, "\{\{ref:\s*([^}\r\n]*?)\s*\}\}", &m, pos) {
+            id := Trim(m[1])
+            if (id = "")
+                missing.Push("（空 id）")
+            else if !ReferenceLibrary.Exists(id, flowKey)
+                missing.Push(id)
+            pos := m.Pos + m.Len
+        }
+        if (missing.Length > 0)
+            return "引用的参考文档找不到：" this._Join(missing)
+
+        return ""
+    }
+
     static _WritableFlow(flowKey) {
         flow := FlowLibrary.Get(flowKey)
         if (flow.Readonly)

@@ -39,6 +39,10 @@ global BMDlgOk := ""
 global BMDlgMode := ""
 global BMDlgEditId := ""
 
+global BMRefDlg := ""
+global BMRefList := ""
+global BMRefIds := []
+
 ; 打开块维护窗口；有改动返回 true
 ShowBlockMaintainWindow(flowKey) {
     global BMWin, BMFlowKey, BMChanged
@@ -446,7 +450,9 @@ ShowBMDialog(mode, blockId := "") {
     BMKindCombo.Value := 1
 
     d.AddText("xm y+8 w60 h20", "正文")
-    BMBodyEdit := d.AddEdit("x+8 y+2 w536 h240 +Multi +VScroll")
+    btnInsertRef := d.AddButton("x+8 yp w90 h22", "插入引用")
+    btnInsertRef.OnEvent("Click", OnBMInsertRef)
+    BMBodyEdit := d.AddEdit("xm y+26 w600 h240 +Multi +VScroll")
 
     BMDlgHint := d.AddText("xm y+8 w600 h20 cRed", "")
     BMDlgOk := d.AddButton("x452 y+6 w80 h26 Default", "确定")
@@ -487,6 +493,14 @@ SetBMKindValue(kind) {
 CloseBMDialog(*) {
     global BMDlg, BMIdEdit, BMNameEdit, BMPurposeEdit, BMKindCombo, BMBodyEdit
     global BMDlgHint, BMDlgOk, BMDlgMode, BMDlgEditId
+    global BMRefDlg, BMRefList, BMRefIds
+
+    if (GuiAlive(BMRefDlg)) {
+        try BMRefDlg.Destroy()
+    }
+    BMRefDlg := ""
+    BMRefList := ""
+    BMRefIds := []
 
     if (GuiAlive(BMDlg)) {
         try BMDlg.Destroy()
@@ -537,6 +551,13 @@ OnBMDialogOk(*) {
     created := false
 
     try {
+        ; 引用校验必须在写正文之前：否则文件已经被写脏了再报错
+        err := BlockEditor.ValidateRefs(BMFlowKey, body)
+        if (err != "") {
+            BMDlgHint.Text := err
+            return
+        }
+
         if (mode = "new") {
             BlockEditor.Create(BMFlowKey, id, name, purpose, kind)
             created := true
@@ -560,4 +581,113 @@ OnBMDialogOk(*) {
     SetBMStatus(mode = "new" ? "已新增：" name : "已保存：" name)
     if (mode = "new" && Trim(body) = "")
         SetBMStatus("已新增：" name "（正文为空，记得补）")
+}
+
+; ---- 插入引用（03）----
+
+; 弹窗：只列可引用的两层（本流程私有 + 全局）；骨架私有不可引用，不出现在候选里
+ShowBMRefPicker() {
+    global BMDlg, BMRefDlg, BMRefList, BMRefIds, BMFlowKey
+
+    if (GuiAlive(BMRefDlg)) {
+        BMRefDlg.Show()
+        WinActivate("ahk_id " BMRefDlg.Hwnd)
+        return
+    }
+
+    opts := "+AlwaysOnTop +ToolWindow"
+    if (GuiAlive(BMDlg))
+        opts .= " +Owner" BMDlg.Hwnd
+
+    d := Gui(opts, "选择参考文档")
+    BMRefDlg := d
+    d.BackColor := GetDialogBackColor()
+    d.MarginX := 12
+    d.MarginY := 12
+    d.SetFont("s9", "Microsoft YaHei UI")
+    d.OnEvent("Close", CloseBMRefPicker)
+    d.OnEvent("Escape", CloseBMRefPicker)
+
+    BMRefList := d.AddListView("xm ym w560 h260 -Multi", ["名称", "用途", "来源"])
+    BMRefList.ModifyCol(1, 150)
+    BMRefList.ModifyCol(2, 300)
+    BMRefList.ModifyCol(3, 100)
+    ApplyDialogListStyle(BMRefList)
+    BMRefList.OnEvent("DoubleClick", OnBMRefPickerOk)
+
+    BMRefIds := []
+    for doc in ReferenceLibrary.ListFlow(BMFlowKey) {
+        BMRefList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose, "本流程私有")
+        BMRefIds.Push(doc.Id)
+    }
+    for doc in ReferenceLibrary.ListGlobal() {
+        BMRefList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose, "全局")
+        BMRefIds.Push(doc.Id)
+    }
+    if (BMRefIds.Length > 0)
+        BMRefList.Modify(1, "Select Focus")
+
+    btnOk := d.AddButton("x432 y+10 w80 h26 Default", "插入")
+    btnOk.OnEvent("Click", OnBMRefPickerOk)
+    btnCancel := d.AddButton("x+8 yp w80 h26", "取消")
+    btnCancel.OnEvent("Click", CloseBMRefPicker)
+
+    d.Show("w600 h360")
+}
+
+CloseBMRefPicker(*) {
+    global BMRefDlg, BMRefList, BMRefIds
+
+    if (GuiAlive(BMRefDlg)) {
+        try BMRefDlg.Destroy()
+    }
+    BMRefDlg := ""
+    BMRefList := ""
+    BMRefIds := []
+}
+
+OnBMInsertRef(*) {
+    ShowBMRefPicker()
+}
+
+OnBMRefPickerOk(*) {
+    global BMRefList, BMRefIds
+
+    row := BMRefList.GetNext(0)
+    if (row = 0 || row > BMRefIds.Length)
+        return
+
+    id := BMRefIds[row]
+    CloseBMRefPicker()
+    InsertBMRefText("{{ref:" id "}}")
+}
+
+; 在光标处插入；前后补空格边界；取不到光标就落文末
+InsertBMRefText(piece) {
+    global BMBodyEdit
+
+    EM_GETSEL := 0x00B0, EM_SETSEL := 0x00B1, EM_REPLACESEL := 0x00C2
+
+    current := BMBodyEdit.Value
+    sel := SendMessage(EM_GETSEL, 0, 0, BMBodyEdit.Hwnd)
+    start := sel & 0xFFFF
+    end := (sel >> 16) & 0xFFFF
+    if (start > end) {
+        tmp := start
+        start := end
+        end := tmp
+    }
+    if (start < 0 || start > StrLen(current)) {
+        start := StrLen(current)
+        end := start
+    }
+
+    if (start > 0 && !InStr(" `t`r`n", SubStr(current, start, 1)))
+        piece := " " piece
+    if (end < StrLen(current) && !InStr(" `t`r`n", SubStr(current, end + 1, 1)))
+        piece := piece " "
+
+    SendMessage(EM_SETSEL, start, end, BMBodyEdit.Hwnd)
+    SendMessage(EM_REPLACESEL, true, StrPtr(piece), BMBodyEdit.Hwnd)
+    BMBodyEdit.Focus()
 }
