@@ -24,6 +24,7 @@ global FMWinNewBtn := ""
 global FMWinRenameBtn := ""
 global FMWinDeleteBtn := ""
 global FMWinSelectBtn := ""
+global FMWinBlocksBtn := ""
 global FMNewDialog := "", FMNewName := "", FMNewShort := "", FMNewKey := ""
 global FMNewCopy := "", FMNewBlank := "", FMNewHint := "", FMNewOk := ""
 global FMRenameDialog := "", FMRenameName := "", FMRenameShort := ""
@@ -33,7 +34,7 @@ global FMRenameHint := "", FMRenameOk := ""
 ShowFlowMaintainWindow(flowKey := "") {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
-    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn, FMWinBlocksBtn
 
     if (FMWin) {
         if (GuiAlive(FMWin)) {
@@ -118,6 +119,8 @@ ShowFlowMaintainWindow(flowKey := "") {
     RefreshBtn.OnEvent("Click", (*) => OnFMRefresh(true))
     CheckBtn := FMWin.AddButton("x+8 yp w100 h26", "重新校验")
     CheckBtn.OnEvent("Click", OnFMCheck)
+    FMWinBlocksBtn := FMWin.AddButton("x+8 yp w120 h26", "管理私有块")
+    FMWinBlocksBtn.OnEvent("Click", OnFMPrivateBlocks)
     FMWinHint := FMWin.AddText("x+12 yp+4 w700 h20 cGray", "")
     CloseBtn := FMWin.AddButton("x1308 yp w80 h26", "关闭")
     CloseBtn.OnEvent("Click", CloseFlowMaintainWindow)
@@ -129,7 +132,7 @@ ShowFlowMaintainWindow(flowKey := "") {
 CloseFlowMaintainWindow(*) {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
-    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn, FMWinBlocksBtn
 
     ; 销毁 + 置空：只 Hide 的话变量会悬空，下次 Show 报 "Gui has no window"。
     ; 窗口可能已被 owner 连带销毁，那时 Hwnd 读取会抛错，所以先判活。
@@ -151,6 +154,7 @@ CloseFlowMaintainWindow(*) {
     FMWinRenameBtn := ""
     FMWinDeleteBtn := ""
     FMWinSelectBtn := ""
+    FMWinBlocksBtn := ""
 }
 
 ; ---- 左列表 ----
@@ -312,6 +316,42 @@ OnFMSelectBlock(*) {
     }
 }
 
+; ---- 私有块（05.2）----
+
+; 打开块维护窗口；有改动才重建中列与预览（块名会变）
+OnFMPrivateBlocks(*) {
+    global FMWinCurFlow, FMWinCombos, FMWinComboList
+
+    if (FMWinCurFlow = "")
+        return
+    try {
+        flow := FlowLibrary.Get(FMWinCurFlow)
+    } catch {
+        return
+    }
+    if (flow.Readonly)
+        return
+
+    row := FMWinComboList.GetNext(0)
+    comboKey := (row > 0 && row <= FMWinCombos.Length) ? FMWinCombos[row]["combo"] : ""
+
+    if (!ShowBlockMaintainWindow(FMWinCurFlow))
+        return
+
+    RefreshFMFlowList(FMWinCurFlow)
+    if (comboKey != "") {
+        for idx, item in FMWinCombos {
+            if (item["combo"] = comboKey) {
+                FMWinComboList.Modify(idx, "Select Focus")
+                OnFMComboSelect()
+                break
+            }
+        }
+    }
+    OnFMRefresh(true)
+    SetFMHint("私有块已更新")
+}
+
 ; ---- 校验 ----
 
 OnFMCheck(*) {
@@ -444,11 +484,13 @@ BuildFMEnv(flowKey) {
 
 ; 内置流程只读：改名 / 删除置灰；新建始终可用（列表为空时也能建第一个）
 UpdateFMWriteButtons(hasFlow, isBuiltin) {
-    global FMWinRenameBtn, FMWinDeleteBtn
+    global FMWinRenameBtn, FMWinDeleteBtn, FMWinBlocksBtn
     if (FMWinRenameBtn)
         FMWinRenameBtn.Enabled := hasFlow && !isBuiltin
     if (FMWinDeleteBtn)
         FMWinDeleteBtn.Enabled := hasFlow && !isBuiltin
+    if (FMWinBlocksBtn)
+        FMWinBlocksBtn.Enabled := hasFlow && !isBuiltin
 }
 
 SetFMHint(text) {
@@ -745,6 +787,7 @@ OnFMDelete(*) {
     RefreshFMFlowList(nextKey)
     SetFMHint("已删除：" flow.Name)
 }
+
 
 
 
