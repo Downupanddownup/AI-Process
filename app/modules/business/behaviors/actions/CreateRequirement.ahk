@@ -11,9 +11,8 @@ class CreateRequirement extends AgentActionBase {
 
     Execute() {
         filePath := DomainConventions.RequirementPath(GetCurrentDir())
-        existed := FileExist(filePath)
+        existed := UpgradeToDomain(GetCurrentDir())
         if !existed {
-            FileAppend("", filePath, "UTF-8")
             ShowFeedback("已创建：需求.txt")
         } else {
             ShowFeedback("文件已存在：需求.txt", true)

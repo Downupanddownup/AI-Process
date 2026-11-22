@@ -20,10 +20,7 @@ SetCurrentDirAndOpenRequirement(dirPath) {
     }
 
     filePath := DomainConventions.RequirementPath(GetCurrentDir())
-    existed := FileExist(filePath)
-    if (!existed) {
-        FileAppend("", filePath, "UTF-8")
-    }
+    UpgradeToDomain(GetCurrentDir())
 
     EditorOpener.Open(filePath)
 }
@@ -111,6 +108,7 @@ SubmitDirectoryDialog(*) {
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
     RefreshDirectoryStateUI()
+    FlowResolver.EnsureInherited(GetCurrentDir(), "进入")
     CloseDirectoryDialog()
     ShowFeedback("当前目录已切换")
     LogThemeIndex(GetCurrentDir(), "面板")
@@ -224,6 +222,7 @@ ReturnToThemeDir(*) {
     SaveWindowSession(GetActiveWindowId())
     UpdateCurrentPathDisplay()
     RefreshDirectoryStateUI()
+    FlowResolver.EnsureInherited(GetCurrentDir(), "进入")
     ShowFeedback("已返回主题目录")
 }
 
@@ -237,5 +236,6 @@ SetCurrentDirAndRefresh(dirPath, source) {
     UpdateCurrentPathDisplay()
     SetControlsEnabled(true)
     RefreshDirectoryStateUI()
+    FlowResolver.EnsureInherited(GetCurrentDir(), "进入")
     LogThemeIndex(GetCurrentDir(), source)
 }

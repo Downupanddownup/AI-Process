@@ -188,6 +188,18 @@ SwitchToNewTheme(newDir) {
     AgentActions.CreateRequirement()
 }
 
+; 升级为对话域的唯一入口：建 需求.txt（没有才建）+ 流程归属落地
+; 所有"建需求"路径（按钮、新建并切换、主题选择确定、右键设目录）必须走这里——升级逻辑一个家，不漂移
+UpgradeToDomain(dir) {
+    filePath := DomainConventions.RequirementPath(dir)
+    existed := FileExist(filePath)
+    if !existed {
+        FileAppend("", filePath, "UTF-8")
+    }
+    FlowResolver.EnsureInherited(dir, "升级")
+    return existed
+}
+
 IsValidDirName(name) {
     if (name = "" || name = "." || name = "..") {
         return false

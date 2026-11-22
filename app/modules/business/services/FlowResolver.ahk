@@ -52,14 +52,41 @@ class FlowResolver {
         return file
     }
 
-    ; 新建主题时该取哪个流程
-    ; 顶级主题（parentDir 为空）→ 默认流程
-    ; 子主题 → 父主题当前的值（含"坏 key"：父子一起报错，不悄悄修正）
-    static ResolveForNew(parentDir := "") {
-        if (parentDir = "") {
-            return GetDefaultFlowKey()
+    ; 流程归属落地：升级/进入时给"还没有 flow.txt 的已开工域"定归属，一次定终身
+    ; 规则：向上找最近祖先的 flow.txt → 继承（含"坏 key"：父子一起报错，不悄悄修正）；
+    ;       找到仓库根都没有 → 顶级域，写当前默认流程 key（显式落地，不留隐式默认）
+    ; occasion 只进日志："升级"（建需求漏斗）/ "进入"（设目录、需求树、返）
+    static EnsureInherited(dir, occasion) {
+        if (!DomainConventions.IsDomainDir(dir) || this._ReadFlow(dir) != "") {
+            return
         }
-        return this.Resolve(parentDir)["flowKey"]
+        parentDir := ""
+        SplitPath(dir, , &parentDir)
+        found := this._ResolveUpward(parentDir)
+        flowKey := found.Has("key") ? found["key"] : GetDefaultFlowKey()
+        this.Write(dir, flowKey)
+        LogActivity("流程归属", "", Map(
+            "flow", flowKey,
+            "source", found.Has("key") ? found["from"] : "默认",
+            "occasion", occasion))
+    }
+
+    ; 自 dir 向上找第一个 flow.txt：找到 → Map("key", …, "from", 所在目录)；都没有 → 空 Map
+    static _ResolveUpward(dir) {
+        p := dir
+        while (p != "" && StrLen(p) > 3) {
+            key := this._ReadFlow(p)
+            if (key != "") {
+                return Map("key", key, "from", p)
+            }
+            if (DomainConventions.IsRepoRootDir(p)) {
+                break
+            }
+            nextDir := ""
+            SplitPath(p, , &nextDir)
+            p := nextDir
+        }
+        return Map()
     }
 
     ; 该流程是否存在
