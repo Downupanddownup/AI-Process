@@ -25,6 +25,7 @@ global FMWinRenameBtn := ""
 global FMWinDeleteBtn := ""
 global FMWinSelectBtn := ""
 global FMWinBlocksBtn := ""
+global FMWinExportBtn := ""
 global FMNewDialog := "", FMNewName := "", FMNewShort := "", FMNewKey := ""
 global FMNewCopy := "", FMNewBlank := "", FMNewHint := "", FMNewOk := ""
 global FMRenameDialog := "", FMRenameName := "", FMRenameShort := ""
@@ -34,7 +35,7 @@ global FMRenameHint := "", FMRenameOk := ""
 ShowFlowMaintainWindow(flowKey := "") {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
-    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn, FMWinBlocksBtn
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn, FMWinBlocksBtn, FMWinExportBtn
 
     if (FMWin) {
         if (GuiAlive(FMWin)) {
@@ -101,6 +102,9 @@ ShowFlowMaintainWindow(flowKey := "") {
 
     FMWinSelectBtn := FMWin.AddButton("xp y+6 w100 h26", "选块…")
     FMWinSelectBtn.OnEvent("Click", OnFMSelectBlock)
+    ; 导出对象是"整套流程"，不是选中的组合，所以与左列三个流程级按钮同排
+    FMWinExportBtn := FMWin.AddButton("x+8 yp w100 h26", "一键导出")
+    FMWinExportBtn.OnEvent("Click", OnFMExport)
 
     ; 右列（x=748..1388）：这里必须写绝对 x，因为上一个控件是「选块…」按钮，
     ; 用 x+8 会贴到按钮右边（曾经的三列错位就是这么来的）
@@ -136,7 +140,7 @@ ShowFlowMaintainWindow(flowKey := "") {
 CloseFlowMaintainWindow(*) {
     global FMWin, FMWinFlowList, FMWinComboList, FMWinPreview, FMWinDemoLabel
     global FMWinIssueList, FMWinHint, FMWinIssues, FMWinFlowKeys, FMWinCombos, FMWinCurFlow
-    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn, FMWinBlocksBtn
+    global FMWinNewBtn, FMWinRenameBtn, FMWinDeleteBtn, FMWinSelectBtn, FMWinBlocksBtn, FMWinExportBtn
 
     ; 销毁 + 置空：只 Hide 的话变量会悬空，下次 Show 报 "Gui has no window"。
     ; 窗口可能已被 owner 连带销毁，那时 Hwnd 读取会抛错，所以先判活。
@@ -159,6 +163,7 @@ CloseFlowMaintainWindow(*) {
     FMWinDeleteBtn := ""
     FMWinSelectBtn := ""
     FMWinBlocksBtn := ""
+    FMWinExportBtn := ""
 }
 
 ; ---- 左列表 ----
@@ -390,6 +395,38 @@ OnFMPrivateBlocks(*) {
     SetFMHint("私有块已更新")
 }
 
+; ---- 一键导出（13）----
+
+; 把整套流程的九个组合导成一份 JSON：与人看、与 AI 核对"改完到底长什么样"
+; 导出内容由 PromptExporter 定，这里只管选路径与提示；内置流程也允许导（只读不等于不能看）
+OnFMExport(*) {
+    global FMWinCurFlow
+
+    if (FMWinCurFlow = "")
+        return
+    try {
+        FlowLibrary.Get(FMWinCurFlow)
+    } catch as e {
+        SetFMHint("流程读不出来：" e.Message)
+        return
+    }
+
+    path := FileSelect("S", FMWinCurFlow "-prompts.json", "导出流程提示词", "JSON 文件 (*.json)")
+    if (path = "")
+        return
+
+    try {
+        chars := PromptExporter.Write(FMWinCurFlow, path)
+    } catch as e {
+        ; 失败只进 hint，不弹框：与"预览失败"的处理一致
+        SetFMHint("导出失败：" e.Message)
+        return
+    }
+
+    SetFMHint("已导出：" path "（" chars " 字符）")
+    EditorOpener.Open(path)
+}
+
 ; ---- 校验 ----
 
 OnFMCheck(*) {
@@ -502,9 +539,9 @@ ComboDisplayName(comboKey) {
 }
 
 ; 预览固定用演示主题：不随当前主题变，同一流程永远同一份预览
+; 目录只在 PromptExporter 定义一次——预览与导出必须落在同一个目录上
 PreviewTopicDir() {
-    global AppRoot
-    return AppRoot "\templates\preview-topic"
+    return PromptExporter.DemoTopicDir
 }
 
 BuildFMEnv(flowKey) {

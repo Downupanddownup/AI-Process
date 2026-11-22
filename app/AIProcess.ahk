@@ -72,6 +72,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\promptflow\engine\AssemblerEngine.ahk
 #Include %A_ScriptDir%\modules\promptflow\runtime\Environment.ahk
 #Include %A_ScriptDir%\modules\promptflow\PromptAssembler.ahk
+#Include %A_ScriptDir%\modules\promptflow\PromptExporter.ahk
 #Include %A_ScriptDir%\modules\promptflow\PromptValidator.ahk
 #Include %A_ScriptDir%\modules\business\services\FlowResolver.ahk
 #Include %A_ScriptDir%\modules\business\services\PromptSource.ahk
