@@ -19,6 +19,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\core\AppBootstrap.ahk
 #Include %A_ScriptDir%\modules\session\Session.ahk
 #Include %A_ScriptDir%\modules\ui\TrayManager.ahk
+#Include %A_ScriptDir%\modules\ui\PromptLabels.ahk
 #Include %A_ScriptDir%\modules\ui\FlowMaintainWindow.ahk
 #Include %A_ScriptDir%\modules\ui\FlowBlockPicker.ahk
 #Include %A_ScriptDir%\modules\ui\BlockMaintainWindow.ahk

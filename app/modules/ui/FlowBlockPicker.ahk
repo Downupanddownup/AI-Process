@@ -99,13 +99,16 @@ BuildFlowBlockPicker() {
     FBPCountText := d.AddText("x+16 yp w120 h22 cGray", "")
 
     ; 左列：候选（先开复选框样式，再添行；顺序反了会丢勾选框）
-    FBPLeftList := d.AddListView("xm y+8 w520 h400 -Multi", ["名称", "类别", "归属", "说明"])
+    ; 「标识」列顶掉原来的「说明」列：说明本就只是不换行的截断前缀，全文在下面的 FBPDetail
+    FBPLeftList := d.AddListView("xm y+8 w520 h400 -Multi", ["名称", "标识", "类别", "归属"])
     SendMessage(LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES, LVS_EX_CHECKBOXES, FBPLeftList.Hwnd)
-    FBPLeftList.ModifyCol(1, 170)
-    FBPLeftList.ModifyCol(2, 90)
-    FBPLeftList.ModifyCol(3, 60)
-    FBPLeftList.ModifyCol(4, 196)
+    FBPLeftList.ModifyCol(1, 190)
+    FBPLeftList.ModifyCol(2, 170)
+    FBPLeftList.ModifyCol(3, 100)
+    FBPLeftList.ModifyCol(4, 60)
     ApplyDialogListStyle(FBPLeftList)
+    ; 按行号取 FBPVisible：点表头内建排序会让"勾选意图"落到别的块上
+    DisableListHeaderSort(FBPLeftList)
     FBPLeftList.OnEvent("DoubleClick", OnFBPToggleRow)
     FBPLeftList.OnEvent("ItemSelect", OnFBPLeftSelect)
 
@@ -121,6 +124,8 @@ BuildFlowBlockPicker() {
     FBPRightList.ModifyCol(1, 40)
     FBPRightList.ModifyCol(2, 276)
     ApplyDialogListStyle(FBPRightList)
+    ; 按行号取 FBPSelected
+    DisableListHeaderSort(FBPRightList)
     FBPRightList.OnEvent("Click", OnFBPRightClick)
     FBPRightList.OnEvent("ItemSelect", OnFBPRightClick)
 
@@ -276,7 +281,7 @@ RefreshFBPLeft() {
             continue
 
         FBPVisible.Push(c)
-        FBPLeftList.Add(, c["name"], c["kind"], c["scope"], c["purpose"])
+        FBPLeftList.Add(, c["name"], c["id"], c["kind"], c["scope"])
         if FBPChecked.Has(c["id"])
             FBPLeftList.Modify(A_Index, "Check")
     }

@@ -21,6 +21,7 @@ global RMChanged := false
 global RMBtnNew := "", RMBtnEdit := "", RMBtnDelete := "", RMBtnOpen := ""
 
 global RMNameText := ""
+global RMIdText := ""
 global RMScopeText := ""
 global RMPurposeView := ""
 global RMBodyView := ""
@@ -65,7 +66,7 @@ BuildRMWindow(flowKey) {
     global RMWin, RMFlowKey, RMPrivateList, RMSkelList, RMGlobalList, RMStatus
     global RMPrivateIds, RMSkelIds, RMGlobalIds, RMSelectedKind, RMSelectedId
     global RMBtnNew, RMBtnEdit, RMBtnDelete, RMBtnOpen
-    global RMNameText, RMScopeText, RMPurposeView, RMBodyView, RMUsedText
+    global RMNameText, RMIdText, RMScopeText, RMPurposeView, RMBodyView, RMUsedText
     global FMWin
 
     flow := FlowLibrary.Get(flowKey)
@@ -88,11 +89,14 @@ BuildRMWindow(flowKey) {
 
     ; ---- 左：三个列表 ----
     d.AddText("x12 y12 w700 h18", "本流程私有：" flow.Name (flow.Readonly ? "（内置流程，只读）" : "（可写）"))
-    RMPrivateList := d.AddListView("x12 y32 w700 h150 -Multi", ["名称", "说明", "正文"])
-    RMPrivateList.ModifyCol(1, 160)
-    RMPrivateList.ModifyCol(2, 400)
-    RMPrivateList.ModifyCol(3, 100)
+    RMPrivateList := d.AddListView("x12 y32 w700 h150 -Multi", ["名称", "标识", "说明", "正文"])
+    RMPrivateList.ModifyCol(1, 140)
+    RMPrivateList.ModifyCol(2, 160)
+    RMPrivateList.ModifyCol(3, 300)
+    RMPrivateList.ModifyCol(4, 80)
     ApplyDialogListStyle(RMPrivateList)
+    ; 行序必须恒等于填充顺序（按行号取 RMPrivateIds）：点表头内建排序会脱钩
+    DisableListHeaderSort(RMPrivateList)
     RMPrivateList.OnEvent("ItemSelect", (*) => OnRMSelect("flow"))
 
     d.AddText("x12 y186 w700 h18", "")
@@ -106,17 +110,21 @@ BuildRMWindow(flowKey) {
     RMBtnOpen.OnEvent("Click", OnRMOpenBody)
 
     d.AddText("x12 y226 w700 h18", "骨架私有（只读 · 不可引用）")
-    RMSkelList := d.AddListView("x12 y246 w700 h80 -Multi", ["名称", "说明"])
-    RMSkelList.ModifyCol(1, 160)
-    RMSkelList.ModifyCol(2, 500)
+    RMSkelList := d.AddListView("x12 y246 w700 h80 -Multi", ["名称", "标识", "说明"])
+    RMSkelList.ModifyCol(1, 140)
+    RMSkelList.ModifyCol(2, 160)
+    RMSkelList.ModifyCol(3, 400)
     ApplyDialogListStyle(RMSkelList)
+    DisableListHeaderSort(RMSkelList)
     RMSkelList.OnEvent("ItemSelect", (*) => OnRMSelect("skeleton"))
 
     d.AddText("x12 y332 w700 h18", "全局（只读，任何流程可引用）")
-    RMGlobalList := d.AddListView("x12 y352 w700 h150 -Multi", ["名称", "说明"])
-    RMGlobalList.ModifyCol(1, 160)
-    RMGlobalList.ModifyCol(2, 500)
+    RMGlobalList := d.AddListView("x12 y352 w700 h150 -Multi", ["名称", "标识", "说明"])
+    RMGlobalList.ModifyCol(1, 140)
+    RMGlobalList.ModifyCol(2, 160)
+    RMGlobalList.ModifyCol(3, 400)
     ApplyDialogListStyle(RMGlobalList)
+    DisableListHeaderSort(RMGlobalList)
     RMGlobalList.OnEvent("ItemSelect", (*) => OnRMSelect("global"))
 
     d.AddText("x12 y510 w700 h18 cGray", "只读的层改不了：要改全局，就新建流程并在它的 references 下放一份私有副本")
@@ -127,17 +135,21 @@ BuildRMWindow(flowKey) {
     d.AddText("x724 y36 w50 h20", "名称")
     RMNameText := d.AddText("x778 y36 w390 h20", "")
 
-    d.AddText("x724 y60 w50 h20", "归属")
-    RMScopeText := d.AddText("x778 y60 w390 h20", "")
+    ; 标识用只读 Edit 而不是 Text：Text 选不中、复制不了，而"拿 id 去目录里找人"正是它的用途
+    d.AddText("x724 y62 w50 h20", "标识")
+    RMIdText := d.AddEdit("x778 y62 w390 h22 +ReadOnly", "")
 
-    d.AddText("x724 y86 w444 h18", "用途")
-    RMPurposeView := d.AddEdit("x724 y106 w444 h50 +ReadOnly +Multi +VScroll", "")
+    d.AddText("x724 y92 w50 h20", "归属")
+    RMScopeText := d.AddText("x778 y92 w390 h20", "")
 
-    d.AddText("x724 y164 w444 h18", "正文（只读预览 · 用「打开正文」改）")
-    RMBodyView := d.AddEdit("x724 y184 w444 h290 +ReadOnly +Multi +VScroll", "")
+    d.AddText("x724 y118 w444 h18", "用途")
+    RMPurposeView := d.AddEdit("x724 y140 w444 h50 +ReadOnly +Multi +VScroll", "")
 
-    d.AddText("x724 y482 w444 h18", "被谁引用（本流程的块）")
-    RMUsedText := d.AddEdit("x724 y502 w444 h40 +ReadOnly +Multi +VScroll", "")
+    d.AddText("x724 y196 w444 h18", "正文（只读预览 · 用「打开正文」改）")
+    RMBodyView := d.AddEdit("x724 y216 w444 h260 +ReadOnly +Multi +VScroll", "")
+
+    d.AddText("x724 y484 w444 h18", "被谁引用（本流程的块）")
+    RMUsedText := d.AddEdit("x724 y504 w444 h40 +ReadOnly +Multi +VScroll", "")
 
     ; ---- 底部 ----
     RMStatus := d.AddText("x12 y576 w900 h20 cGray", "")
@@ -160,7 +172,7 @@ CloseRMWindow(*) {
     global RMPrivateIds, RMSkelIds, RMGlobalIds, RMSelectedKind, RMSelectedId
     global RMDlg, RMIdEdit, RMNameEdit, RMPurposeEdit, RMBodyEdit
     global RMDlgHint, RMDlgOk, RMDlgMode, RMDlgEditId
-    global RMNameText, RMScopeText, RMPurposeView, RMBodyView, RMUsedText
+    global RMNameText, RMIdText, RMScopeText, RMPurposeView, RMBodyView, RMUsedText
 
     if (GuiAlive(RMWin)) {
         try RMWin.Destroy()
@@ -188,6 +200,7 @@ CloseRMWindow(*) {
     RMDlgEditId := ""
 
     RMNameText := ""
+    RMIdText := ""
     RMScopeText := ""
     RMPurposeView := ""
     RMBodyView := ""
@@ -208,7 +221,7 @@ RefreshRMPrivate(preferId := "") {
 
     for doc in ReferenceLibrary.ListFlow(RMFlowKey) {
         bodyState := (FileExist(doc.BodyPath) && FileGetSize(doc.BodyPath) > 0) ? "已写" : "未写正文"
-        RMPrivateList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose, bodyState)
+        RMPrivateList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Id, doc.Purpose, bodyState)
         RMPrivateIds.Push(doc.Id)
         if (preferId != "" && doc.Id = preferId && selectRow = 0)
             selectRow := A_Index
@@ -230,7 +243,7 @@ RefreshRMSkeleton() {
     RMSkelList.Delete()
     RMSkelIds := []
     for doc in ReferenceLibrary.ListSkeleton() {
-        RMSkelList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose)
+        RMSkelList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Id, doc.Purpose)
         RMSkelIds.Push(doc.Id)
     }
 }
@@ -241,7 +254,7 @@ RefreshRMGlobal() {
     RMGlobalList.Delete()
     RMGlobalIds := []
     for doc in ReferenceLibrary.ListGlobal() {
-        RMGlobalList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose)
+        RMGlobalList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Id, doc.Purpose)
         RMGlobalIds.Push(doc.Id)
     }
 }
@@ -295,7 +308,7 @@ OnRMSelect(kind) {
 ; 按层精确加载：不走 Get(id, flowKey) 的三层回退，否则同名时会显示错那一层
 LoadRMDetail(kind, id) {
     global RMFlowKey, RMSelectedKind, RMSelectedId
-    global RMNameText, RMScopeText, RMPurposeView, RMBodyView, RMUsedText
+    global RMNameText, RMIdText, RMScopeText, RMPurposeView, RMBodyView, RMUsedText
 
     RMSelectedKind := kind
     RMSelectedId := id
@@ -312,6 +325,7 @@ LoadRMDetail(kind, id) {
         }
     } catch as e {
         RMNameText.Text := "（读不出来）"
+        RMIdText.Value := ""
         RMScopeText.Text := ""
         RMPurposeView.Value := ""
         RMBodyView.Value := ""
@@ -321,6 +335,7 @@ LoadRMDetail(kind, id) {
     }
 
     RMNameText.Text := doc.Name != "" ? doc.Name : id
+    RMIdText.Value := id
     RMScopeText.Text := kind = "flow" ? "本流程私有" : (kind = "skeleton" ? "骨架私有（不可引用）" : "全局")
     RMPurposeView.Value := doc.Purpose
 
@@ -329,15 +344,13 @@ LoadRMDetail(kind, id) {
         body := FileRead(doc.BodyPath, "UTF-8")
     RMBodyView.Value := body
 
+    ; 只吐 ID 的地方给名称：块维护改了名，这里跟着变
+    flow := FlowLibrary.Get(RMFlowKey)
     used := ReferenceEditor.UsedByBlocks(RMFlowKey, id)
-    RMUsedText.Value := used.Length > 0 ? JoinRM(used, "、") : "（无）"
-}
-
-JoinRM(arr, sep) {
-    out := ""
-    for item in arr
-        out .= (out = "" ? "" : sep) item
-    return out
+    labels := []
+    for blockId in used
+        labels.Push(PromptLabels.Block(blockId, flow.BlocksDir))
+    RMUsedText.Value := labels.Length > 0 ? PromptLabels.Join(labels) : "（无）"
 }
 
 ; ---- 动作 ----
@@ -368,6 +381,23 @@ OnRMDelete(*) {
         return
     id := RMPrivateIds[row]
     name := RMPrivateList.GetText(row, 1)
+
+    ; 先查引用：被引用时删不掉，别先问"确定删除吗"再报错（白问一次）。
+    ; 领域层的 ReferenceEditor.Delete 仍自带同一道闸，那是数据完整性的兜底，不承担展示
+    flow := FlowLibrary.Get(RMFlowKey)
+    used := ReferenceEditor.UsedByBlocks(RMFlowKey, id)
+    if (used.Length > 0) {
+        labels := []
+        for blockId in used
+            labels.Push(PromptLabels.Block(blockId, flow.BlocksDir))
+        ownerHwnd := GuiAlive(RMWin) ? RMWin.Hwnd : 0
+        opts := "Icon!"
+        if (ownerHwnd)
+            opts .= " Owner" ownerHwnd
+        MsgBox("仍被这些块引用，先把引用改掉再删：`n`n" PromptLabels.Join(labels), "不能删除", opts)
+        SetRMStatus("不能删除：" name " 仍被引用")
+        return
+    }
 
     ownerHwnd := GuiAlive(RMWin) ? RMWin.Hwnd : 0
     opts := "Icon! YesNo Default2"

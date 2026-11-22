@@ -19,10 +19,12 @@ global BMChanged := false
 global BMBtnEdit := "", BMBtnDelete := "", BMBtnOpen := ""
 
 global BMNameText := ""
+global BMIdText := ""
 global BMKindText := ""
 global BMScopeText := ""
 global BMPurposeView := ""
 global BMBodyView := ""
+global BMRefText := ""
 
 global BMSelectedKind := ""
 global BMSelectedId := ""
@@ -68,7 +70,7 @@ BuildBMWindow(flowKey) {
     global BMWin, BMPrivateList, BMGlobalList, BMStatus, BMPrivateIds, BMGlobalIds
     global FMWin, BMChanged, BMFlowKey
     global BMBtnEdit, BMBtnDelete, BMBtnOpen
-    global BMNameText, BMKindText, BMScopeText, BMPurposeView, BMBodyView
+    global BMNameText, BMIdText, BMKindText, BMScopeText, BMPurposeView, BMBodyView, BMRefText
     global BMSelectedKind, BMSelectedId
 
     flow := FlowLibrary.Get(flowKey)
@@ -91,12 +93,15 @@ BuildBMWindow(flowKey) {
 
     ; ---- 左：两个列表 ----
     d.AddText("xm ym w700 h18", "私有块：" flow.Name "（只属于这套流程）")
-    BMPrivateList := d.AddListView("xm y+2 w700 h240 -Multi", ["名称", "说明", "分类", "正文"])
-    BMPrivateList.ModifyCol(1, 160)
-    BMPrivateList.ModifyCol(2, 300)
-    BMPrivateList.ModifyCol(3, 110)
-    BMPrivateList.ModifyCol(4, 70)
+    BMPrivateList := d.AddListView("xm y+2 w700 h240 -Multi", ["名称", "标识", "说明", "分类", "正文"])
+    BMPrivateList.ModifyCol(1, 140)
+    BMPrivateList.ModifyCol(2, 160)
+    BMPrivateList.ModifyCol(3, 220)
+    BMPrivateList.ModifyCol(4, 90)
+    BMPrivateList.ModifyCol(5, 70)
     ApplyDialogListStyle(BMPrivateList)
+    ; 行序必须恒等于填充顺序（按行号取 BMPrivateIds）：点表头内建排序会脱钩
+    DisableListHeaderSort(BMPrivateList)
     BMPrivateList.OnEvent("ItemSelect", (*) => OnBMSelect("private"))
 
     btnNew := d.AddButton("xm y+6 w90 h26", "新增")
@@ -109,12 +114,14 @@ BuildBMWindow(flowKey) {
     BMBtnOpen.OnEvent("Click", OnBMOpenBody)
 
     d.AddText("xm y+12 w700 h18", "全局块（只读）")
-    BMGlobalList := d.AddListView("xm y+2 w700 h200 -Multi", ["名称", "说明", "分类", "归属"])
-    BMGlobalList.ModifyCol(1, 160)
-    BMGlobalList.ModifyCol(2, 300)
-    BMGlobalList.ModifyCol(3, 110)
-    BMGlobalList.ModifyCol(4, 70)
+    BMGlobalList := d.AddListView("xm y+2 w700 h200 -Multi", ["名称", "标识", "说明", "分类", "归属"])
+    BMGlobalList.ModifyCol(1, 140)
+    BMGlobalList.ModifyCol(2, 160)
+    BMGlobalList.ModifyCol(3, 220)
+    BMGlobalList.ModifyCol(4, 90)
+    BMGlobalList.ModifyCol(5, 70)
     ApplyDialogListStyle(BMGlobalList)
+    DisableListHeaderSort(BMGlobalList)
     BMGlobalList.OnEvent("ItemSelect", (*) => OnBMSelect("global"))
 
     d.AddText("xm y+4 w700 h18 cGray", "只读 · 要改就新建流程，它会复制一份私有副本")
@@ -124,16 +131,25 @@ BuildBMWindow(flowKey) {
 
     d.AddText("x724 y36 w50 h20", "名称")
     BMNameText := d.AddText("x+8 yp w386 h20", "")
-    d.AddText("x724 y60 w50 h20", "分类")
+
+    ; 标识用只读 Edit 而不是 Text：Text 选不中、复制不了，而"拿 id 去目录里找人"正是它的用途
+    d.AddText("x724 y62 w50 h20", "标识")
+    BMIdText := d.AddEdit("x+8 yp w386 h22 +ReadOnly", "")
+
+    d.AddText("x724 y92 w50 h20", "分类")
     BMKindText := d.AddText("x+8 yp w160 h20", "")
     d.AddText("x+16 yp w50 h20", "归属")
     BMScopeText := d.AddText("x+8 yp w120 h20", "")
 
-    d.AddText("x724 y88 w444 h18", "说明")
-    BMPurposeView := d.AddEdit("x724 y+2 w444 h60 +ReadOnly +Multi +VScroll", "")
+    d.AddText("x724 y118 w444 h18", "说明")
+    BMPurposeView := d.AddEdit("x724 y140 w444 h52 +ReadOnly +Multi +VScroll", "")
 
-    d.AddText("x724 y176 w444 h18", "正文")
-    BMBodyView := d.AddEdit("x724 y+2 w444 h340 +ReadOnly +Multi +VScroll", "")
+    d.AddText("x724 y200 w444 h18", "正文")
+    BMBodyView := d.AddEdit("x724 y222 w444 h280 +ReadOnly +Multi +VScroll", "")
+
+    ; 正文里的 {{ref:…}} 译文：正文是数据，一个字不动，翻译放在框外
+    d.AddText("x724 y510 w444 h18", "本文引用")
+    BMRefText := d.AddEdit("x724 y532 w444 h30 +ReadOnly +Multi +VScroll", "")
 
     ; ---- 底部 ----
     BMStatus := d.AddText("x12 y568 w700 h20 cGray", "")
@@ -152,7 +168,7 @@ CloseBMWindow(*) {
     global BMWin, BMPrivateList, BMGlobalList, BMStatus, BMPrivateIds, BMGlobalIds
     global BMDlg, BMIdEdit, BMNameEdit, BMPurposeEdit, BMKindCombo, BMBodyEdit
     global BMDlgHint, BMDlgOk, BMDlgMode, BMDlgEditId
-    global BMNameText, BMKindText, BMScopeText, BMPurposeView, BMBodyView
+    global BMNameText, BMIdText, BMKindText, BMScopeText, BMPurposeView, BMBodyView, BMRefText
     global BMSelectedKind, BMSelectedId
 
     if (GuiAlive(BMWin)) {
@@ -180,10 +196,12 @@ CloseBMWindow(*) {
     BMDlgEditId := ""
 
     BMNameText := ""
+    BMIdText := ""
     BMKindText := ""
     BMScopeText := ""
     BMPurposeView := ""
     BMBodyView := ""
+    BMRefText := ""
     BMSelectedKind := ""
     BMSelectedId := ""
 }
@@ -212,7 +230,7 @@ RefreshBMPrivate(preferId := "") {
         bodyPath := flow.BlocksDir "\" id "\body.txt"
         bodyState := (FileExist(bodyPath) && FileGetSize(bodyPath) > 0) ? "已写" : "未写正文"
 
-        BMPrivateList.Add(, name, purpose, kind, bodyState)
+        BMPrivateList.Add(, name, id, purpose, kind, bodyState)
         BMPrivateIds.Push(id)
         if (preferId != "" && id = preferId && selectRow = 0)
             selectRow := A_Index
@@ -244,7 +262,7 @@ RefreshBMGlobal() {
             kind := blk.Kind
             purpose := blk.Purpose
         }
-        BMGlobalList.Add(, name, purpose, kind, "公共")
+        BMGlobalList.Add(, name, id, purpose, kind, "公共")
         BMGlobalIds.Push(id)
     }
 }
@@ -288,17 +306,19 @@ OnBMSelect(kind) {
 
 LoadBMDetail(kind, id) {
     global BMSelectedKind, BMSelectedId
-    global BMNameText, BMKindText, BMScopeText, BMPurposeView, BMBodyView, BMFlowKey
+    global BMNameText, BMIdText, BMKindText, BMScopeText, BMPurposeView, BMBodyView, BMRefText, BMFlowKey
 
     BMSelectedKind := kind
     BMSelectedId := id
 
     if (id = "") {
         BMNameText.Text := ""
+        BMIdText.Value := ""
         BMKindText.Text := ""
         BMScopeText.Text := ""
         BMPurposeView.Value := ""
         BMBodyView.Value := ""
+        BMRefText.Value := ""
         return
     }
 
@@ -309,10 +329,13 @@ LoadBMDetail(kind, id) {
         blk := BlockLibrary.Get(id, "")
 
     BMNameText.Text := blk.Name != "" ? blk.Name : id
+    BMIdText.Value := id
     BMKindText.Text := blk.Kind
     BMScopeText.Text := (kind = "private") ? "私有" : "公共"
     BMPurposeView.Value := blk.Purpose
     BMBodyView.Value := blk.Body
+    ; 正文里的 {{ref:…}} 就地翻成人话：引用按当前流程解析（全局块也一样）
+    BMRefText.Value := PromptLabels.RefsInBody(blk.Body, BMFlowKey)
 }
 
 ; ---- 三个动作 ----
@@ -608,20 +631,23 @@ ShowBMRefPicker() {
     d.OnEvent("Close", CloseBMRefPicker)
     d.OnEvent("Escape", CloseBMRefPicker)
 
-    BMRefList := d.AddListView("xm ym w560 h260 -Multi", ["名称", "用途", "来源"])
-    BMRefList.ModifyCol(1, 150)
-    BMRefList.ModifyCol(2, 300)
-    BMRefList.ModifyCol(3, 100)
+    BMRefList := d.AddListView("xm ym w560 h260 -Multi", ["名称", "标识", "用途", "来源"])
+    BMRefList.ModifyCol(1, 130)
+    BMRefList.ModifyCol(2, 150)
+    BMRefList.ModifyCol(3, 190)
+    BMRefList.ModifyCol(4, 90)
     ApplyDialogListStyle(BMRefList)
+    ; 按行号取 BMRefIds：点表头会打乱行序，必须关掉内建排序
+    DisableListHeaderSort(BMRefList)
     BMRefList.OnEvent("DoubleClick", OnBMRefPickerOk)
 
     BMRefIds := []
     for doc in ReferenceLibrary.ListFlow(BMFlowKey) {
-        BMRefList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose, "本流程私有")
+        BMRefList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Id, doc.Purpose, "本流程私有")
         BMRefIds.Push(doc.Id)
     }
     for doc in ReferenceLibrary.ListGlobal() {
-        BMRefList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Purpose, "全局")
+        BMRefList.Add(, doc.Name != "" ? doc.Name : doc.Id, doc.Id, doc.Purpose, "全局")
         BMRefIds.Push(doc.Id)
     }
     if (BMRefIds.Length > 0)
