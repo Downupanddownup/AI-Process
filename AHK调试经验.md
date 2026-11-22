@@ -78,6 +78,17 @@ SetTimer(() => ExitApp(), -10000)   ; 自灭：万一下面卡住，10 秒后自
 
 判读：输出里若出现 `#Warn` 行，**对着行号看一眼**——警告位置在你没改的行上（如 `JSON` / `AppRoot`），那属于"单文件校验的固有噪音"，不是缺陷。（跨天BUG 那轮：改动落在 39 / 96 / 102 / 330 行，警告在 28 / 181 行，位置不相干。）
 
+### 1.6 生成临时脚本：用写入工具直写，不经过 shell 拼接
+
+**症状**：PowerShell 生成包装脚本，`'#Include ' + $t` 被拆成两行（`#Include` 拿到空参数报错）；换 bash `printf` 写，路径里的 `\A` 被当转义吃掉（`D:\PersonWorkSpace\AI-Process` 变成带响铃字符的怪路径）。
+
+**做法**：
+
+- 内容固定的脚本（单文件包装、断言尾部）一律用**文件写入工具直写**；
+- 必须程序化生成时（整树 include 列表这类），**ASCII 生成器与含中文的片段分文件**，由生成器 `Get-Content -Encoding UTF8 -Raw` 拼入——2.5 的 BOM 坑管 ps1 本身，这条管拼出来的 ahk。
+
+实测：拼接两法各失败一次，改直写后一次到位（结果微调 01 那轮）。
+
 ## 二、AHK v2 的坑（本机实测）
 
 ### 2.1 多行循环体必须加花括号
@@ -235,6 +246,25 @@ powershell -File test\Verify-Output.ps1 -Case Stats -Compare before
 
 ⚠ **回退后还要重算一遍剩下的**——因为回退前算出的父级 `aggregate` 里已经含了那些（马上就被删掉的）子主题，不复算就不自洽。
 
+### 3.9 GUI 行为断言配方：屏幕外窗口 + 模拟点击 + 回读
+
+"点表头会不会排序""禁用有没有生效"这类 GUI 行为问题，不用手点（与 3.5 互补：真机手验留给人，这条管能自动断言的部分）：
+
+```autohotkey
+g := Gui("+ToolWindow", "probe")
+lv := g.AddListView("w300 h300 -Multi", ["组合", "块"])
+lv.Add(, "复需求", "a")
+g.Show("x-3000 y-3000")        ; 屏幕外，不打搅运行中的面板
+
+headerHwnd := SendMessage(0x101F, 0, 0, lv.Hwnd)              ; LVM_GETHEADER
+PostMessage(0x201, 1, (5 << 16) | 30, , "ahk_id " headerHwnd) ; WM_LBUTTONDOWN
+PostMessage(0x202, 0, (5 << 16) | 30, , "ahk_id " headerHwnd) ; WM_LBUTTONUP
+Sleep(500)
+; 回读 lv.GetText 逐行行序，与点击前比对，结论写文件
+```
+
+实测：用它证实了三个结论——AHK ListView 表头有内建排序、`ColClick` 回调拦不住、摘 HDS_BUTTONS 拦得住（见 6.7）。
+
 ## 四、可直接抄的两段骨架
 
 ### 4.1 临时调试脚本
@@ -340,7 +370,168 @@ Set-Content -LiteralPath $wrap -Encoding UTF8 -Value @(
 - [ ] 临时校验/调试**进程**也清了（按 PID 精确杀，两种进程名都枚举；杀完核对主面板仍在）
 - [ ] 产物类改动确认过**重算范围**（只跑有产物的主题，见 3.7）
 
-## 六、案例索引
+## 六、库与环境的事实（登记制）
+
+> 本章从 `需求/关于AI Process的结构，通用与特化/基础信息/技术信息.md` 整体迁入——非根目录文档会被清理，知识归根；迁入后新增 6.7、6.8 两条。
+> 判据：一条要进来，必须满足"**不知道它就会写错，且错了不容易发现**"。每条写四样——现象、根因、对策、落点，外加"错过的后果"。一次性踩过的操作失误不在此列。
+
+### 6.1 JSON 序列化（`app/lib/JSON.ahk` v2.1.0）
+
+**默认行为**
+
+| # | 默认值 | 现象 | 开关 | 项目现状 |
+|---|---|---|---|---|
+| 1 | `EscapeUnicode = true` | 中文写成 `\u5199\u4F5C` | 有 | **已在绕**：`ActivityLogger` / `HistoryIndexManager` / `RepositoryManager` 三处在 Dump 前置 `false` |
+| 2 | `BoolsAsInts = true` | `true/false` 读成 `1/0`，写出也是 `1/0` | 有 | **没绕**：布尔落到文件里就是数字 |
+| 3 | `Dump(obj, 1)` | Tab 缩进、键**按字母序**排 | **没有** | 无解，只能自己写 |
+
+**为什么不能靠开关**：两个开关都是**全局静态**的，一开影响所有读 JSON 的地方。实测 `JSON.BoolsAsInts := false` 之后，读 `builtin/code/flow.json` 得到的 `readonly` 是 `JSON.True` 对象，不再是 `1`；07 校验器里的 `(raw["readonly"] = true)` 立刻判假 → 内置流程被误报 `bad_config`。**结论：为了让文件好看去关开关，会把读侧弄坏。全局开关一律不碰。**
+
+**对策：按"会不会被人改"分流**
+
+| 文件类型 | 例子 | 写法 |
+|---|---|---|
+| 给人看、会手改的配置 | `flow.json`、`meta.json` | **定向序列化**：固定字段序、两空格、中文原文、`true/false`、UTF-8 无 BOM、末尾一个换行 |
+| 纯机器读写 | `log.jsonl`、历史/仓库索引、`stats.json`、`filetools.json` | 默认 `JSON.Dump` 可以；需要中文可读时自行置 `EscapeUnicode := false` |
+
+**落点**：`FlowEditor._DumpFlow()`（首份定向序列化，含写后自检：写 `.tmp` → 读回比对 → 覆盖）。
+
+**错过的后果**：按默认 `Dump` 写配置，功能上还能读回（等价于 0/1），但中文不可读、布尔不合规范、字段顺序随机、diff 全是噪声——每次写入都把可读配置变成库的私有格式，且不报错。
+
+### 6.2 文件编码
+
+| 文件 | 编码 | 约束 |
+|---|---|---|
+| `config/settings.ini` | UTF-16 LE 带 BOM | 只能走 `SafeIniWrite`，直接 `IniWrite` 会破坏编码 |
+| `.aiprocess` 下的文本 | UTF-8 无 BOM | 与既有文本一致 |
+| `flow.json` / 其它要写的 JSON | 写入用 `"UTF-8-RAW"` | `"UTF-8"` 会加 BOM（08 踩过：拼装结果开头多 `EF BB BF`） |
+| 读任何 UTF-8 文本 | `FileRead(path, "UTF-8")` | 能正确跳过 BOM |
+
+**错过的后果**：BOM 会让"逐字节比对"永远不通过，也会让某些解析器把首字符读成怪字符；`settings.ini` 用错编码会让整份配置读不出来。
+
+### 6.3 Gui 生命周期（owner 销毁会带走子窗口）
+
+**现象**：绑了 `+Owner` 的窗口，**父窗口销毁时会被连带销毁**，且没有任何回调通知它。销毁之后：
+
+| 操作 | 结果 |
+|---|---|
+| `if (gui)` | **仍为真**（变量里还有对象） |
+| `gui.Hwnd` | 抛 `Gui has no window` |
+| `gui.Show()` | 抛 `Gui has no window` |
+| `gui.Destroy()` | 不抛（无害） |
+
+典型症状：**"关掉再打开就报 Gui has no window"**，且只有"先关掉父窗口、再打开子窗口"这条路径才会出现。
+
+**根因**：AHK 的 `if (gui)` 判的是"变量里有对象"，不是"窗口还活着"。Windows 的 owner 规则是"父销毁 → 子销毁"，AHK 不会替你把变量置空，也不会通知你。
+
+**对策**：判活函数，**凡是"复用已创建过的窗口"之前都问它**：
+
+```autohotkey
+FMGuiAlive(g) {
+    if !IsObject(g)
+        return false
+    try {
+        return (g.Hwnd != 0)     ; 死了会抛，抛就是没活
+    } catch {
+        return false
+    }
+}
+```
+
+三处用法，一处都不能省：**复用**（死了先清理再重建，不要直接 `Show()`）；**关闭**（死了就跳过 `Destroy()`，照样把变量置空）；**绑 owner**（owner 自己也可能是死引用，绑之前同样要判活）。
+
+**落点**：`ui/GuiLifecycle.ahk` 的 `GuiAlive(g)`。已接入 `ui/FlowMaintainWindow.ahk`、`business/RepositoryDialog.ahk`。凡"只建一次、之后复用"的窗口都要接，`+Owner` 的窗口优先。
+
+**错过的后果**：这不是"忘了一次置空"——只修"自己关自己"的路径治不了"被父窗口带走"。同类问题已出现三次。**一次踩到，就要按"这一类"排查**。
+
+**附带一条：`MsgBox` 也要绑 `Owner`**——不写 `Owner` 时是独立顶层窗口，会掉到业务窗口后面（表现为"确认框层级低""点了没反应"）。写法：`MsgBox(text, title, "Icon! YesNo Default2 Owner" hwnd)`。同理，**模态等待期间 owner 可能被关掉**：`WinWaitClose` 返回后要重新判一次 `GuiAlive(父窗口)`。
+
+### 6.4 GUI 布局坐标（`x+8` 的语义）
+
+**现象**：控件跑到窗口外、或整块区域右移，窗口看起来"被裁掉"。
+
+**根因**：AHK 的定位选项里，`x+8` 是**上一个控件的右边缘 + 8**，不是"左边 + 8"。同一列里连续写 `x+8`，每往下一层就右移一个控件宽度。
+
+**对策**：
+
+| 意图 | 写法 |
+|---|---|
+| 标题 → 它下面的控件 | `xp y+2`（与上一个同左边缘） |
+| 跨到下一列 | `x+8`（相对上一列的右缘） |
+| 与某个绝对位置对齐 | 直接写数字，如 `x88` |
+| 同一行内排按钮 | `x+8 yp`（相对上一个按钮的右缘，正确） |
+
+**ComboBox / DropDownList 的 `h` 是"下拉展开高度"**：`AddComboBox("w300 h24")` 里的 `h` 不是控件高度，而是下拉列表展开后的总高度。要看全建议 `h200`；控件本体的可见高度由字体与行高决定，不受这个值影响。
+
+**落点**：`ui/FlowMaintainWindow.ahk`（主窗口三列、新建/改名两个弹窗）、`ui/BlockMaintainWindow.ahk`（分类下拉）。
+
+**错过的后果**：已犯过两次——主窗口三列错位成"四块区域"、新建弹窗单选被推出窗口右缘。**布局验收必须读真实坐标（`GetPos`），不能只看代码。**
+
+### 6.5 ListView 勾选框
+
+**现象**：`lv.Add("Check", …)` 不报错，但界面上**看不到勾选框**；`lv.OnEvent("ItemCheck", …)` 注册报 `Invalid callback function`。
+
+**根因**：① AHK 不会因为 `Check` 选项自动开 `LVS_EX_CHECKBOXES` 扩展样式——样式没开，状态位设了也不显示；② 这个版本（2.0.2）的 ListView **没有 ItemCheck 事件**，勾选变化拿不到回调。
+
+**对策**：
+
+```autohotkey
+; 必须先开样式，再添行；顺序反了前面的行会没有勾选框
+SendMessage(0x1036, 0x4, 0x4, lv.Hwnd)      ; LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES
+lv.Add(, …)
+lv.Modify(row, "Check")                      ; 勾选 / 取消用 "-Check"
+; 读状态：0x102C = LVM_GETITEMSTATE，mask 0x2000 = STATEIMAGEMASK
+s := SendMessage(0x102C, row - 1, 0x2000, lv.Hwnd)
+checked := ((s >> 12) & 0xF) = 2            ; 实测未勾为 0，已勾为 2
+```
+
+**没有变更事件**，"勾选之后怎么生效"必须显式设计：要么轮询，要么给一个显式按钮（本项目选了后者，见 `ui/FlowBlockPicker.ahk` 的「同步到选中区」）。
+
+**错过的后果**：勾选框不显示、或勾了却没反应；靠"看起来有 Check 参数"判断会一路以为功能正常。
+
+### 6.6 块缓存
+
+**现象**：改了块目录里的 `body.txt` / `meta.json`，界面上（选块弹窗、预览、维护窗口）仍是旧内容。
+
+**根因**：`BlockLibrary` 按块目录路径缓存 `PromptBlock`（`_cache`）；`FlowLibrary` 也有流程缓存。直接改文件不会让缓存失效。
+
+**对策**：**写完块必须 `BlockLibrary.ClearCache()`**；写完 `flow.json` 必须 `FlowLibrary.ClearCache()`。两件事分别由 `BlockEditor` 与 `FlowEditor` 自己负责，不指望调用方记得。
+
+**落点**：`promptflow/definition/BlockEditor.ahk`（三个写方法）、`promptflow/definition/FlowEditor.ahk`。
+
+**错过的后果**："改完看不到变化"，人会以为写盘失败，反复保存；排查时又找不到错误——因为读到的确实是缓存里的旧对象。
+
+### 6.7 ListView 表头有内建排序
+
+**现象**：没注册任何排序处理的 ListView，点表头行也会按该列文本重排（实测为拼音序）；按行号索引数据数组的预览/定位随即错位，而代码里**搜不到任何排序逻辑**。
+
+**根因**：AHK v2（本机 2.0.2）ListView 的内建行为。`ColClick` 事件回调返回非零也**拦不住**（实测）——需要排序的列表（费用窗口）正是靠 `ColClick` 自己重排数据。
+
+**对策**：不需要排序的列表，创建后摘掉表头的按钮样式，点击从机制上不产生行为：
+
+```autohotkey
+headerHwnd := SendMessage(0x101F, 0, 0, lv.Hwnd)                        ; LVM_GETHEADER
+style := DllCall("GetWindowLongPtr", "ptr", headerHwnd, "int", -16, "ptr")   ; GWL_STYLE
+DllCall("SetWindowLongPtr", "ptr", headerHwnd, "int", -16, "ptr", style & ~0x2)   ; 去 HDS_BUTTONS(0x0002)
+```
+
+**落点**：`ui/StyleManager.ahk` 的 `DisableListHeaderSort(lvCtrl)`；已接入 `ui/FlowMaintainWindow.ahk` 中列（行号映射预览，必须"行序恒等于填充顺序"）。别动公用样式函数——费用窗口的排序靠表头。
+
+**错过的后果**：以为"代码里没写排序就不会排"——行序与数据数组脱钩，选中"复回复"预览显示"复执行"，排查时在全项目搜不到排序代码，无从下手。
+
+### 6.8 Map 枚举是键序，不是书写顺序
+
+**现象**：Map 按 A、B、C 顺序写入，枚举出来却是按键名排。实测：`Skeleton.Layouts` 书写顺序为 复需求→复回复→…→复关系，枚举顺序为 复关系→复回复→…，恰好是键的二进制序。
+
+**根因**：AHK v2 Map 的枚举顺序不保证等于插入顺序（本机实测为键序）。
+
+**对策**：**任何"展示顺序有意义"的枚举都必须有显式顺序表**；枚举只用来取全集。新增条目不登记进顺序表就掉出列表（顺序表方法带"漏登记垫后"兜底）。
+
+**落点**：`promptflow/skeleton/Skeleton.ahk` 的 `ComboDisplayOrder` / `GetOrderedComboKeys()`。
+
+**错过的后果**：界面列表顺序"自己会变"，新增条目出现在不可预期的位置；顺序乱了还会连累行号映射（见 6.7）。
+
+## 七、案例索引
 
 | 经验 | 出处 |
 |---|---|
@@ -352,3 +543,5 @@ Set-Content -LiteralPath $wrap -Encoding UTF8 -Value @(
 | 为什么不搞"自动生成的经验链" | `需求/问题优先级排序/实施步骤/06-删除经验总结生成链/` |
 | MSYS 吃开关名（`/validate` → `D:/git/Git/validate`）、`//validate` 配方与对照组、校验期 `#Warn` 弹窗、两种进程名、全量重算的范围纪律、`CreationTime` 回退 | `需求/跨天BUG以及重构/已实施.md`、同目录 `结果微调/01/v1.md` |
 | 验证脚本"输出为空 + 退出码 0"的三种成因（`Start-Process` 的 ExitCode 不可信、`..` 相对 include、缺错误出口） | `需求/当前的提示词是否在有意引导deepseek忽略质量约束/v4.md` |
+| 表头内建排序三连实测（6.7）、Map 键序（6.8）、shell 拼接两坑（1.6）、GUI 行为断言配方（3.9） | `需求/关于AI Process的结构，通用与特化/结果微调/01/`（v4–v15、已实施.md） |
+| 第六章「库与环境的事实」整体迁入 | 原 `需求/关于AI Process的结构，通用与特化/基础信息/技术信息.md` |
