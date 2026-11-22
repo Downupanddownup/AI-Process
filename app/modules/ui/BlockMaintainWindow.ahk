@@ -132,9 +132,9 @@ BuildBMWindow(flowKey) {
     d.AddText("x724 y36 w50 h20", "名称")
     BMNameText := d.AddText("x+8 yp w386 h20", "")
 
-    ; 标识用只读 Edit 而不是 Text：Text 选不中、复制不了，而"拿 id 去目录里找人"正是它的用途
+    ; 标识只展示：不用只读 Edit——那种控件值改不了，但边框与光标跟输入框一样，看着像能改
     d.AddText("x724 y62 w50 h20", "标识")
-    BMIdText := d.AddEdit("x+8 yp w386 h22 +ReadOnly", "")
+    BMIdText := d.AddText("x+8 yp w386 h20", "")
 
     d.AddText("x724 y92 w50 h20", "分类")
     BMKindText := d.AddText("x+8 yp w160 h20", "")
@@ -145,11 +145,12 @@ BuildBMWindow(flowKey) {
     BMPurposeView := d.AddEdit("x724 y140 w444 h52 +ReadOnly +Multi +VScroll", "")
 
     d.AddText("x724 y200 w444 h18", "正文")
-    BMBodyView := d.AddEdit("x724 y222 w444 h280 +ReadOnly +Multi +VScroll", "")
+    BMBodyView := d.AddEdit("x724 y222 w444 h250 +ReadOnly +Multi +VScroll", "")
 
     ; 正文里的 {{ref:…}} 译文：正文是数据，一个字不动，翻译放在框外
-    d.AddText("x724 y510 w444 h18", "本文引用")
-    BMRefText := d.AddEdit("x724 y532 w444 h30 +ReadOnly +Multi +VScroll", "")
+    ; 高度按 3 行给：常见 2–3 条引用，再长在框内滚，不裁
+    d.AddText("x724 y480 w444 h18", "本文引用")
+    BMRefText := d.AddEdit("x724 y500 w444 h56 +ReadOnly +Multi +VScroll", "")
 
     ; ---- 底部 ----
     BMStatus := d.AddText("x12 y568 w700 h20 cGray", "")
@@ -313,7 +314,7 @@ LoadBMDetail(kind, id) {
 
     if (id = "") {
         BMNameText.Text := ""
-        BMIdText.Value := ""
+        BMIdText.Text := ""
         BMKindText.Text := ""
         BMScopeText.Text := ""
         BMPurposeView.Value := ""
@@ -329,7 +330,7 @@ LoadBMDetail(kind, id) {
         blk := BlockLibrary.Get(id, "")
 
     BMNameText.Text := blk.Name != "" ? blk.Name : id
-    BMIdText.Value := id
+    BMIdText.Text := id
     BMKindText.Text := blk.Kind
     BMScopeText.Text := (kind = "private") ? "私有" : "公共"
     BMPurposeView.Value := blk.Purpose

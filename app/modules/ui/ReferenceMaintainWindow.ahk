@@ -135,9 +135,9 @@ BuildRMWindow(flowKey) {
     d.AddText("x724 y36 w50 h20", "名称")
     RMNameText := d.AddText("x778 y36 w390 h20", "")
 
-    ; 标识用只读 Edit 而不是 Text：Text 选不中、复制不了，而"拿 id 去目录里找人"正是它的用途
+    ; 标识只展示：不用只读 Edit——那种控件值改不了，但边框与光标跟输入框一样，看着像能改
     d.AddText("x724 y62 w50 h20", "标识")
-    RMIdText := d.AddEdit("x778 y62 w390 h22 +ReadOnly", "")
+    RMIdText := d.AddText("x778 y62 w390 h20", "")
 
     d.AddText("x724 y92 w50 h20", "归属")
     RMScopeText := d.AddText("x778 y92 w390 h20", "")
@@ -146,10 +146,11 @@ BuildRMWindow(flowKey) {
     RMPurposeView := d.AddEdit("x724 y140 w444 h50 +ReadOnly +Multi +VScroll", "")
 
     d.AddText("x724 y196 w444 h18", "正文（只读预览 · 用「打开正文」改）")
-    RMBodyView := d.AddEdit("x724 y216 w444 h260 +ReadOnly +Multi +VScroll", "")
+    RMBodyView := d.AddEdit("x724 y216 w444 h240 +ReadOnly +Multi +VScroll", "")
 
-    d.AddText("x724 y484 w444 h18", "被谁引用（本流程的块）")
-    RMUsedText := d.AddEdit("x724 y504 w444 h40 +ReadOnly +Multi +VScroll", "")
+    ; 高度按 3 行给：一个文档被两个块引用时不再被切
+    d.AddText("x724 y464 w444 h18", "被谁引用（本流程的块）")
+    RMUsedText := d.AddEdit("x724 y484 w444 h56 +ReadOnly +Multi +VScroll", "")
 
     ; ---- 底部 ----
     RMStatus := d.AddText("x12 y576 w900 h20 cGray", "")
@@ -325,7 +326,7 @@ LoadRMDetail(kind, id) {
         }
     } catch as e {
         RMNameText.Text := "（读不出来）"
-        RMIdText.Value := ""
+        RMIdText.Text := ""
         RMScopeText.Text := ""
         RMPurposeView.Value := ""
         RMBodyView.Value := ""
@@ -335,7 +336,7 @@ LoadRMDetail(kind, id) {
     }
 
     RMNameText.Text := doc.Name != "" ? doc.Name : id
-    RMIdText.Value := id
+    RMIdText.Text := id
     RMScopeText.Text := kind = "flow" ? "本流程私有" : (kind = "skeleton" ? "骨架私有（不可引用）" : "全局")
     RMPurposeView.Value := doc.Purpose
 
