@@ -77,7 +77,7 @@ CreateMainGui() {
     ; 两段文字合起来 126 px（26 + 4 + 96），与原来单控件同宽，右侧按钮坐标不动
     FlowNameText := MainGui.AddText("xm y" (rowY + 2) " w26 h18 +0x200", "")
     FlowNameText.SetFont("c1A6FC4")
-    FlowNameText.OnEvent("Click", ShowThemeSelectDialog)
+    FlowNameText.OnEvent("Click", ShowFlowSwitchDialog)
     FlowNameTextHwnd := FlowNameText.Hwnd
     CurrentPathText := MainGui.AddText("x+4 yp w96 h18 +0x200", "未设置")
     CurrentPathText.OnEvent("Click", ShowThemeSelectDialog)
