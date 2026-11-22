@@ -53,6 +53,15 @@ ApplyDialogListStyle(lvCtrl) {
     SendMessage(0x1003, 1, rowIL, lvCtrl.Hwnd)   ; LVM_SETIMAGELIST, LVSIL_SMALL
 }
 
+; 禁用表头排序：摘掉表头的 HDS_BUTTONS(0x0002)，表头变纯标题，点击不产生任何行为
+; 背景：AHK ListView 点表头会按列文本内建排序（ColClick 回调拦不住，实测）；
+; 行序一变，按行号取数据的预览就错位。只给"行序必须恒等于填充顺序"的列表用
+DisableListHeaderSort(lvCtrl) {
+    headerHwnd := SendMessage(0x101F, 0, 0, lvCtrl.Hwnd)   ; LVM_GETHEADER
+    style := DllCall("GetWindowLongPtr", "ptr", headerHwnd, "int", -16, "ptr")   ; GWL_STYLE
+    DllCall("SetWindowLongPtr", "ptr", headerHwnd, "int", -16, "ptr", style & ~0x2)
+}
+
 ; 应用样式到主窗口
 ApplyMainWindowStyle(windowId, mainGui) {
     style := GetWindowStyle(windowId)

@@ -225,6 +225,34 @@ class Skeleton {
         return keys
     }
 
+    ; 组合键的展示顺序（流程维护窗口中列）：按使用动线定稿——
+    ; 主链 需求→回复→执行，辅助 关系→复盘→质检 收尾
+    ; 必须显式给出：Map 枚举是键序不是书写顺序，新增组合不登记就掉出列表
+    static ComboDisplayOrder := [
+        "复需求|single",
+        "复回复|direct", "复回复|impl",
+        "复执行|steps_dir", "复执行|tweak",
+        "复关系|auto",
+        "复盘|defense", "复盘|tech",
+        "质检码|single"
+    ]
+
+    ; 展示顺序的组合键：定稿顺序在前，漏登记的（新增组合）按 GetAllComboKeys 顺序垫后
+    static GetOrderedComboKeys() {
+        keys := []
+        for k in this.ComboDisplayOrder {
+            if (this.Layouts.Has(k)) {
+                keys.Push(k)
+            }
+        }
+        for k in this.GetAllComboKeys() {
+            if (!this._Has(keys, k)) {
+                keys.Push(k)
+            }
+        }
+        return keys
+    }
+
     static _Has(arr, value) {
         for item in arr {
             if (item = value) {

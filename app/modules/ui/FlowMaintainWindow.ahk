@@ -94,6 +94,8 @@ ShowFlowMaintainWindow(flowKey := "") {
     FMWinComboList.ModifyCol(1, 130)
     FMWinComboList.ModifyCol(2, 370)
     ApplyDialogListStyle(FMWinComboList)
+    ; 行序必须恒等于填充顺序（预览按行号取 FMWinCombos），表头排序会错位，禁用
+    DisableListHeaderSort(FMWinComboList)
     FMWinComboList.OnEvent("ItemSelect", OnFMComboSelect)
     FMWinComboList.OnEvent("DoubleClick", OnFMSelectBlock)
 
@@ -225,7 +227,7 @@ OnFMFlowSelect(*) {
     ; 内置流程只读：改名 / 删除 / 管理私有块 / 选块 置灰，不给入口比点了再报错好
     UpdateFMWriteButtons(true, flow.Readonly)
 
-    for comboKey in Skeleton.GetAllComboKeys() {
+    for comboKey in Skeleton.GetOrderedComboKeys() {
         parts := StrSplit(comboKey, "|")
         blockIds := []
         blockNames := ""
