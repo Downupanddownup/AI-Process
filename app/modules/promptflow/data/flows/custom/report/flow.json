@@ -4,8 +4,9 @@
   "shortName": "报告",
   "readonly": false,
   "recipes": {
-    "复需求|single": { "content": ["reader_purpose", "content_quality", "question_rules", "artifact_guard"] },
+    "复需求|single": { "content": ["reader_purpose", "artifact_map", "content_quality", "question_rules", "artifact_guard"] },
     "复回复|direct": { "content": ["content_quality", "artifact_guard"] },
+    "复回复|impl":  { "content": ["apply_list"] },
     "质检码|single": { "content": ["self_check", "reader_review", "no_modify"] },
     "复执行|tweak":  { "content": ["apply_list"] },
     "复执行|steps_dir": { "content": ["steps_rules", "format_steps"] },

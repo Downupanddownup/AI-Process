@@ -1,0 +1,1 @@
+本流程产物三类：骨架（结构契约）、结论清单（内容取舍登记）、报告（版本化成对产出），格式分别见 {{ref:skeleton_guide}}、{{ref:conclusion_list_guide}}、{{ref:report_artifact_guide}}。讨论中确认了结构或内容取舍时，提议登记到对应产物；落地与否由用户指令决定。
