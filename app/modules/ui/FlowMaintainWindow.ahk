@@ -544,12 +544,10 @@ PreviewTopicDir() {
     return PromptExporter.DemoTopicDir
 }
 
+; 预览环境 = 演示主题 + 当前活动窗口号；构造只在 PromptExporter.DemoEnv 存在一处
+; 窗口号传当前活动窗口：预览要模拟"真的从这里发出去"；导出固定用 2（见 PromptExporter.DemoEnv）
 BuildFMEnv(flowKey) {
-    env := Environment()
-    env.TopicDir := PreviewTopicDir()
-    env.WindowId := GetActiveWindowId()
-    env.FlowKey := flowKey
-    return env
+    return PromptExporter.DemoEnv(flowKey, GetActiveWindowId())
 }
 
 ; ---- 新建 / 改名 / 删除（02）----

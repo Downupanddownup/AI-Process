@@ -4,6 +4,8 @@
 ;
 ; 位置在 promptflow 层：只依赖组装引擎、流程库、序列化件；不知道 AppRoot、窗口、.aiprocess。
 ; 单一实现：UI 与 CLI 都只调这里，谁都不许自己拼文本、自己转义——要改成品，只改这个文件。
+; 拼接只有一条路：PromptAssembler.Build（预览、发送、导出共用）；本文件只做"装进 JSON"，
+; 不拆行、不重排、不再拼第二遍。演示环境也只在这里造一次（DemoEnv），预览调用时传自己的窗口号。
 ; 为什么不用 JSON.Dump：中文转 \u、布尔变 1、键按字母序，两个开关还是全局静态的，关掉会打坏
 ; 校验器的布尔判断（见《AHK调试经验》6.1）。
 
@@ -36,7 +38,7 @@ class PromptExporter {
     ; 成品文本（不做 IO）。任一组合拼不出来即抛错，不产出半份
     static Export(flowKey) {
         flow := FlowLibrary.Get(flowKey)
-        env := this._EnvOf(flowKey)
+        env := this.DemoEnv(flowKey)
         combos := []
         for comboKey in Skeleton.GetOrderedComboKeys() {
             combos.Push(this._Combo(env, comboKey))
@@ -54,18 +56,19 @@ class PromptExporter {
 
     ; ---- 私有 ----
 
-    ; 导出用的运行环境：固定演示主题 + 固定窗口号 + 显式流程 key
-    ; 窗口号不取 GetActiveWindowId()：随窗口变会让两份导出无法比对
+    ; 演示环境：预览与导出共用这一处构造，别再各造一份
+    ; windowId 由调用方给：预览传当前活动窗口，导出用默认值 2（固定，两份导出才可比）
     ; FlowKey 必须显式设：{{ref:…}} 的解析靠它
-    static _EnvOf(flowKey) {
+    static DemoEnv(flowKey, windowId := "2") {
         env := Environment()
-        env.WindowId := "2"
         env.TopicDir := this.DemoTopicDir
+        env.WindowId := windowId
         env.FlowKey := flowKey
         return env
     }
 
-    ; 一个组合：拼装 + 身份 + 职责 + 拆行
+    ; 一个组合：拼装 + 身份 + 职责 + 整份提示词
+    ; prompt 存组装结果本身，原样一个字符串——不拆行、不重排，导出层不做第二次拼接
     static _Combo(env, comboKey) {
         parts := StrSplit(comboKey, "|")
         actKey := parts[1]
@@ -82,11 +85,11 @@ class PromptExporter {
             "action", actKey,
             "policy", polKey,
             "duty", this.Duties.Has(comboKey) ? this.Duties[comboKey] : "",
-            "prompt", StrSplit(this._NormalizeEol(text), "`n")
+            "prompt", this._NormalizeEol(text)
         )
     }
 
-    ; 统一行尾再拆行：源文件行尾不统一（有的 LF、有的 CRLF），拼起来会混
+    ; 统一行尾：源文件行尾不统一（有的 LF、有的 CRLF），拼起来会混
     static _NormalizeEol(text) {
         return StrReplace(StrReplace(text, "`r`n", "`n"), "`r", "`n")
     }
@@ -99,18 +102,13 @@ class PromptExporter {
         out .= '  "combos": [`n'
 
         for i, c in combos {
-            lines := c["prompt"]
             out .= "    {`n"
             out .= '      "combo": ' this._Q(c["combo"]) ",`n"
             out .= '      "display": ' this._Q(c["display"]) ",`n"
             out .= '      "action": ' this._Q(c["action"]) ",`n"
             out .= '      "policy": ' this._Q(c["policy"]) ",`n"
             out .= '      "duty": ' this._Q(c["duty"]) ",`n"
-            out .= '      "prompt": [`n'
-            for j, line in lines {
-                out .= "        " this._Q(line) ((j < lines.Length) ? "," : "") "`n"
-            }
-            out .= "      ]`n"
+            out .= '      "prompt": ' this._Q(c["prompt"]) "`n"
             out .= (i < combos.Length) ? "    },`n" : "    }`n"
         }
 
@@ -136,7 +134,7 @@ class PromptExporter {
             if !c.Has("prompt") {
                 throw Error("导出自检失败：" c["combo"] " 缺 prompt")
             }
-            if (c["prompt"].Length = 0) {
+            if (StrLen(c["prompt"]) = 0) {
                 throw Error("导出自检失败：" c["combo"] " 的 prompt 为空")
             }
         }

@@ -36,6 +36,10 @@ SetTimer(() => ExitApp(), -10000)   ; 自灭：万一下面卡住，10 秒后自
 
 最后那行还有个用处：`#Warn` 的告警弹窗会把进程**挂死**（02 主线那轮踩过），自灭定时器兜得住。
 
+> ⚠ **运行方式也是三件套的一部分：一律带 `/ErrorStdOut` 并重定向 stderr**（PowerShell 单斜杠；bash 因 MSYS 转换写 `//ErrorStdOut`，见 2.7）。头三件套只管**运行期**错误——`#Include` 找不到、`log` 这类撞名（2.2）都在**加载期**，`OnError` 一行都轮不到，默认就是一个模态框直接怼到人脸上。
+> 实测（13-导出那轮，两次）：漏 include 时带 `/ErrorStdOut` → 错误以文本进 stderr、无弹窗；不带 → 弹框并"把程序挂在那儿"。
+> 另一个坑：`//validate` 在 PowerShell 里**不是开关**——AHK 会把它当脚本路径，弹 `Script file not found. //validate`。PowerShell 写 `/validate`，bash 才写 `//validate`。
+
 > ⚠ **错误出口必须和验证结果写进同一个文件**（引子那次实测补的）。头三件套解决的是"别弹窗"，**不解决"失败时你看得见"**：验证逻辑若没有 `try/catch` 出口，脚本一抛错就**静默死掉**——输出文件不生成、stdout 为空、退出码仍是 0，外部看到的与"脚本没跑"完全一样。那次连着三次拿到空结果，全卡在这里。
 >
 > 做法：验证主体整体包 `try`，**成功与 `catch Error as e` 两条路都把结果写进同一个输出文件**（异常那条至少落 `e.Message` / `e.What` / `e.Extra`），再 `ExitApp(0)`。加完之后第一次运行就把真实原因暴露出来了。
