@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 
-; 一份"细则"：类别自己引用的参考资料，块正文里用 {{ref:id}} 指向它。
-; 与流程的参考文档同形（body.md ＋ meta.json），但只归本类别，不与流程共享。
+; 一份"细则"：这一条自己引用的参考资料，正文里用 {{ref:id}} 指向它。
+; 与流程的参考文档同形（body.md ＋ meta.json），但只归这一条，不与流程共享。
 
 class OffflowReference {
 

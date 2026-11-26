@@ -18,11 +18,11 @@ class OffflowRepository {
     }
 
     ; 只列带 meta.json 的目录——给界面用
-    static ListCategories() {
+    static ListPrompts() {
         out := []
         for dir in this._ListDirs() {
             if FileExist(dir "\meta.json") {
-                out.Push(OffflowCategory.FromDir(dir))
+                out.Push(OffflowPrompt.FromDir(dir))
             }
         }
         return out
@@ -39,7 +39,7 @@ class OffflowRepository {
         return FileExist(path) ? FileRead(path, "UTF-8") : ""
     }
 
-    ; 该类别引用的细则；目录不存在时返回空数组
+    ; 这一条引用的细则；目录不存在时返回空数组
     static ListReferences(key) {
         out := []
         refRoot := this.DataRoot "\" key "\references"
@@ -92,7 +92,7 @@ class OffflowRepository {
                 return ref.Path
             }
         }
-        throw Error("引用不存在：" id "（类别 " key "）")
+        throw Error("引用不存在：" id "（" key "）")
     }
 
     static _ListDirs() {

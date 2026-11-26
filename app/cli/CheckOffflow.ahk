@@ -6,8 +6,8 @@
 ;
 ; 用法：CheckOffflow.bat [outDir]
 ;   产物：<outDir>\offlow-check.txt
-;     通过 → 第一行 OK，第二行类别数
-;     失败 → 逐行「类别 / 文件 / 问题」
+;     通过 → 第一行 OK，第二行条数
+;     失败 → 逐行「条目 / 文件 / 问题」
 ;   成败只认产物文件，不看 stdout、不看退出码（项目既有经验）。
 ; 纪律：不弹窗、OnError 兜底、60 秒自灭。
 
@@ -25,7 +25,7 @@ global gOutDir := A_Temp
 global gPromptMarker := ".offlow-prompts"   ; 成品目录归属标记：没有它，一个文件都不删
 
 #Include %A_ScriptDir%\..\lib\JSON.ahk
-#Include %A_ScriptDir%\..\modules\offflow\definition\OffflowCategory.ahk
+#Include %A_ScriptDir%\..\modules\offflow\definition\OffflowPrompt.ahk
 #Include %A_ScriptDir%\..\modules\offflow\definition\OffflowReference.ahk
 #Include %A_ScriptDir%\..\modules\offflow\repository\OffflowRepository.ahk
 #Include %A_ScriptDir%\..\modules\offflow\validation\OffflowValidator.ahk
@@ -56,7 +56,7 @@ try {
 }
 
 ; ---- 落成品 + 一致性断言 ----
-; 每个类别落一份成品文件，内容就是 RenderBody 的返回值——一个字节不加，
+; 每条落一份成品文件，内容就是 RenderBody 的返回值——一个字节不加，
 ; 等价于"取用时复制到剪贴板的那段"。写完立刻读回比对，不等即报错。
 
 promptDir := gOutDir "\offlow-prompts"
@@ -97,7 +97,7 @@ if (refuse != "") {
 ; 报告只放结论与索引；提示词成品在 offlow-prompts\ 下，各占一个文件。
 
 text := (problems.Length = 0)
-    ? "OK`n类别数：" OffflowValidator.CountCategories() "`n"
+    ? "OK`n条数：" OffflowValidator.CountPrompts() "`n"
     : "失败 " problems.Length " 条`n"
 
 if (problems.Length > 0) {
@@ -107,7 +107,7 @@ if (problems.Length > 0) {
 }
 
 text .= "`n成品：" promptDir "`n"
-text .= "类别：" JoinKeys(keys) "`n"
+text .= "条目：" JoinKeys(keys) "`n"
 WriteText(target, text)
 ExitApp(problems.Length = 0 ? 0 : 2)
 

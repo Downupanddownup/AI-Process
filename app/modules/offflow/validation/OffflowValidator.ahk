@@ -5,7 +5,7 @@
 
 class OffflowValidator {
 
-    ; 判一个类别；key 为目录名
+    ; 判一条；key 为目录名
     static Check(key) {
         problems := []
         catDir := OffflowRepository.DataRoot "\" key
@@ -15,12 +15,19 @@ class OffflowValidator {
         if !FileExist(metaPath) {
             problems.Push(key " / meta.json / 不存在")
         } else {
-            cat := OffflowCategory.FromDir(catDir)
+            cat := OffflowPrompt.FromDir(catDir)
             if (cat.Name = "") {
                 problems.Push(key " / meta.json / 缺 name")
             }
             if (cat.Purpose = "") {
                 problems.Push(key " / meta.json / 缺 purpose")
+            }
+            if (cat.HasCategory) {
+                if (Trim(cat.Category) = "") {
+                    problems.Push(key " / meta.json / category 为空")
+                } else if (StrLen(cat.Category) > 12) {
+                    problems.Push(key " / meta.json / category 超过 12 字（" StrLen(cat.Category) "）")
+                }
             }
             if (cat.HasHidden && cat.HiddenRaw != "1" && cat.HiddenRaw != "0"
                 && cat.HiddenRaw != "true" && cat.HiddenRaw != "false") {
@@ -68,7 +75,7 @@ class OffflowValidator {
         return problems
     }
 
-    ; 判全部类别（含缺 meta.json 的目录）
+    ; 判全部（含缺 meta.json 的目录）
     static CheckAll() {
         problems := []
         for dir in OffflowRepository.ListAllDirs() {
@@ -80,8 +87,8 @@ class OffflowValidator {
         return problems
     }
 
-    ; 类别数（报告用）
-    static CountCategories() {
+    ; 条数（报告用）
+    static CountPrompts() {
         return OffflowRepository.ListAllDirs().Length
     }
 }
