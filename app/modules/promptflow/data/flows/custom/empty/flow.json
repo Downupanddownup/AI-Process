@@ -4,6 +4,18 @@
   "shortName": "基础",
   "readonly": false,
   "recipes": {
+    "复需求|single": {
+      "content": ["complexity", "question_rules"]
+    },
+    "复回复|direct": {
+      "content": ["no_modify"]
+    },
+    "复回复|impl": {
+      "content": ["no_modify"]
+    },
+    "复执行|tweak": {
+      "content": ["format_doc"]
+    },
     "复执行|steps_dir": {
       "content": ["steps_rules", "format_steps"]
     }
