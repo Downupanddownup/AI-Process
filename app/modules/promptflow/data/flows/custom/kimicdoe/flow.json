@@ -11,10 +11,10 @@
       "content": ["no_modify"]
     },
     "复回复|impl": {
-      "content": ["impl_four_sections", "impl_principles", "no_modify"]
+      "content": ["impl_four_sections", "impl_principles", "naming_guard", "no_modify"]
     },
     "质检码|single": {
-      "content": ["quality_check_body", "no_modify"]
+      "content": ["quality_check_body", "naming_guard", "no_modify"]
     },
     "复盘|defense": {
       "content": ["defense_body", "no_modify"]
