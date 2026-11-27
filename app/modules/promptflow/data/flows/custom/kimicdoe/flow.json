@@ -1,0 +1,35 @@
+{
+  "key": "kimicdoe",
+  "name": "基于kimi的代码流程",
+  "shortName": "KM",
+  "readonly": false,
+  "recipes": {
+    "复需求|single": {
+      "content": ["complexity", "no_modify", "question_rules"]
+    },
+    "复回复|direct": {
+      "content": ["no_modify"]
+    },
+    "复回复|impl": {
+      "content": ["impl_four_sections", "impl_principles", "no_modify"]
+    },
+    "质检码|single": {
+      "content": ["quality_check_body", "no_modify"]
+    },
+    "复盘|defense": {
+      "content": ["defense_body", "no_modify"]
+    },
+    "复盘|tech": {
+      "content": ["review_tech_body", "no_modify"]
+    },
+    "复执行|tweak": {
+      "content": ["format_doc"]
+    },
+    "复执行|steps_dir": {
+      "content": ["steps_rules", "format_steps"]
+    },
+    "复关系|auto": {
+      "content": ["no_modify"]
+    }
+  }
+}
