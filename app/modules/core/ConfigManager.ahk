@@ -90,6 +90,12 @@ EnsureDefaultFiles() {
     if (IniRead(SettingsFile, "Hotkey", "EnableWindow3", "") = "") {
         IniWrite("0", SettingsFile, "Hotkey", "EnableWindow3")
     }
+    if (IniRead(SettingsFile, "Hotkey", "OffflowPanelHotkey", "") = "") {
+        IniWrite("F5", SettingsFile, "Hotkey", "OffflowPanelHotkey")
+    }
+    if (IniRead(SettingsFile, "Hotkey", "EnableOffflowPanelHotkey", "") = "") {
+        IniWrite("1", SettingsFile, "Hotkey", "EnableOffflowPanelHotkey")
+    }
 
     ; [Window1] 段
     if (IniRead(SettingsFile, "Window1", "CurrentDir", "") = "") {
@@ -222,6 +228,8 @@ LoadHotkeyConfig() {
     AppConfig["Window3Hotkey"] := IniRead(SettingsFile, "Hotkey", "Window3Hotkey", "F4")
     AppConfig["EnableWindow2"] := IniRead(SettingsFile, "Hotkey", "EnableWindow2", "0") = "1"
     AppConfig["EnableWindow3"] := IniRead(SettingsFile, "Hotkey", "EnableWindow3", "0") = "1"
+    AppConfig["OffflowPanelHotkey"] := IniRead(SettingsFile, "Hotkey", "OffflowPanelHotkey", "F5")
+    AppConfig["EnableOffflowPanelHotkey"] := IniRead(SettingsFile, "Hotkey", "EnableOffflowPanelHotkey", "1") = "1"
 }
 
 ; 加载各窗口会话数据
@@ -293,6 +301,11 @@ SaveEnableWindow2(enabled) {
 SaveEnableWindow3(enabled) {
     global SettingsFile
     SafeIniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableWindow3")
+}
+
+SaveEnableOffflowPanelHotkey(enabled) {
+    global SettingsFile
+    SafeIniWrite(enabled ? "1" : "0", SettingsFile, "Hotkey", "EnableOffflowPanelHotkey")
 }
 
 ; 确保 INI 文件使用 UTF-16 LE 带 BOM 格式，避免中文乱码

@@ -37,10 +37,10 @@ ShowConfigDialog(*) {
     ; 分隔线
     ConfigDialog.AddText("xm y+12 w240 h2 +0x7")
 
-    ; 窗口列表区域（底部，修改后需重启）
-    ConfigDialog.AddText("xm y+6 w240 h18", "窗口列表")
+    ; 窗口与面板热键区域（底部，修改后需重启）
+    ConfigDialog.AddText("xm y+6 w240 h18", "窗口与面板")
 
-    ConfigDialogListView := ConfigDialog.AddListView("xm y+6 w240 h110 Checked", ["窗口", "热键"])
+    ConfigDialogListView := ConfigDialog.AddListView("xm y+6 w240 h140 Checked", ["对象", "热键"])
     ConfigDialogListView.Add("Check", "1 号窗", AppConfig["Window1Hotkey"])
     if (AppConfig["EnableWindow2"]) {
         ConfigDialogListView.Add("Check", "2 号窗", AppConfig["Window2Hotkey"])
@@ -52,6 +52,13 @@ ShowConfigDialog(*) {
     } else {
         ConfigDialogListView.Add("", "3 号窗", AppConfig["Window3Hotkey"])
     }
+    if (AppConfig["EnableOffflowPanelHotkey"]) {
+        ConfigDialogListView.Add("Check", "流程外提示词面板快捷键", AppConfig["OffflowPanelHotkey"])
+    } else {
+        ConfigDialogListView.Add("", "流程外提示词面板快捷键", AppConfig["OffflowPanelHotkey"])
+    }
+    ConfigDialogListView.ModifyCol(1, 175)
+    ConfigDialogListView.ModifyCol(2, 45)
     ConfigDialogListView.OnEvent("ItemCheck", OnConfigDialogItemCheck)
 
     ConfigDialog.AddText("xm y+10 w240 h18 cGray", "修改后需退出重启")
@@ -81,6 +88,10 @@ OnConfigDialogItemCheck(ctrl, itemIndex, checked) {
     if (itemIndex = 3) {
         AppConfig["EnableWindow3"] := checked
         SaveEnableWindow3(checked)
+    }
+    if (itemIndex = 4) {
+        AppConfig["EnableOffflowPanelHotkey"] := checked
+        SaveEnableOffflowPanelHotkey(checked)
     }
 }
 

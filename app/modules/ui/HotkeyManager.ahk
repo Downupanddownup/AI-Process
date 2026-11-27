@@ -37,6 +37,28 @@ RegisterGlobalHotkey() {
             }
         }
     }
+
+    RegisterOffflowPanelHotkey()
+}
+
+RegisterOffflowPanelHotkey() {
+    global AppConfig, MainGui
+
+    if !AppConfig["EnableOffflowPanelHotkey"] {
+        return
+    }
+    if (AppConfig["OffflowPanelHotkey"] = AppConfig["Window1Hotkey"]
+        || AppConfig["OffflowPanelHotkey"] = AppConfig["Window2Hotkey"]
+        || AppConfig["OffflowPanelHotkey"] = AppConfig["Window3Hotkey"]) {
+        return
+    }
+
+    try {
+        Hotkey(AppConfig["OffflowPanelHotkey"], ToggleOffflowPanel)
+    } catch Error as err {
+        ownerHwnd := MainGui ? MainGui.Hwnd : 0
+        MsgBox("流程外提示词面板热键注册失败：" AppConfig["OffflowPanelHotkey"] "`n" err.Message, "AIProcess", "Iconx Owner" ownerHwnd)
+    }
 }
 
 ToggleWindow1(*) {

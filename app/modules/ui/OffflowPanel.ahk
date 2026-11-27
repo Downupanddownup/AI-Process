@@ -33,6 +33,16 @@ ShowOffflowPanel(*) {
     CreateOffflowPanel()
 }
 
+ToggleOffflowPanel(*) {
+    global OffflowGui
+
+    if GuiAlive(OffflowGui) {
+        CloseOffflowPanel()
+    } else {
+        ShowOffflowPanel()
+    }
+}
+
 CreateOffflowPanel() {
     global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText
     global OffflowReferenceLabel, OffflowReferenceList, OffflowPreviewY, OffflowPreviewMaxHeight, OffflowContentWidth
