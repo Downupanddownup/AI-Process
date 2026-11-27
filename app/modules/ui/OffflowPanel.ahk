@@ -39,13 +39,13 @@ CreateOffflowPanel() {
     x := area["x"] + area["w"] - physicalWidth
     y := area["y"]
 
-    listWidth := 180
-    previewX := 12 + listWidth + 10
-    previewWidth := width - previewX - 12
+    contentWidth := width - 24
     contentY := 46
+    listHeight := 100
+    previewY := contentY + listHeight + 10
     bottomHeight := 46
-    contentHeight := height - contentY - bottomHeight
-    bottomY := contentY + contentHeight + 10
+    previewHeight := height - previewY - bottomHeight
+    bottomY := previewY + previewHeight + 10
 
     OffflowGui.BackColor := GetDialogBackColor()
     OffflowGui.MarginX := 12
@@ -54,15 +54,15 @@ CreateOffflowPanel() {
     OffflowGui.OnEvent("Close", CloseOffflowPanel)
     OffflowGui.OnEvent("Escape", CloseOffflowPanel)
 
-    OffflowGui.AddText("x12 y12 w" width - 24 " h24", "流程外提示词")
-    OffflowList := OffflowGui.AddListView("x12 y" contentY " w" listWidth " h" contentHeight " -Multi", ["名称"])
-    OffflowList.ModifyCol(1, listWidth - 24)
+    OffflowGui.AddText("x12 y12 w" contentWidth " h24", "流程外提示词")
+    OffflowList := OffflowGui.AddListView("x12 y" contentY " w" contentWidth " h" listHeight " -Multi", ["名称"])
+    OffflowList.ModifyCol(1, contentWidth - 24)
     ApplyDialogListStyle(OffflowList)
     DisableListHeaderSort(OffflowList)
     OffflowList.OnEvent("ItemSelect", OnOffflowPromptSelect)
     OffflowList.OnEvent("DoubleClick", OnOffflowPromptDoubleClick)
 
-    OffflowPreview := OffflowGui.AddEdit("x" previewX " y" contentY " w" previewWidth " h" contentHeight " +ReadOnly +VScroll", "")
+    OffflowPreview := OffflowGui.AddEdit("x12 y" previewY " w" contentWidth " h" previewHeight " +ReadOnly +VScroll", "")
 
     OffflowCopyButton := OffflowGui.AddButton("x12 y" bottomY " w88 h28", "复制")
     OffflowCopyButton.OnEvent("Click", CopyOffflowPrompt)
