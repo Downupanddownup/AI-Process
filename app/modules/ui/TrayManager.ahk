@@ -5,6 +5,7 @@
 CreateTray() {
     A_TrayMenu.Delete()
     A_TrayMenu.Add("显示", ShowMainWindow)
+    A_TrayMenu.Add("流程外提示词", ShowOffflowPanel)
     A_TrayMenu.Add("经验总结", ShowSummaryWindow)
     A_TrayMenu.Add("需求成本", ShowCostWindow)
     A_TrayMenu.Add("仓库管理", (*) => ShowRepoWindow())
