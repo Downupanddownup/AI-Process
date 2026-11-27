@@ -34,6 +34,9 @@ class Skeleton {
             ; 两档 brief 由运行规模二选一，不是用户可选
             Map("key", "auto", "label", "", "brief", "context_relation_full.txt",
                 "briefAlt", "context_relation_skeleton.txt", "feedback", "文件关系说明已复制")
+        ],
+        "沉淀", [
+            Map("key", "single", "label", "", "brief", "settle_prefab.txt", "feedback", "沉淀提示词已复制")
         ]
     )
 
@@ -100,6 +103,12 @@ class Skeleton {
             Map("kind", "block", "id", "manifest_block"),
             Map("kind", "slot",  "id", "content"),
             Map("kind", "block", "id", "end_notify")
+        ],
+        "沉淀|single", [
+            Map("kind", "block", "id", "brief"),
+            Map("kind", "slot",  "id", "content"),
+            Map("kind", "block", "id", "question_format"),
+            Map("kind", "block", "id", "end_open_generated")
         ]
     )
 
@@ -226,7 +235,7 @@ class Skeleton {
     }
 
     ; 组合键的展示顺序（流程维护窗口中列）：按使用动线定稿——
-    ; 主链 需求→回复→执行，辅助 关系→复盘→质检 收尾
+    ; 主链 需求→回复→执行，辅助 关系→复盘→质检→沉淀 收尾
     ; 必须显式给出：Map 枚举是键序不是书写顺序，新增组合不登记就掉出列表
     static ComboDisplayOrder := [
         "复需求|single",
@@ -234,7 +243,7 @@ class Skeleton {
         "复执行|steps_dir", "复执行|tweak",
         "复关系|auto",
         "复盘|defense", "复盘|tech",
-        "质检码|single"
+        "质检码|single", "沉淀|single"
     ]
 
     ; 展示顺序的组合键：定稿顺序在前，漏登记的（新增组合）按 GetAllComboKeys 顺序垫后

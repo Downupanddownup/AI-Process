@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 
-; 领域行为入口门面：七个业务行为的统一声明点（UI 的行为调用走这里；策略下拉框等 UI 细节仍直连各自服务）
+; 领域行为入口门面：业务行为的统一声明点（UI 的行为调用走这里；策略下拉框等 UI 细节仍直连各自服务）
 ; 注意：AHK v2 函数/方法内为 assume-local，引用行为类（全局变量）必须显式 global 声明
 
 class AgentActions {
@@ -47,9 +47,17 @@ class AgentActions {
         return (QualityCheck()).Run()
     }
 
-    ; 复盘（ai）：答辩 / 技炼 两模式，共用一套实现
+    ; 复盘（ai）：答辩 / 技炼 两模式，共用一套实现；沉淀入口复用下拉，动作独立
     static Review(*) {
-        global Review
+        global Review, SettleOffflowPrompt
+        if (ReviewModeRegistry.GetSelected() = "settle") {
+            return (SettleOffflowPrompt()).Run()
+        }
         return (Review()).Run()
+    }
+
+    static SettleOffflowPrompt(*) {
+        global SettleOffflowPrompt
+        return (SettleOffflowPrompt()).Run()
     }
 }

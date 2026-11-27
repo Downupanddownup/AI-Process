@@ -64,6 +64,12 @@ class PromptParamRule {
             return chain.LatestReplyPath()
         }
 
+        ; 沉淀：用户最新补充意图（最新回复 → 需求）
+        if (action.Key = "沉淀") {
+            src := chain.LatestReplyPath()
+            return src != "" && FileExist(src) ? src : chain.RequirementPath()
+        }
+
         ; 复执行 步目：三档依据（实施文档 → 最新回复 → 最新版本文档）
         if (action.Key = "复执行") {
             src := chain.StepsSource()

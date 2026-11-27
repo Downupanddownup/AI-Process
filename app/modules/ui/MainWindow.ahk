@@ -106,7 +106,7 @@ CreateMainGui() {
     ApplyButtonStyle(DomainTreeButton)
     rowY += actionButtonHeight + actionGap
 
-    ; R3 检查行：质检码 + 复盘 + 复盘模式下拉（复盘与「复执行」同列，模式下拉与「改吧」同列）
+    ; R3 检查行：质检码 + 复盘 + 复盘／沉淀入口下拉（复盘与「复执行」同列，模式下拉与「改吧」同列）
     QualityCheckButton := MainGui.AddButton("xm y" rowY " w" actionButtonWidth " h" actionButtonHeight, "质检码")
     QualityCheckButton.OnEvent("Click", AgentActions.QualityCheck)
     ApplyButtonStyle(QualityCheckButton)

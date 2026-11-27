@@ -1,6 +1,6 @@
 #Requires AutoHotkey v2.0
 
-; 导出件：一套流程 → 一份成品 JSON（九个组合，每条 = 动作身份 + 职责 + 整份提示词）
+; 导出件：一套流程 → 一份成品 JSON（每个组合 = 动作身份 + 职责 + 整份提示词）
 ;
 ; 位置在 promptflow 层：只依赖组装引擎、流程库、序列化件；不知道 AppRoot、窗口、.aiprocess。
 ; 单一实现：UI 与 CLI 都只调这里，谁都不许自己拼文本、自己转义——要改成品，只改这个文件。
@@ -22,7 +22,8 @@ class PromptExporter {
         "复关系|auto",      "新会话上下文重建：按目录约定重读文件，恢复现场。",
         "复盘|defense",     "出题考你能不能凭脑复述；作答时不翻文档。",
         "复盘|tech",        "出题提炼技术点，练到能复述原理。",
-        "质检码|single",    "对某一版方案做专项自检，只出清单，不改正文。"
+        "质检码|single",    "对某一版方案做专项自检，只出清单，不改正文。",
+        "沉淀|single",      "提取可泛化的合作约定，经用户筛选后形成 offlow 资产草案。"
     )
 
     ; 演示主题：预览与导出共用的替换环境。
@@ -116,7 +117,7 @@ class PromptExporter {
         return out
     }
 
-    ; 写后自检：能解析、九个组合、每条有 prompt
+    ; 写后自检：能解析、组合数与骨架一致、每条有 prompt
     static _Verify(back) {
         try {
             doc := JSON.Load(back)
@@ -127,8 +128,9 @@ class PromptExporter {
             throw Error("导出自检失败：缺 combos")
         }
         combos := doc["combos"]
-        if (combos.Length != 9) {
-            throw Error("导出自检失败：组合数为 " combos.Length "，应为 9")
+        expectedCount := Skeleton.GetOrderedComboKeys().Length
+        if (combos.Length != expectedCount) {
+            throw Error("导出自检失败：组合数为 " combos.Length "，应为 " expectedCount)
         }
         for c in combos {
             if !c.Has("prompt") {

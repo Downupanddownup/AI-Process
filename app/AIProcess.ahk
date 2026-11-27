@@ -90,6 +90,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\business\behaviors\actions\CopyRelations.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\QualityCheck.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\actions\Review.ahk
+#Include %A_ScriptDir%\modules\business\behaviors\actions\SettleOffflowPrompt.ahk
 #Include %A_ScriptDir%\modules\business\behaviors\AgentActions.ahk
 #Include %A_ScriptDir%\modules\business\summary\HistoricalThemeImporter.ahk
 #Include %A_ScriptDir%\modules\business\summary\ThemePathUtils.ahk

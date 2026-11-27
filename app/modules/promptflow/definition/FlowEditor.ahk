@@ -11,12 +11,12 @@
 
 class FlowEditor {
 
-    ; 写盘时的组合顺序：与 配置规范.md §2.2 列出的九个组合顺序一致。
+    ; 写盘时的组合顺序：与骨架动作的职责顺序一致。
     ; 不取 Map 的遍历顺序——AHK 的 Map 不保证插入序，取到的会是另一种顺序，
     ; 那样每次写盘都会把 recipes 重排一遍。
     static ComboOrder := [
         "复需求|single", "复回复|direct", "复回复|impl", "质检码|single",
-        "复盘|defense", "复盘|tech", "复执行|tweak", "复执行|steps_dir", "复关系|auto"
+        "复盘|defense", "复盘|tech", "复执行|tweak", "复执行|steps_dir", "复关系|auto", "沉淀|single"
     ]
 
     ; ---- 写操作 ----
