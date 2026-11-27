@@ -4,6 +4,14 @@ global OffflowGui := ""
 global OffflowList := ""
 global OffflowPreview := ""
 global OffflowPurposeText := ""
+global OffflowReferenceLabel := ""
+global OffflowReferenceList := ""
+global OffflowReferencePaths := []
+global OffflowReferenceHasBody := []
+global OffflowReferencesVisible := false
+global OffflowPreviewY := 0
+global OffflowPreviewMaxHeight := 0
+global OffflowContentWidth := 0
 global OffflowCopyButton := ""
 global OffflowStatus := ""
 global OffflowPromptKeys := []
@@ -26,7 +34,9 @@ ShowOffflowPanel(*) {
 }
 
 CreateOffflowPanel() {
-    global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
+    global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText
+    global OffflowReferenceLabel, OffflowReferenceList, OffflowPreviewY, OffflowPreviewMaxHeight, OffflowContentWidth
+    global OffflowCopyButton, OffflowStatus
 
     area := GetOffflowWorkArea()
     OffflowGui := Gui("+AlwaysOnTop +ToolWindow -Caption", "流程外提示词")
@@ -72,6 +82,17 @@ CreateOffflowPanel() {
     OffflowGui.AddText("x12 y" purposeLabelY " w" contentWidth " h20 cGray", "用途（不随正文复制）")
     OffflowPurposeText := OffflowGui.AddEdit("x12 y" purposeY " w" contentWidth " h" purposeHeight " +ReadOnly +VScroll", "")
     OffflowPreview := OffflowGui.AddEdit("x12 y" previewY " w" contentWidth " h" previewHeight " +ReadOnly +VScroll", "")
+    OffflowPreviewY := previewY
+    OffflowPreviewMaxHeight := previewHeight
+    OffflowContentWidth := contentWidth
+
+    OffflowReferenceLabel := OffflowGui.AddText("x12 y" bottomY " w" contentWidth " h20 cGray", "参考文档（双击打开）")
+    OffflowReferenceList := OffflowGui.AddListView("x12 y" bottomY + 24 " w" contentWidth " h70 -Multi", ["名称", "用途"])
+    OffflowReferenceList.ModifyCol(1, 140)
+    OffflowReferenceList.ModifyCol(2, contentWidth - 164)
+    ApplyDialogListStyle(OffflowReferenceList)
+    DisableListHeaderSort(OffflowReferenceList)
+    OffflowReferenceList.OnEvent("DoubleClick", OnOffflowReferenceDoubleClick)
 
     OffflowCopyButton := OffflowGui.AddButton("x12 y" bottomY " w88 h28", "复制")
     OffflowCopyButton.OnEvent("Click", CopyOffflowPrompt)
@@ -80,6 +101,7 @@ CreateOffflowPanel() {
     OffflowStatus := OffflowGui.AddText("x112 y" bottomY + 5 " w" width - 224 " h20 cGray", "")
 
     OffflowGui.Show("x" x " y" y " w" width " h" height)
+    ClearOffflowReferences()
     RefreshOffflowPanel()
 }
 
@@ -141,6 +163,7 @@ UpdateOffflowPreview() {
     OffflowCurrentKey := OffflowPromptKeys[row]
     OffflowCurrentName := OffflowPromptNames[row]
     OffflowPurposeText.Value := ""
+    ClearOffflowReferences()
     OffflowRenderedBody := ""
     OffflowCopyButton.Enabled := false
     OffflowStatus.Text := ""
@@ -151,6 +174,7 @@ UpdateOffflowPreview() {
         OffflowPreview.Value := OffflowRenderedBody
         SendMessage(0x00B1, 0, 0, OffflowPurposeText.Hwnd)
         SendMessage(0x00B1, 0, 0, OffflowPreview.Hwnd)
+        RefreshOffflowReferences(OffflowCurrentKey)
         OffflowCopyButton.Enabled := true
     } catch as e {
         OffflowCurrentKey := ""
@@ -188,14 +212,99 @@ ClearOffflowSelection(message := "") {
     OffflowCurrentKey := ""
     OffflowCurrentName := ""
     OffflowRenderedBody := ""
+    ClearOffflowReferences()
     OffflowPurposeText.Value := ""
     OffflowPreview.Value := message
     OffflowStatus.Text := message
     OffflowCopyButton.Enabled := false
 }
 
+RefreshOffflowReferences(key) {
+    global OffflowReferenceList, OffflowReferencePaths, OffflowReferenceHasBody, OffflowReferencesVisible
+    global OffflowStatus
+
+    ClearOffflowReferences()
+    try {
+        for ref in OffflowRepository.ListReferences(key) {
+            OffflowReferencePaths.Push(ref.Path)
+            OffflowReferenceHasBody.Push(ref.HasBody && FileExist(ref.Path))
+            OffflowReferenceList.Add(, ref.Name != "" ? ref.Name : ref.Id, ref.Purpose)
+        }
+    } catch as e {
+        ClearOffflowReferences()
+        OffflowStatus.Text := "参考读取失败：" e.Message
+        return
+    }
+
+    OffflowReferencesVisible := OffflowReferencePaths.Length > 0
+    UpdateOffflowPanelLayout()
+}
+
+ClearOffflowReferences() {
+    global OffflowReferenceList, OffflowReferencePaths, OffflowReferenceHasBody, OffflowReferencesVisible
+
+    OffflowReferencePaths := []
+    OffflowReferenceHasBody := []
+    OffflowReferencesVisible := false
+    if OffflowReferenceList {
+        OffflowReferenceList.Delete()
+    }
+    UpdateOffflowPanelLayout()
+}
+
+UpdateOffflowPanelLayout() {
+    global OffflowGui, OffflowPreview, OffflowReferenceLabel, OffflowReferenceList
+    global OffflowReferencesVisible, OffflowPreviewY, OffflowPreviewMaxHeight, OffflowContentWidth
+
+    if !GuiAlive(OffflowGui) || !OffflowPreview {
+        return
+    }
+
+    if OffflowReferencesVisible {
+        previewHeight := OffflowPreviewMaxHeight - 106
+        labelY := OffflowPreviewY + previewHeight + 10
+        listY := labelY + 24
+        OffflowPreview.Move(12, OffflowPreviewY, OffflowContentWidth, previewHeight)
+        OffflowReferenceLabel.Move(12, labelY, OffflowContentWidth, 20)
+        OffflowReferenceList.Move(12, listY, OffflowContentWidth, 70)
+        OffflowReferenceLabel.Visible := true
+        OffflowReferenceList.Visible := true
+    } else {
+        OffflowPreview.Move(12, OffflowPreviewY, OffflowContentWidth, OffflowPreviewMaxHeight)
+        OffflowReferenceLabel.Visible := false
+        OffflowReferenceList.Visible := false
+    }
+}
+
+OnOffflowReferenceDoubleClick(ctrl, row, *) {
+    OpenOffflowReference(row)
+}
+
+OpenOffflowReference(row) {
+    global OffflowReferencePaths, OffflowReferenceHasBody, OffflowStatus
+
+    if row <= 0 || row > OffflowReferencePaths.Length {
+        return
+    }
+
+    path := OffflowReferencePaths[row]
+    if !OffflowReferenceHasBody[row] || !FileExist(path) {
+        OffflowStatus.Text := "参考正文缺失：" path
+        return
+    }
+
+    try {
+        EditorOpener.Open(path)
+    } catch as e {
+        OffflowStatus.Text := "参考打开失败：" e.Message
+    }
+}
+
 CloseOffflowPanel(*) {
-    global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
+    global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText
+    global OffflowReferenceLabel, OffflowReferenceList, OffflowReferencePaths, OffflowReferenceHasBody
+    global OffflowReferencesVisible, OffflowPreviewY, OffflowPreviewMaxHeight, OffflowContentWidth
+    global OffflowCopyButton, OffflowStatus
     global OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
     global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
@@ -206,6 +315,14 @@ CloseOffflowPanel(*) {
     OffflowList := ""
     OffflowPreview := ""
     OffflowPurposeText := ""
+    OffflowReferenceLabel := ""
+    OffflowReferenceList := ""
+    OffflowReferencePaths := []
+    OffflowReferenceHasBody := []
+    OffflowReferencesVisible := false
+    OffflowPreviewY := 0
+    OffflowPreviewMaxHeight := 0
+    OffflowContentWidth := 0
     OffflowCopyButton := ""
     OffflowStatus := ""
     OffflowPromptKeys := []
