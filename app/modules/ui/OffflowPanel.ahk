@@ -3,10 +3,12 @@
 global OffflowGui := ""
 global OffflowList := ""
 global OffflowPreview := ""
+global OffflowPurposeText := ""
 global OffflowCopyButton := ""
 global OffflowStatus := ""
 global OffflowPromptKeys := []
 global OffflowPromptNames := []
+global OffflowPromptPurposes := []
 global OffflowCurrentKey := ""
 global OffflowCurrentName := ""
 global OffflowRenderedBody := ""
@@ -24,7 +26,7 @@ ShowOffflowPanel(*) {
 }
 
 CreateOffflowPanel() {
-    global OffflowGui, OffflowList, OffflowPreview, OffflowCopyButton, OffflowStatus
+    global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
 
     area := GetOffflowWorkArea()
     OffflowGui := Gui("+AlwaysOnTop +ToolWindow -Caption", "流程外提示词")
@@ -41,8 +43,11 @@ CreateOffflowPanel() {
 
     contentWidth := width - 24
     contentY := 46
-    listHeight := 100
-    previewY := contentY + listHeight + 10
+    listHeight := 140
+    purposeLabelY := contentY + listHeight + 8
+    purposeY := purposeLabelY + 22
+    purposeHeight := 54
+    previewY := purposeY + purposeHeight + 10
     bottomHeight := 46
     previewHeight := height - previewY - bottomHeight
     bottomY := previewY + previewHeight + 10
@@ -55,13 +60,17 @@ CreateOffflowPanel() {
     OffflowGui.OnEvent("Escape", CloseOffflowPanel)
 
     OffflowGui.AddText("x12 y12 w" contentWidth " h24", "流程外提示词")
-    OffflowList := OffflowGui.AddListView("x12 y" contentY " w" contentWidth " h" listHeight " -Multi", ["名称"])
-    OffflowList.ModifyCol(1, contentWidth - 24)
+    OffflowList := OffflowGui.AddListView("x12 y" contentY " w" contentWidth " h" listHeight " -Multi", ["名称", "类别"])
+    categoryWidth := 100
+    OffflowList.ModifyCol(1, contentWidth - categoryWidth - 24)
+    OffflowList.ModifyCol(2, categoryWidth)
     ApplyDialogListStyle(OffflowList)
     DisableListHeaderSort(OffflowList)
     OffflowList.OnEvent("ItemSelect", OnOffflowPromptSelect)
     OffflowList.OnEvent("DoubleClick", OnOffflowPromptDoubleClick)
 
+    OffflowGui.AddText("x12 y" purposeLabelY " w" contentWidth " h20 cGray", "用途（不随正文复制）")
+    OffflowPurposeText := OffflowGui.AddEdit("x12 y" purposeY " w" contentWidth " h" purposeHeight " +ReadOnly +VScroll", "")
     OffflowPreview := OffflowGui.AddEdit("x12 y" previewY " w" contentWidth " h" previewHeight " +ReadOnly +VScroll", "")
 
     OffflowCopyButton := OffflowGui.AddButton("x12 y" bottomY " w88 h28", "复制")
@@ -75,7 +84,7 @@ CreateOffflowPanel() {
 }
 
 RefreshOffflowPanel() {
-    global OffflowGui, OffflowList, OffflowPromptKeys, OffflowPromptNames
+    global OffflowGui, OffflowList, OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
 
     if !GuiAlive(OffflowGui) {
         return
@@ -84,6 +93,7 @@ RefreshOffflowPanel() {
     OffflowList.Delete()
     OffflowPromptKeys := []
     OffflowPromptNames := []
+    OffflowPromptPurposes := []
 
     try {
         for prompt in OffflowRepository.ListPrompts() {
@@ -92,7 +102,8 @@ RefreshOffflowPanel() {
             }
             OffflowPromptKeys.Push(prompt.Key)
             OffflowPromptNames.Push(prompt.Name != "" ? prompt.Name : prompt.Key)
-            OffflowList.Add(, OffflowPromptNames[OffflowPromptNames.Length])
+            OffflowPromptPurposes.Push(prompt.Purpose)
+            OffflowList.Add(, OffflowPromptNames[OffflowPromptNames.Length], prompt.Category)
         }
     } catch as e {
         ClearOffflowSelection("读取失败：" e.Message)
@@ -117,8 +128,9 @@ OnOffflowPromptSelect(ctrl, item, selected) {
 }
 
 UpdateOffflowPreview() {
-    global OffflowList, OffflowPreview, OffflowCopyButton, OffflowStatus
-    global OffflowPromptKeys, OffflowPromptNames, OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
+    global OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
+    global OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
+    global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
     row := OffflowList.GetNext(0)
     if row = 0 || row > OffflowPromptKeys.Length {
@@ -128,13 +140,16 @@ UpdateOffflowPreview() {
 
     OffflowCurrentKey := OffflowPromptKeys[row]
     OffflowCurrentName := OffflowPromptNames[row]
+    OffflowPurposeText.Value := ""
     OffflowRenderedBody := ""
     OffflowCopyButton.Enabled := false
     OffflowStatus.Text := ""
 
     try {
         OffflowRenderedBody := OffflowRepository.RenderBody(OffflowCurrentKey)
+        OffflowPurposeText.Value := OffflowPromptPurposes[row]
         OffflowPreview.Value := OffflowRenderedBody
+        SendMessage(0x00B1, 0, 0, OffflowPurposeText.Hwnd)
         SendMessage(0x00B1, 0, 0, OffflowPreview.Hwnd)
         OffflowCopyButton.Enabled := true
     } catch as e {
@@ -167,20 +182,22 @@ CopyOffflowPrompt(*) {
 }
 
 ClearOffflowSelection(message := "") {
-    global OffflowPreview, OffflowCopyButton, OffflowStatus
+    global OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
     global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
     OffflowCurrentKey := ""
     OffflowCurrentName := ""
     OffflowRenderedBody := ""
+    OffflowPurposeText.Value := ""
     OffflowPreview.Value := message
     OffflowStatus.Text := message
     OffflowCopyButton.Enabled := false
 }
 
 CloseOffflowPanel(*) {
-    global OffflowGui, OffflowList, OffflowPreview, OffflowCopyButton, OffflowStatus
-    global OffflowPromptKeys, OffflowPromptNames, OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
+    global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
+    global OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
+    global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
     if GuiAlive(OffflowGui) {
         try OffflowGui.Destroy()
@@ -188,10 +205,12 @@ CloseOffflowPanel(*) {
     OffflowGui := ""
     OffflowList := ""
     OffflowPreview := ""
+    OffflowPurposeText := ""
     OffflowCopyButton := ""
     OffflowStatus := ""
     OffflowPromptKeys := []
     OffflowPromptNames := []
+    OffflowPromptPurposes := []
     OffflowCurrentKey := ""
     OffflowCurrentName := ""
     OffflowRenderedBody := ""
