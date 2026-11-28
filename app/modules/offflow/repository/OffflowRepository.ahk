@@ -33,16 +33,24 @@ class OffflowRepository {
         return this._ListDirs()
     }
 
+    static BodyPath(key) {
+        return this.DataRoot "\" key "\body.txt"
+    }
+
+    static ReferencesPath(key) {
+        return this.DataRoot "\" key "\references"
+    }
+
     ; 正文全文；不存在返回空串
     static ReadBody(key) {
-        path := this.DataRoot "\" key "\body.txt"
+        path := this.BodyPath(key)
         return FileExist(path) ? FileRead(path, "UTF-8") : ""
     }
 
     ; 这一条引用的细则；目录不存在时返回空数组
     static ListReferences(key) {
         out := []
-        refRoot := this.DataRoot "\" key "\references"
+        refRoot := this.ReferencesPath(key)
         if !DirExist(refRoot) {
             return out
         }

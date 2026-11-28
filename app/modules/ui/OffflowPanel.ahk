@@ -12,7 +12,8 @@ global OffflowReferencesVisible := false
 global OffflowPreviewY := 0
 global OffflowPreviewMaxHeight := 0
 global OffflowContentWidth := 0
-global OffflowCopyButton := ""
+global OffflowCopyBodyButton := ""
+global OffflowCopyReferenceButton := ""
 global OffflowStatus := ""
 global OffflowPromptKeys := []
 global OffflowPromptNames := []
@@ -46,7 +47,7 @@ ToggleOffflowPanel(*) {
 CreateOffflowPanel() {
     global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText
     global OffflowReferenceLabel, OffflowReferenceList, OffflowPreviewY, OffflowPreviewMaxHeight, OffflowContentWidth
-    global OffflowCopyButton, OffflowStatus
+    global OffflowCopyBodyButton, OffflowCopyReferenceButton, OffflowStatus
 
     area := GetOffflowWorkArea()
     OffflowGui := Gui("+AlwaysOnTop +ToolWindow -Caption", "流程外提示词")
@@ -104,11 +105,13 @@ CreateOffflowPanel() {
     DisableListHeaderSort(OffflowReferenceList)
     OffflowReferenceList.OnEvent("DoubleClick", OnOffflowReferenceDoubleClick)
 
-    OffflowCopyButton := OffflowGui.AddButton("x12 y" bottomY " w88 h28", "复制")
-    OffflowCopyButton.OnEvent("Click", CopyOffflowPrompt)
+    OffflowCopyBodyButton := OffflowGui.AddButton("x12 y" bottomY " w88 h28", "复制正文")
+    OffflowCopyBodyButton.OnEvent("Click", CopyOffflowBody)
+    OffflowCopyReferenceButton := OffflowGui.AddButton("x104 y" bottomY " w88 h28", "复制引用")
+    OffflowCopyReferenceButton.OnEvent("Click", CopyOffflowPromptReference)
     closeButton := OffflowGui.AddButton("x" width - 100 " y" bottomY " w88 h28", "关闭")
     closeButton.OnEvent("Click", CloseOffflowPanel)
-    OffflowStatus := OffflowGui.AddText("x112 y" bottomY + 5 " w" width - 224 " h20 cGray", "")
+    OffflowStatus := OffflowGui.AddText("x200 y" bottomY + 5 " w" width - 308 " h20 cGray", "")
 
     OffflowGui.Show("x" x " y" y " w" width " h" height)
     ClearOffflowReferences()
@@ -117,6 +120,7 @@ CreateOffflowPanel() {
 
 RefreshOffflowPanel() {
     global OffflowGui, OffflowList, OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
+    global OffflowCopyBodyButton, OffflowCopyReferenceButton
 
     if !GuiAlive(OffflowGui) {
         return
@@ -148,7 +152,8 @@ RefreshOffflowPanel() {
         return
     }
 
-    OffflowCopyButton.Enabled := true
+    OffflowCopyBodyButton.Enabled := true
+    OffflowCopyReferenceButton.Enabled := true
     OffflowList.Modify(1, "Select Focus")
     UpdateOffflowPreview()
 }
@@ -160,7 +165,7 @@ OnOffflowPromptSelect(ctrl, item, selected) {
 }
 
 UpdateOffflowPreview() {
-    global OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
+    global OffflowList, OffflowPreview, OffflowPurposeText, OffflowCopyBodyButton, OffflowCopyReferenceButton, OffflowStatus
     global OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
     global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
@@ -175,7 +180,8 @@ UpdateOffflowPreview() {
     OffflowPurposeText.Value := ""
     ClearOffflowReferences()
     OffflowRenderedBody := ""
-    OffflowCopyButton.Enabled := false
+    OffflowCopyBodyButton.Enabled := false
+    OffflowCopyReferenceButton.Enabled := false
     OffflowStatus.Text := ""
 
     try {
@@ -185,7 +191,8 @@ UpdateOffflowPreview() {
         SendMessage(0x00B1, 0, 0, OffflowPurposeText.Hwnd)
         SendMessage(0x00B1, 0, 0, OffflowPreview.Hwnd)
         RefreshOffflowReferences(OffflowCurrentKey)
-        OffflowCopyButton.Enabled := true
+        OffflowCopyBodyButton.Enabled := true
+        OffflowCopyReferenceButton.Enabled := true
     } catch as e {
         OffflowCurrentKey := ""
         OffflowPreview.Value := "预览失败：" e.Message
@@ -196,11 +203,11 @@ UpdateOffflowPreview() {
 OnOffflowPromptDoubleClick(ctrl, row, *) {
     global OffflowPromptKeys
     if row > 0 && row <= OffflowPromptKeys.Length {
-        CopyOffflowPrompt()
+        CopyOffflowBody()
     }
 }
 
-CopyOffflowPrompt(*) {
+CopyOffflowBody(*) {
     global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody, OffflowStatus
 
     if OffflowCurrentKey = "" {
@@ -209,14 +216,29 @@ CopyOffflowPrompt(*) {
 
     try {
         A_Clipboard := OffflowRenderedBody
-        OffflowStatus.Text := "已复制：" OffflowCurrentName
+        OffflowStatus.Text := "已复制正文：" OffflowCurrentName
     } catch as e {
-        OffflowStatus.Text := "复制失败：" e.Message
+        OffflowStatus.Text := "正文复制失败：" e.Message
+    }
+}
+
+CopyOffflowPromptReference(*) {
+    global OffflowCurrentKey, OffflowCurrentName, OffflowStatus
+
+    if OffflowCurrentKey = "" {
+        return
+    }
+
+    try {
+        OffflowPromptReferenceCopy.Copy(OffflowCurrentKey)
+        OffflowStatus.Text := "已复制引用：" OffflowCurrentName
+    } catch as e {
+        OffflowStatus.Text := "引用复制失败：" e.Message
     }
 }
 
 ClearOffflowSelection(message := "") {
-    global OffflowPreview, OffflowPurposeText, OffflowCopyButton, OffflowStatus
+    global OffflowPreview, OffflowPurposeText, OffflowCopyBodyButton, OffflowCopyReferenceButton, OffflowStatus
     global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
     OffflowCurrentKey := ""
@@ -226,7 +248,8 @@ ClearOffflowSelection(message := "") {
     OffflowPurposeText.Value := ""
     OffflowPreview.Value := message
     OffflowStatus.Text := message
-    OffflowCopyButton.Enabled := false
+    OffflowCopyBodyButton.Enabled := false
+    OffflowCopyReferenceButton.Enabled := false
 }
 
 RefreshOffflowReferences(key) {
@@ -314,7 +337,7 @@ CloseOffflowPanel(*) {
     global OffflowGui, OffflowList, OffflowPreview, OffflowPurposeText
     global OffflowReferenceLabel, OffflowReferenceList, OffflowReferencePaths, OffflowReferenceHasBody
     global OffflowReferencesVisible, OffflowPreviewY, OffflowPreviewMaxHeight, OffflowContentWidth
-    global OffflowCopyButton, OffflowStatus
+    global OffflowCopyBodyButton, OffflowCopyReferenceButton, OffflowStatus
     global OffflowPromptKeys, OffflowPromptNames, OffflowPromptPurposes
     global OffflowCurrentKey, OffflowCurrentName, OffflowRenderedBody
 
@@ -333,7 +356,8 @@ CloseOffflowPanel(*) {
     OffflowPreviewY := 0
     OffflowPreviewMaxHeight := 0
     OffflowContentWidth := 0
-    OffflowCopyButton := ""
+    OffflowCopyBodyButton := ""
+    OffflowCopyReferenceButton := ""
     OffflowStatus := ""
     OffflowPromptKeys := []
     OffflowPromptNames := []

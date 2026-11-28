@@ -78,13 +78,49 @@ class OffflowValidator {
     ; 判全部（含缺 meta.json 的目录）
     static CheckAll() {
         problems := []
+        templateProblems := this.CheckReferenceCopyTemplate()
+        for p in templateProblems {
+            problems.Push(p)
+        }
+        canBuildReference := templateProblems.Length = 0
+        sharedBuildFailed := false
+
         for dir in OffflowRepository.ListAllDirs() {
             SplitPath(dir, &key)
-            for p in this.Check(key) {
+            itemProblems := this.Check(key)
+            for p in itemProblems {
                 problems.Push(p)
+            }
+            if itemProblems.Length > 0 || !canBuildReference || sharedBuildFailed {
+                continue
+            }
+            try {
+                OffflowPromptReferenceCopy.Build(key)
+            } catch as e {
+                if InStr(e.Message, "公共提示词") = 1 {
+                    problems.Push("共享 / prompt_reference_copy.txt / " e.Message)
+                    sharedBuildFailed := true
+                } else {
+                    problems.Push(key " / prompt_reference_copy.txt / " e.Message)
+                }
             }
         }
         return problems
+    }
+
+    static CheckReferenceCopyTemplate() {
+        path := OffflowPromptReferenceCopy.TemplatePath
+        if !FileExist(path) {
+            return ["共享 / prompt_reference_copy.txt / 不存在"]
+        }
+        try {
+            if Trim(FileRead(path, "UTF-8")) = "" {
+                return ["共享 / prompt_reference_copy.txt / 为空"]
+            }
+        } catch as e {
+            return ["共享 / prompt_reference_copy.txt / 无法读取：" e.Message]
+        }
+        return []
     }
 
     ; 条数（报告用）

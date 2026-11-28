@@ -28,6 +28,7 @@ global gPromptMarker := ".offlow-prompts"   ; 成品目录归属标记：没有�
 #Include %A_ScriptDir%\..\modules\offflow\definition\OffflowPrompt.ahk
 #Include %A_ScriptDir%\..\modules\offflow\definition\OffflowReference.ahk
 #Include %A_ScriptDir%\..\modules\offflow\repository\OffflowRepository.ahk
+#Include %A_ScriptDir%\..\modules\offflow\action\OffflowPromptReferenceCopy.ahk
 #Include %A_ScriptDir%\..\modules\offflow\validation\OffflowValidator.ahk
 
 ; ---- 输出目录 ----

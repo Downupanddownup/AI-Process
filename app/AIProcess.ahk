@@ -21,6 +21,7 @@ global LibDir := AppRoot "\lib"
 #Include %A_ScriptDir%\modules\offflow\definition\OffflowPrompt.ahk
 #Include %A_ScriptDir%\modules\offflow\definition\OffflowReference.ahk
 #Include %A_ScriptDir%\modules\offflow\repository\OffflowRepository.ahk
+#Include %A_ScriptDir%\modules\offflow\action\OffflowPromptReferenceCopy.ahk
 #Include %A_ScriptDir%\modules\ui\TrayManager.ahk
 #Include %A_ScriptDir%\modules\ui\PromptLabels.ahk
 #Include %A_ScriptDir%\modules\ui\OffflowPanel.ahk
